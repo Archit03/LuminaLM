@@ -1,4 +1,4 @@
-import torch
+import torch 
 from tokenizers import Tokenizer
 from Transformer import model  # Ensure this is the correct import from your model file
 from sklearn.decomposition import PCA
@@ -133,18 +133,12 @@ umap_model = umap.UMAP(n_components=3, random_state=42)
 reduced_embeddings_umap = umap_model.fit_transform(reduced_embeddings)
 print(reduced_embeddings_umap)
 
-num_top_pairs = 5
-similar_pairs = np.dstack(np.unravel_index(np.argsort(-cos_sim_matrix.ravel()), cos_sim_matrix.shape))[0]
-print(f'Top {num_top_pairs} most similar pairs of embeddings (index-based):')
-for idx in range(num_top_pairs):
-    print(f'Pair {idx+1}: Embedding {similar_pairs[idx][0]} and Embedding {similar_pairs[idx][1]} with similarity {cos_sim_matrix[similar_pairs[idx][0], similar_pairs[idx][1]]:.4f}')
-
 """
 # 3D Plotting
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 
-# Plot the 3D reduced embeddings
+Plot the 3D reduced embeddings
 ax.scatter(reduced_embeddings_umap[:, 0], reduced_embeddings_umap[:, 1], reduced_embeddings_umap[:, 2])
 ax.set_title('3D UMAP of Embeddings')
 ax.set_xlabel('Component 1')
@@ -153,3 +147,27 @@ ax.set_zlabel('Component 3')
 
 plt.show()
 """
+
+# ----------------------------------------------
+# Cosine Similarity Calculation
+# ----------------------------------------------
+print("Calculating cosine similarities...")
+
+# Calculate the cosine similarity between embeddings
+cos_sim_matrix = cosine_similarity(embedding_np)
+
+"""
+Let's visualize a small section of the cosine similarity matrix
+import seaborn as sns
+plt.figure(figsize=(10, 7))
+sns.heatmap(cos_sim_matrix[:50, :50], cmap='coolwarm', annot=False)  # Plot only a 50x50 section for visualization
+plt.title('Cosine Similarity Heatmap of Embeddings')
+plt.show()
+"""
+
+# Identify the top 5 most similar pairs of embeddings based on cosine similarity
+num_top_pairs = 5
+similar_pairs = np.dstack(np.unravel_index(np.argsort(-cos_sim_matrix.ravel()), cos_sim_matrix.shape))[0]
+print(f'Top {num_top_pairs} most similar pairs of embeddings (index-based):')
+for idx in range(num_top_pairs):
+    print(f'Pair {idx+1}: Embedding {similar_pairs[idx][0]} and Embedding {similar_pairs[idx][1]} with similarity {cos_sim_matrix[similar_pairs[idx][0], similar_pairs[idx][1]]:.4f}')
