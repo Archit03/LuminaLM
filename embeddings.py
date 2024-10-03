@@ -20,7 +20,7 @@ tokenizer = Tokenizer.from_file("bpe_token.json")
 
 # Initialize the transformer model
 d_model = 512  # embedding dimension
-src_leq_len = 64  # Maximum sequence length per batch
+src_leq_len = 1064  # Maximum sequence length per batch
 src_vocab_size = len(tokenizer.get_vocab())  # vocab size from the BPE tokenizer
 tgt_vocab_size = src_vocab_size  # assuming you want the same vocab size for target
 
