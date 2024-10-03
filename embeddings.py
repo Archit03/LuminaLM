@@ -85,18 +85,27 @@ distance_matrix_pca = squareform(distances_pca)
 print("Pairwise distances for PCA-reduced embeddings calculated.")
 
 # ----------------------------------------------
-# Option 3: Batch Processing for Distance Calculation
+# Option 3: Batch Processing for Distance Calculation with Handling Last Batch
 # ----------------------------------------------
 def batch_pdist(embeddings, batch_size):
-    num_batches = len(embeddings) // batch_size + (1 if len(embeddings) % batch_size != 0 else 0)
+    num_batches = len(embeddings) // batch_size
+    remainder = len(embeddings) % batch_size
     distance_matrices = []
 
+    # Process full-size batches
     for i in range(num_batches):
         batch_embeddings = embeddings[i * batch_size:(i + 1) * batch_size]
         distances = pdist(batch_embeddings)  # Calculate pairwise distances within the batch
         distance_matrices.append(squareform(distances))
 
-    return np.concatenate(distance_matrices, axis=0)
+    # Process the last batch (remainder)
+    if remainder > 0:
+        last_batch_embeddings = embeddings[num_batches * batch_size:]
+        distances = pdist(last_batch_embeddings)  # Calculate pairwise distances for the smaller batch
+        distance_matrices.append(squareform(distances))
+
+    # Concatenate the distance matrices without dimension mismatch
+    return np.block(distance_matrices)
 
 batch_size = 1024  # Smaller batch size for processing
 distance_matrix_batch = batch_pdist(all_embeddings_tensor.numpy(), batch_size=batch_size)
