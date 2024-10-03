@@ -130,7 +130,7 @@ print("Applying UMAP for visualization...")
 umap_model = umap.UMAP(n_components=3, random_state=42)
 reduced_embeddings_umap = umap_model.fit_transform(reduced_embeddings)
 
-%matplotlib inline
+
 # 3D Plotting
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
