@@ -1,9 +1,7 @@
 import torch
 from tokenizers import Tokenizer
 from Transformer import model  # Ensure this is the correct import from your model file
-from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
-from sklearn.metrics.pairwise import euclidean_distances
 from scipy.spatial.distance import pdist, squareform
 import umap
 import numpy as np
@@ -52,11 +50,17 @@ for batch in input_ids_batches:
     # Collect embeddings for this batch
     all_embeddings.append(embeddings.squeeze(0).detach())
 
+    # Print embeddings for this batch
+    print("Embeddings for the current batch:\n", embeddings.squeeze(0).detach().numpy())
+
 # Concatenate all batch embeddings into a single tensor
 all_embeddings_tensor = torch.cat(all_embeddings, dim=0)
 
 # Convert the embeddings tensor to numpy for further processing
 embedding_np = all_embeddings_tensor.numpy()
+
+# Print all embeddings
+print("All Embeddings:\n", embedding_np)
 
 # ----------------------------------------------
 # Option 1: Downsampled Embeddings (Choose Factor)
@@ -85,9 +89,6 @@ print("Pairwise distances for PCA-reduced embeddings calculated.")
 # ----------------------------------------------
 # Option 3: Batch Processing for Distance Calculation with Handling Last Batch
 # ----------------------------------------------
-import numpy as np
-from scipy.spatial.distance import pdist, squareform
-
 def batch_pdist(embeddings, batch_size):
     num_batches = len(embeddings) // batch_size
     remainder = len(embeddings) % batch_size
@@ -112,13 +113,12 @@ def batch_pdist(embeddings, batch_size):
 
     # Concatenate distance matrices row-wise and column-wise
     combined_matrix = np.block([[distance_matrices[i] for i in range(num_batches)]])
-    
+
     return combined_matrix
 
 # Example usage
 batch_size = 1024  # Adjust according to your needs
 distance_matrix_batch = batch_pdist(all_embeddings_tensor.numpy(), batch_size=batch_size)
-
 print("Batch pairwise distances calculated.")
 
 # ----------------------------------------------
@@ -129,7 +129,6 @@ print("Batch pairwise distances calculated.")
 print("Applying UMAP for visualization...")
 umap_model = umap.UMAP(n_components=3, random_state=42)
 reduced_embeddings_umap = umap_model.fit_transform(reduced_embeddings)
-
 
 # 3D Plotting
 fig = plt.figure()
