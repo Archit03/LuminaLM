@@ -8,7 +8,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # For 3D plotting
 from sklearn.metrics.pairwise import cosine_similarity
-from tqdm import tqdm  # For progress bars
+import seaborn as sns
+from tqdm import tqdm
 
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -19,7 +20,7 @@ tokenizer = Tokenizer.from_file("bpe_token.json")
 
 # Initialize the transformer model
 d_model = 512  # embedding dimension
-src_leq_len = 1064  # Maximum sequence length per batch
+src_leq_len = 64  # Maximum sequence length per batch
 src_vocab_size = len(tokenizer.get_vocab())  # vocab size from the BPE tokenizer
 tgt_vocab_size = src_vocab_size  # assuming you want the same vocab size for target
 
@@ -43,8 +44,8 @@ input_ids_batches = [encoded_input.ids[i:i + batch_size] for i in range(0, len(e
 # Initialize a list to store embeddings for all batches
 all_embeddings = []
 
-# Process each batch independently with progress tracking
-for batch in tqdm(input_ids_batches, desc="Processing batches"):
+# Process each batch independently
+for batch in tqdm(input_ids_batches, desc="Processing Batches"):
     # Ensure the input batch has the correct type and batch dimension and move it to the GPU
     input_ids = torch.tensor([batch], dtype=torch.long).to(device)
 
@@ -71,10 +72,10 @@ print("All Embeddings:\n", embedding_np)
 downsample_factor = 10  # Adjust as needed
 downsampled_embeddings = all_embeddings_tensor[::downsample_factor]
 
-# Now calculate pairwise distances on the downsampled embeddings with progress tracking
+# Now calculate pairwise distances on the downsampled embeddings
 print("Calculating distances for downsampled embeddings...")
 distances = pdist(downsampled_embeddings.numpy())
-distance_matrix = squareform(tqdm(distances, desc="Calculating distances"))
+distance_matrix = squareform(distances)
 print("Pairwise distances for downsampled embeddings calculated.", distance_matrix)
 
 # ----------------------------------------------
@@ -91,74 +92,42 @@ distance_matrix_pca = squareform(distances_pca)
 print("Pairwise distances for PCA-reduced embeddings calculated.", distance_matrix_pca)
 
 # ----------------------------------------------
-# Option 3: Batch Processing for Distance Calculation with Progress Bar
-# ----------------------------------------------
-def batch_pdist(embeddings, batch_size):
-    num_batches = len(embeddings) // batch_size
-    remainder = len(embeddings) % batch_size
-    distance_matrices = []
-
-    # Process full-size batches with progress bar
-    for i in tqdm(range(num_batches), desc="Processing batches for distance calculation"):
-        batch_embeddings = embeddings[i * batch_size:(i + 1) * batch_size]
-        distances = pdist(batch_embeddings)  # Calculate pairwise distances within the batch
-        distance_matrix = squareform(distances)
-        distance_matrices.append(distance_matrix)
-
-    # Process the last batch (remainder), if any
-    if remainder > 0:
-        last_batch_embeddings = embeddings[num_batches * batch_size:]
-        distances = pdist(last_batch_embeddings)  # Calculate pairwise distances for the smaller batch
-        distance_matrix = squareform(distances)
-        # Pad the smaller matrix to match the shape of the larger ones
-        padded_matrix = np.zeros((batch_size, batch_size))
-        padded_matrix[:remainder, :remainder] = distance_matrix
-        distance_matrices.append(padded_matrix)
-
-    # Concatenate distance matrices row-wise and column-wise
-    combined_matrix = np.block([[distance_matrices[i] for i in range(num_batches)]])
-    
-    return combined_matrix
-
-# Example usage
-batch_size = 1024  # Adjust according to your needs
-distance_matrix_batch = batch_pdist(all_embeddings_tensor.numpy(), batch_size=batch_size)
-print("Batch pairwise distances calculated.", distance_matrix_batch)
-
-# ----------------------------------------------
 # Visualization of Embeddings using UMAP or t-SNE
 # ----------------------------------------------
-
-# Apply UMAP for dimensionality reduction to 3D with progress bar
 print("Applying UMAP for visualization...")
 umap_model = umap.UMAP(n_components=3, random_state=42)
-reduced_embeddings_umap = umap_model.fit_transform(tqdm(reduced_embeddings, desc="UMAP Dimensionality Reduction"))
+reduced_embeddings_umap = umap_model.fit_transform(reduced_embeddings)
 print(reduced_embeddings_umap)
 
-# Uncomment for 3D Plotting if needed
-# fig = plt.figure()
-# ax = fig.add_subplot(111, projection='3d')
-# ax.scatter(reduced_embeddings_umap[:, 0], reduced_embeddings_umap[:, 1], reduced_embeddings_umap[:, 2])
-# ax.set_title('3D UMAP of Embeddings')
-# ax.set_xlabel('Component 1')
-# ax.set_ylabel('Component 2')
-# ax.set_zlabel('Component 3')
-# plt.show()
+# 3D Plotting
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.scatter(reduced_embeddings_umap[:, 0], reduced_embeddings_umap[:, 1], reduced_embeddings_umap[:, 2])
+ax.set_title('3D UMAP of Embeddings')
+ax.set_xlabel('Component 1')
+ax.set_ylabel('Component 2')
+ax.set_zlabel('Component 3')
+
+# Save the 3D UMAP plot
+plt.savefig('umap_3d_embeddings.png')
+plt.show()
 
 # ----------------------------------------------
-# Cosine Similarity Calculation with Progress Bar
+# Cosine Similarity Calculation
 # ----------------------------------------------
 print("Calculating cosine similarities...")
 
 # Calculate the cosine similarity between embeddings
-cos_sim_matrix = cosine_similarity(tqdm(embedding_np, desc="Cosine Similarity Calculation"))
+cos_sim_matrix = cosine_similarity(embedding_np)
 
-# Uncomment for visualizing a small section of the cosine similarity matrix
-# import seaborn as sns
-# plt.figure(figsize=(10, 7))
-# sns.heatmap(cos_sim_matrix[:50, :50], cmap='coolwarm', annot=False)  # Plot only a 50x50 section for visualization
-# plt.title('Cosine Similarity Heatmap of Embeddings')
-# plt.show()
+# Cosine Similarity Heatmap Visualization (small section)
+plt.figure(figsize=(10, 7))
+sns.heatmap(cos_sim_matrix[:50, :50], cmap='coolwarm', annot=False)
+plt.title('Cosine Similarity Heatmap of Embeddings')
+
+# Save the heatmap
+plt.savefig('cosine_similarity_heatmap.png')
+plt.show()
 
 # Identify the top 5 most similar pairs of embeddings based on cosine similarity
 num_top_pairs = 5
