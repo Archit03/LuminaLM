@@ -1,0 +1,8 @@
+torch  # or your preferred version of PyTorch
+transformers  # Hugging Face transformers library
+tokenizers  # For the BPE tokenizer
+scikit-learn  # For t-SNE, PCA, and other machine learning utilities
+umap-learn  # For UMAP dimensionality reduction
+matplotlib
+numpy
+pandas

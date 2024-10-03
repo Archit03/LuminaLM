@@ -2,6 +2,11 @@ import torch
 from tokenizers import Tokenizer
 from Transformer import model  # Ensure this is the correct import from your model file
 from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
+from sklearn.metrics.pairwise import euclidean_distances
+from scipy.spatial.distance import pdist, squareform
+import umap
+import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # For 3D plotting
 
@@ -29,7 +34,7 @@ encoded_input = tokenizer.encode(text)
 
 # Split the tokenized input into batches
 batch_size = 1024  # Define the batch size (equal to src_leq_len)
-input_ids_batches = [encoded_input.ids[i:i+batch_size] for i in range(0, len(encoded_input.ids), batch_size)]
+input_ids_batches = [encoded_input.ids[i:i + batch_size] for i in range(0, len(encoded_input.ids), batch_size)]
 
 # Initialize a list to store embeddings for all batches
 all_embeddings = []
@@ -46,24 +51,74 @@ for batch in input_ids_batches:
 
     # Collect embeddings for this batch
     all_embeddings.append(embeddings.squeeze(0).detach())
+print(all_embeddings)
 
 # Concatenate all batch embeddings into a single tensor
 all_embeddings_tensor = torch.cat(all_embeddings, dim=0)
 
-# Convert the embeddings tensor to numpy for t-SNE
-embedding_np = all_embeddings_tensor.numpy()  # Convert to numpy
+# Convert the embeddings tensor to numpy for further processing
+embedding_np = all_embeddings_tensor.numpy()
 
-# Apply t-SNE for dimensionality reduction to 3D
-tsne = TSNE(n_components=3, random_state=42)
-reduced_embeddings = tsne.fit_transform(embedding_np)
+# ----------------------------------------------
+# Option 1: Downsampled Embeddings (Choose Factor)
+# ----------------------------------------------
+downsample_factor = 10  # Adjust as needed
+downsampled_embeddings = all_embeddings_tensor[::downsample_factor]
+
+# Now calculate pairwise distances on the downsampled embeddings
+print("Calculating distances for downsampled embeddings...")
+distances = pdist(downsampled_embeddings.numpy())
+distance_matrix = squareform(distances)
+
+print("Pairwise distances for downsampled embeddings calculated.")
+
+# ----------------------------------------------
+# Option 2: PCA for Dimensionality Reduction
+# ----------------------------------------------
+print("Reducing dimensionality using PCA...")
+pca = PCA(n_components=10)  # Reducing to 10 dimensions
+reduced_embeddings = pca.fit_transform(embedding_np)
+
+# Calculate pairwise distances on reduced embeddings
+distances_pca = pdist(reduced_embeddings)
+distance_matrix_pca = squareform(distances_pca)
+print("Pairwise distances for PCA-reduced embeddings calculated.")
+
+# ----------------------------------------------
+# Option 3: Batch Processing for Distance Calculation
+# ----------------------------------------------
+def batch_pdist(embeddings, batch_size):
+    num_batches = len(embeddings) // batch_size + (1 if len(embeddings) % batch_size != 0 else 0)
+    distance_matrices = []
+
+    for i in range(num_batches):
+        batch_embeddings = embeddings[i * batch_size:(i + 1) * batch_size]
+        distances = pdist(batch_embeddings)  # Calculate pairwise distances within the batch
+        distance_matrices.append(squareform(distances))
+
+    return np.concatenate(distance_matrices, axis=0)
+
+batch_size = 1024  # Smaller batch size for processing
+distance_matrix_batch = batch_pdist(all_embeddings_tensor.numpy(), batch_size=batch_size)
+
+print("Batch pairwise distances calculated.")
+
+# ----------------------------------------------
+# Visualization of Embeddings using UMAP or t-SNE
+# ----------------------------------------------
+
+# Apply UMAP for dimensionality reduction to 3D
+print("Applying UMAP for visualization...")
+umap_model = umap.UMAP(n_components=3, random_state=42)
+reduced_embeddings_umap = umap_model.fit_transform(reduced_embeddings)
 
 # 3D Plotting
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 
 # Plot the 3D reduced embeddings
-ax.scatter(reduced_embeddings[:, 0], reduced_embeddings[:, 1], reduced_embeddings[:, 2])
-ax.set_title('3D t-SNE of Embeddings')
+ax.scatter(reduced_embeddings_umap[:, 0], reduced_embeddings_umap[:, 1], reduced_embeddings_umap[:, 2])
+ax.set_title('3D UMAP of Embeddings')
 ax.set_xlabel('Component 1')
 ax.set_ylabel('Component 2')
 ax.set_zlabel('Component 3')
