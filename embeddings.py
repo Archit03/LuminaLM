@@ -85,6 +85,9 @@ print("Pairwise distances for PCA-reduced embeddings calculated.")
 # ----------------------------------------------
 # Option 3: Batch Processing for Distance Calculation with Handling Last Batch
 # ----------------------------------------------
+import numpy as np
+from scipy.spatial.distance import pdist, squareform
+
 def batch_pdist(embeddings, batch_size):
     num_batches = len(embeddings) // batch_size
     remainder = len(embeddings) % batch_size
@@ -94,18 +97,26 @@ def batch_pdist(embeddings, batch_size):
     for i in range(num_batches):
         batch_embeddings = embeddings[i * batch_size:(i + 1) * batch_size]
         distances = pdist(batch_embeddings)  # Calculate pairwise distances within the batch
-        distance_matrices.append(squareform(distances))
+        distance_matrix = squareform(distances)
+        distance_matrices.append(distance_matrix)
 
-    # Process the last batch (remainder)
+    # Process the last batch (remainder), if any
     if remainder > 0:
         last_batch_embeddings = embeddings[num_batches * batch_size:]
         distances = pdist(last_batch_embeddings)  # Calculate pairwise distances for the smaller batch
-        distance_matrices.append(squareform(distances))
+        distance_matrix = squareform(distances)
+        # Pad the smaller matrix to match the shape of the larger ones
+        padded_matrix = np.zeros((batch_size, batch_size))
+        padded_matrix[:remainder, :remainder] = distance_matrix
+        distance_matrices.append(padded_matrix)
 
-    # Concatenate the distance matrices without dimension mismatch
-    return np.block(distance_matrices)
+    # Concatenate distance matrices row-wise and column-wise
+    combined_matrix = np.block([[distance_matrices[i] for i in range(num_batches)]])
+    
+    return combined_matrix
 
-batch_size = 1024  # Smaller batch size for processing
+# Example usage
+batch_size = 1024  # Adjust according to your needs
 distance_matrix_batch = batch_pdist(all_embeddings_tensor.numpy(), batch_size=batch_size)
 
 print("Batch pairwise distances calculated.")
