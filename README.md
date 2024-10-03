@@ -15,6 +15,10 @@ Visit the live project at: [Sentient Sculptor](https://www.ellanorai.org)
 - **Medical Text Fine-tuning**: Can be fine-tuned for medical applications, such as generating clinical reports, medical question answering, and research summaries.
 - **User-Friendly Interface**: Provides an easy-to-use interface for inputting prompts and receiving AI-generated responses.
 - **API Integration**: Developers can leverage the Sentient Sculptor API for text generation in their own applications.
+- **Custom Built Embeddings Generators**: This model leverages the Transformers architecture, to genereate embeddings. 
+![Cosine Similarity Heatmap](cosine_similarity_heatmap-1.png)
+![Umap 3d Embeddings](umap_3d_embeddings-1.png)
+
 
 ## Requirements
 
@@ -28,4 +32,5 @@ To get started with **Sentient Sculptor**, ensure you have the following depende
 You can install the required packages using:
 
 ```bash
-pip install torch transformers tqdm
+pip install -r requirements.txt
+```
