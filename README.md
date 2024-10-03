@@ -1,4 +1,4 @@
-# Sentient Sculptor - Custom GPT-based Language Model for Creative and Medical Text Generation
+# Sentient Sculptor - Custom GPT-based Language Model for Medical application
 
 ## Overview
 
