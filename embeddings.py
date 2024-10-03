@@ -7,6 +7,7 @@ import umap
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # For 3D plotting
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Load the BPE tokenizer
 tokenizer = Tokenizer.from_file("bpe_token.json")
@@ -72,7 +73,7 @@ downsampled_embeddings = all_embeddings_tensor[::downsample_factor]
 print("Calculating distances for downsampled embeddings...")
 distances = pdist(downsampled_embeddings.numpy())
 distance_matrix = squareform(distances)
-print("Pairwise distances for downsampled embeddings calculated.")
+print("Pairwise distances for downsampled embeddings calculated.", distance_matrix)
 
 # ----------------------------------------------
 # Option 2: PCA for Dimensionality Reduction
@@ -80,11 +81,12 @@ print("Pairwise distances for downsampled embeddings calculated.")
 print("Reducing dimensionality using PCA...")
 pca = PCA(n_components=10)  # Reducing to 10 dimensions
 reduced_embeddings = pca.fit_transform(embedding_np)
+print(reduced_embeddings)
 
 # Calculate pairwise distances on reduced embeddings
 distances_pca = pdist(reduced_embeddings)
 distance_matrix_pca = squareform(distances_pca)
-print("Pairwise distances for PCA-reduced embeddings calculated.")
+print("Pairwise distances for PCA-reduced embeddings calculated.", distance_matrix_pca)
 
 # ----------------------------------------------
 # Option 3: Batch Processing for Distance Calculation with Handling Last Batch
@@ -119,7 +121,7 @@ def batch_pdist(embeddings, batch_size):
 # Example usage
 batch_size = 1024  # Adjust according to your needs
 distance_matrix_batch = batch_pdist(all_embeddings_tensor.numpy(), batch_size=batch_size)
-print("Batch pairwise distances calculated.")
+print("Batch pairwise distances calculated.", distance_matrix_batch)
 
 # ----------------------------------------------
 # Visualization of Embeddings using UMAP or t-SNE
@@ -129,7 +131,15 @@ print("Batch pairwise distances calculated.")
 print("Applying UMAP for visualization...")
 umap_model = umap.UMAP(n_components=3, random_state=42)
 reduced_embeddings_umap = umap_model.fit_transform(reduced_embeddings)
+print(reduced_embeddings_umap)
 
+num_top_pairs = 5
+similar_pairs = np.dstack(np.unravel_index(np.argsort(-cos_sim_matrix.ravel()), cos_sim_matrix.shape))[0]
+print(f'Top {num_top_pairs} most similar pairs of embeddings (index-based):')
+for idx in range(num_top_pairs):
+    print(f'Pair {idx+1}: Embedding {similar_pairs[idx][0]} and Embedding {similar_pairs[idx][1]} with similarity {cos_sim_matrix[similar_pairs[idx][0], similar_pairs[idx][1]]:.4f}')
+
+"""
 # 3D Plotting
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
@@ -142,3 +152,4 @@ ax.set_ylabel('Component 2')
 ax.set_zlabel('Component 3')
 
 plt.show()
+"""
