@@ -10,17 +10,22 @@ tokenizer = Tokenizer.from_file("bpe_token.json")
 
 # Initialize the transformer model
 d_model = 512  # embedding dimension
+
+# Set src_leq_len to handle the larger input size (84985 tokens in this case)
+src_leq_len = 84985  # Updated sequence length to match your input
 src_vocab_size = len(tokenizer.get_vocab())  # vocab size from the BPE tokenizer
 tgt_vocab_size = src_vocab_size  # assuming you want the same vocab size for target
 
-# Build transformer model
-transformer_model = model.build_transformer(src_vocab_size, tgt_vocab_size, src_leq_len=1024, tgt_seq_len=1024, d_model=d_model)
+# Build transformer model with larger sequence length
+transformer_model = model.build_transformer(src_vocab_size, tgt_vocab_size, src_leq_len=src_leq_len, tgt_seq_len=src_leq_len, d_model=d_model)
 
 # Set model to evaluation mode (no gradient tracking needed for inference)
 transformer_model.eval()
 
 # Read input text from a file
-text = "This is a big deal! We have our own embeddings generator. Now, lets kick some ass at OpenAI."
+with open("ACS_CA3_Book.txt", "r", encoding="utf-8") as f:
+    text = f.read()
+
 # Tokenize the input using the BPE tokenizer
 encoded_input = tokenizer.encode(text)
 

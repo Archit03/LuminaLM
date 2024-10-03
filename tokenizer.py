@@ -11,7 +11,7 @@ tokenizer.pre_tokenizer = Whitespace()
 
 # Train the tokenizer on your dataset
 trainer = BpeTrainer(vocab_size=199997, special_tokens=["<pad>", "<unk>", "<s>", "</s>"])
-files = ["data.txt", "healthcare_dataset.csv"]  # Path to your dataset
+files = ["data.txt", "healthcare_dataset.csv", "ACS_CA3_Book.txt"]  # Path to your dataset
 tokenizer.train(files, trainer)
 
 # Save the tokenizer
