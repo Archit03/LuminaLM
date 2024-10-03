@@ -6,3 +6,4 @@ umap-learn  # For UMAP dimensionality reduction
 matplotlib
 numpy
 pandas
+seaborn
