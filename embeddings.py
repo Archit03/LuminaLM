@@ -51,7 +51,6 @@ for batch in input_ids_batches:
 
     # Collect embeddings for this batch
     all_embeddings.append(embeddings.squeeze(0).detach())
-print(all_embeddings)
 
 # Concatenate all batch embeddings into a single tensor
 all_embeddings_tensor = torch.cat(all_embeddings, dim=0)
@@ -69,7 +68,6 @@ downsampled_embeddings = all_embeddings_tensor[::downsample_factor]
 print("Calculating distances for downsampled embeddings...")
 distances = pdist(downsampled_embeddings.numpy())
 distance_matrix = squareform(distances)
-
 print("Pairwise distances for downsampled embeddings calculated.")
 
 # ----------------------------------------------
