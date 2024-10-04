@@ -130,8 +130,35 @@ plt.savefig('cosine_similarity_heatmap.png')
 plt.show()
 
 # Identify the top 5 most similar pairs of embeddings based on cosine similarity
-num_top_pairs = 5
-similar_pairs = np.dstack(np.unravel_index(np.argsort(-cos_sim_matrix.ravel()), cos_sim_matrix.shape))[0]
-print(f'Top {num_top_pairs} most similar pairs of embeddings (index-based):')
-for idx in range(num_top_pairs):
-    print(f'Pair {idx+1}: Embedding {similar_pairs[idx][0]} and Embedding {similar_pairs[idx][1]} with similarity {cos_sim_matrix[similar_pairs[idx][0], similar_pairs[idx][1]]:.4f}')
+def find_top_similar_pairs(cos_sim_matrix, num_top_pairs=5):
+    # Get the indices of the matrix but ignore self-similarity (i.e., where indices are the same)
+    num_embeddings = cos_sim_matrix.shape[0]
+    
+    # Create a mask to ignore diagonal elements (self-similarity)
+    mask = np.ones(cos_sim_matrix.shape, dtype=bool)
+    np.fill_diagonal(mask, 0)
+
+    # Extract the valid similarities (ignoring diagonal elements)
+    filtered_similarities = cos_sim_matrix[mask]
+
+    # Get the top N most similar pairs from the filtered similarities
+    sorted_indices = np.argsort(-filtered_similarities)[:num_top_pairs]
+
+    # Recreate indices from the flattened upper triangle part of the similarity matrix
+    row_indices, col_indices = np.triu_indices(num_embeddings, k=1)
+    
+    top_pairs = []
+    for i in sorted_indices:
+        r, c = row_indices[i], col_indices[i]
+        similarity = cos_sim_matrix[r, c]
+        top_pairs.append((r, c, similarity))
+
+    return top_pairs
+
+# Call the function to get the top 5 pairs
+top_similar_pairs = find_top_similar_pairs(cos_sim_matrix, num_top_pairs=5)
+
+# Print the top similar pairs
+print(f"Top {len(top_similar_pairs)} most similar pairs of embeddings (index-based):")
+for idx, (i, j, sim) in enumerate(top_similar_pairs):
+    print(f'Pair {idx+1}: Embedding {i} and Embedding {j} with similarity {sim:.4f}')
