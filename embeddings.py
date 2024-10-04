@@ -31,8 +31,15 @@ transformer_model = model.build_transformer(src_vocab_size, tgt_vocab_size, src_
 transformer_model.eval()
 
 # Read input text from a file
-with open(["ACS_CA3_Book.txt", "Genomes_3 - T.A. Brown_.txt", "index.txt", "data.txt"], "r", encoding="utf-8") as f:
-    text = f.read()
+file_list = ["ACS_CA3_Book.txt", "Genomes_3 - T.A. Brown_.txt", "index.txt", "data.txt"]
+text = ""
+
+for file_name in file_list:
+    with open(file_name, "r", encoding="utf-8") as f:
+        text += f.read()  # Concatenate the content of each file
+
+# Proceed with tokenizing the concatenated text
+encoded_input = tokenizer.encode(text)
 
 # Tokenize the entire input text using the BPE tokenizer
 encoded_input = tokenizer.encode(text)
@@ -150,14 +157,17 @@ def find_top_similar_pairs(cos_sim_matrix, num_top_pairs=5):
 
     # Recreate indices from the flattened upper triangle part of the similarity matrix
     row_indices, col_indices = np.triu_indices(num_embeddings, k=1)
-    
+
+    # Adjust for the length of sorted_indices to avoid out-of-bound errors
     top_pairs = []
     for i in sorted_indices:
-        r, c = row_indices[i], col_indices[i]
-        similarity = cos_sim_matrix[r, c]
-        top_pairs.append((r, c, similarity))
+        if i < len(row_indices):
+            r, c = row_indices[i], col_indices[i]
+            similarity = cos_sim_matrix[r, c]
+            top_pairs.append((r, c, similarity))
 
     return top_pairs
+
 
 # Call the function to get the top 5 pairs
 top_similar_pairs = find_top_similar_pairs(cos_sim_matrix, num_top_pairs=5)
