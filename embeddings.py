@@ -1,4 +1,4 @@
-import torch 
+import torch
 from tokenizers import Tokenizer
 from Transformer import model  # Ensure this is the correct import from your model file
 from sklearn.decomposition import PCA
@@ -99,17 +99,19 @@ umap_model = umap.UMAP(n_components=3, random_state=42)
 reduced_embeddings_umap = umap_model.fit_transform(reduced_embeddings)
 print(reduced_embeddings_umap)
 
-# 3D Plotting
-fig = plt.figure()
+# 3D Plotting with larger figure size and higher resolution
+fig = plt.figure(figsize=(12, 9))  # Set a larger figure size
 ax = fig.add_subplot(111, projection='3d')
 ax.scatter(reduced_embeddings_umap[:, 0], reduced_embeddings_umap[:, 1], reduced_embeddings_umap[:, 2])
-ax.set_title('3D UMAP of Embeddings')
-ax.set_xlabel('Component 1')
-ax.set_ylabel('Component 2')
-ax.set_zlabel('Component 3')
 
-# Save the 3D UMAP plot
-plt.savefig('umap_3d_embeddings.png', dpi=3000)
+# Set detailed labels and title
+ax.set_title('3D UMAP of Embeddings', fontsize=16)
+ax.set_xlabel('Component 1', fontsize=12)
+ax.set_ylabel('Component 2', fontsize=12)
+ax.set_zlabel('Component 3', fontsize=12)
+
+# Save the 3D UMAP plot with very high resolution (dpi=3000)
+plt.savefig('umap_3d_embeddings_high_res.png', dpi=3000, bbox_inches='tight')
 plt.show()
 
 # ----------------------------------------------
@@ -120,16 +122,18 @@ print("Calculating cosine similarities...")
 # Calculate the cosine similarity between embeddings
 cos_sim_matrix = cosine_similarity(embedding_np)
 
-# Cosine Similarity Heatmap Visualization (small section)
-plt.figure(figsize=(10, 7))
-sns.heatmap(cos_sim_matrix[:50, :50], cmap='coolwarm', annot=False)
-plt.title('Cosine Similarity Heatmap of Embeddings')
+# Cosine Similarity Heatmap Visualization with larger figure size for better clarity
+plt.figure(figsize=(12, 9))  # Set a larger figure size
+sns.heatmap(cos_sim_matrix[:50, :50], cmap='coolwarm', annot=False, cbar_kws={'shrink': 0.8})
 
-# Save the heatmap
-plt.savefig('cosine_similarity_heatmap.png', dpi=3000)
+# Add title and save the heatmap with higher resolution
+plt.title('Cosine Similarity Heatmap of Embeddings', fontsize=16)
+plt.savefig('cosine_similarity_heatmap_high_res.png', dpi=3000, bbox_inches='tight')
 plt.show()
 
+# ----------------------------------------------
 # Identify the top 5 most similar pairs of embeddings based on cosine similarity
+# ----------------------------------------------
 def find_top_similar_pairs(cos_sim_matrix, num_top_pairs=5):
     # Get the indices of the matrix but ignore self-similarity (i.e., where indices are the same)
     num_embeddings = cos_sim_matrix.shape[0]
