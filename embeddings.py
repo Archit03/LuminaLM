@@ -100,18 +100,18 @@ reduced_embeddings_umap = umap_model.fit_transform(reduced_embeddings)
 print(reduced_embeddings_umap)
 
 # 3D Plotting with larger figure size and higher resolution
-fig = plt.figure(figsize=(12, 9))  # Set a larger figure size
+fig = plt.figure(figsize=(14, 10))  # Set a larger figure size
 ax = fig.add_subplot(111, projection='3d')
 ax.scatter(reduced_embeddings_umap[:, 0], reduced_embeddings_umap[:, 1], reduced_embeddings_umap[:, 2])
 
 # Set detailed labels and title
-ax.set_title('3D UMAP of Embeddings', fontsize=16)
-ax.set_xlabel('Component 1', fontsize=12)
-ax.set_ylabel('Component 2', fontsize=12)
-ax.set_zlabel('Component 3', fontsize=12)
+ax.set_title('3D UMAP of Embeddings', fontsize=20)
+ax.set_xlabel('Component 1', fontsize=14)
+ax.set_ylabel('Component 2', fontsize=14)
+ax.set_zlabel('Component 3', fontsize=14)
 
 # Save the 3D UMAP plot with very high resolution (dpi=3000)
-plt.savefig('umap_3d_embeddings_high_res.png', dpi=3000, bbox_inches='tight')
+plt.savefig('umap_3d_embeddings_high_res.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 # ----------------------------------------------
@@ -123,12 +123,12 @@ print("Calculating cosine similarities...")
 cos_sim_matrix = cosine_similarity(embedding_np)
 
 # Cosine Similarity Heatmap Visualization with larger figure size for better clarity
-plt.figure(figsize=(12, 9))  # Set a larger figure size
+plt.figure(figsize=(14, 10))  # Set a larger figure size
 sns.heatmap(cos_sim_matrix[:50, :50], cmap='coolwarm', annot=False, cbar_kws={'shrink': 0.8})
 
 # Add title and save the heatmap with higher resolution
-plt.title('Cosine Similarity Heatmap of Embeddings', fontsize=16)
-plt.savefig('cosine_similarity_heatmap_high_res.png', dpi=3000, bbox_inches='tight')
+plt.title('Cosine Similarity Heatmap of Embeddings', fontsize=20)
+plt.savefig('cosine_similarity_heatmap_high_res.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 # ----------------------------------------------
