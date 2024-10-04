@@ -109,7 +109,7 @@ ax.set_ylabel('Component 2')
 ax.set_zlabel('Component 3')
 
 # Save the 3D UMAP plot
-plt.savefig('umap_3d_embeddings.png', dpi=400)
+plt.savefig('umap_3d_embeddings.png', dpi=3000)
 plt.show()
 
 # ----------------------------------------------
@@ -126,7 +126,7 @@ sns.heatmap(cos_sim_matrix[:50, :50], cmap='coolwarm', annot=False)
 plt.title('Cosine Similarity Heatmap of Embeddings')
 
 # Save the heatmap
-plt.savefig('cosine_similarity_heatmap.png', dpi=400)
+plt.savefig('cosine_similarity_heatmap.png', dpi=3000)
 plt.show()
 
 # Identify the top 5 most similar pairs of embeddings based on cosine similarity
