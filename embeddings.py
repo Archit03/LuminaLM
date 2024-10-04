@@ -156,7 +156,7 @@ def find_top_similar_pairs(cos_sim_matrix, num_top_pairs=5):
     return top_pairs
 
 # Call the function to get the top 5 pairs
-top_similar_pairs = find_top_similar_pairs(cos_sim_matrix, num_top_pairs=5)
+top_similar_pairs = find_top_similar_pairs(cos_sim_matrix, num_top_pairs=5).to(device)
 
 # Print the top similar pairs
 print(f"Top {len(top_similar_pairs)} most similar pairs of embeddings (index-based):")
