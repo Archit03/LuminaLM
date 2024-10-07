@@ -2,9 +2,10 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from transformers import AdamW, GPT2Tokenizer
+from transformers import AdamW
+import embeddings  # Assuming custom embeddings logic in embeddings.py
 from tqdm import tqdm
-import tokenizer
+import tokenizer  # Custom tokenizer from tokenizer.py
 
 # Custom Causal Self-Attention Layer
 class CausalSelfAttention(nn.Module):
@@ -70,7 +71,7 @@ class SentientSculptorConfig:
     block_size: int = 1024  # Number of tokens in a sequence
     vocab_size: int = 199997  # Number of tokens in the vocabulary
     n_layer: int = 48  # 12 layers (adjust as needed)
-    n_head: int = 48 # Number of attention heads
+    n_head: int = 48  # Number of attention heads
     n_embd: int = 6144  # Embedding dimension
 
 # Sentient Sculptor Model Class
@@ -78,21 +79,22 @@ class SentientSculptor(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        # Load custom embeddings from embeddings.py
         self.transformer = nn.ModuleDict({
-            'wte': nn.Embedding(config.vocab_size, config.n_embd),
-            'wpe': nn.Embedding(config.block_size, config.n_embd),
+            'wte': embeddings.load_pretrained_embeddings(),  # Load custom embeddings
+            'wpe': nn.Embedding(config.block_size, config.n_embd),  # Positional encodings
             'h': nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
             'ln_f': nn.LayerNorm(config.n_embd),
         })
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
-        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        self.tokenizer = tokenizer.load_tokenizer()  # Load custom tokenizer
 
     def forward(self, input_ids):
         device = input_ids.device
         position_ids = torch.arange(0, input_ids.size(1), dtype=torch.long, device=device)
         position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
 
-        # Get word embeddings
+        # Get word embeddings from embeddings.py
         inputs_embeds = self.transformer.wte(input_ids)
         position_embeds = self.transformer.wpe(position_ids)
         hidden_states = inputs_embeds + position_embeds
@@ -109,24 +111,23 @@ class SentientSculptor(nn.Module):
         return logits
 
     def generate_text(self, prompt, max_length=50):
-        # Tokenize the prompt
-        input_ids = self.tokenizer.encode(prompt, return_tensors='pt')
+        # Tokenize the prompt using the custom tokenizer from tokenizer.py
+        input_ids = self.tokenizer.encode(prompt)
 
-        # Move the input to the correct device if necessary
+        # Convert to tensor and move to the correct device
         device = next(self.parameters()).device
-        input_ids = input_ids.to(device)
+        input_ids = torch.tensor([input_ids], dtype=torch.long).to(device)
 
         # Pass the tokenized input into the model and generate output tokens
-        self.eval()  # Set model to evaluation mode
+        self.eval()
         with torch.no_grad():
             for _ in range(max_length):
-                outputs = self(input_ids)
-                logits = outputs[:, -1, :]
-                next_token = torch.argmax(logits, dim=-1).unsqueeze(0)
-                input_ids = torch.cat([input_ids, next_token], dim=1)
+                logits = self(input_ids)
+                next_token_id = torch.argmax(logits[:, -1, :], dim=-1)
+                input_ids = torch.cat([input_ids, next_token_id.unsqueeze(-1)], dim=1)
 
-        # Decode the generated tokens into text
-        output_text = self.tokenizer.decode(input_ids[0], skip_special_tokens=True)
+        # Decode using your custom tokenizer
+        output_text = self.tokenizer.decode(input_ids[0].tolist())
         return output_text
 
 # Function to count parameters
@@ -144,7 +145,6 @@ print(f'Total number of trainable parameters: {total_params}')
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 model.to(device)
-
 
 # Get user prompt
 prompt = input("Enter a prompt: ")

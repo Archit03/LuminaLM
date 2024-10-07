@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from tokenizers import Tokenizer
 from Transformer import model  # Ensure this is the correct import from your model file
 from sklearn.decomposition import PCA
@@ -176,3 +177,13 @@ top_similar_pairs = find_top_similar_pairs(cos_sim_matrix, num_top_pairs=5)
 print(f"Top {len(top_similar_pairs)} most similar pairs of embeddings (index-based):")
 for idx, (i, j, sim) in enumerate(top_similar_pairs):
     print(f'Pair {idx+1}: Embedding {i} and Embedding {j} with similarity {sim:.4f}')
+
+def load_pretrained_embeddings():
+    # Load the embeddings from the saved file or a pretrained model
+    # Example: Preloaded embeddings as a tensor (replace with your logic)
+    embedding_weights = torch.load("pretrained_embeddings.pt")  # Load from your file
+    vocab_size, embedding_dim = embedding_weights.size()
+
+    # Return the embedding layer
+    embedding_layer = nn.Embedding.from_pretrained(embedding_weights)
+    return embedding_layer
