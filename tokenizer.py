@@ -16,3 +16,8 @@ tokenizer.train(files, trainer)
 
 # Save the tokenizer
 tokenizer.save("bpe_token.json")
+
+
+def load_tokenizer():
+    # Load the tokenizer from the saved BPE model
+    return Tokenizer.from_file("bpe_token.json")
