@@ -32,7 +32,7 @@ transformer_model = model.build_transformer(src_vocab_size, tgt_vocab_size, src_
 transformer_model.eval()
 
 # Read input text from a file
-file_list = ["ACS_CA3_Book.txt", "Genomes_3 - T.A. Brown_.txt", "index.txt", "data.txt"]
+file_list = ["ACS_CA3_Book.txt", "Genomes_3 - T.A. Brown_.txt", "index.txt", "data.txt", "train.txt", "test.txt"]
 text = ""
 
 for file_name in file_list:
