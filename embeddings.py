@@ -35,27 +35,25 @@ transformer_model.eval()
 file_list = ["ACS_CA3_Book.txt", "Genomes_3 - T.A. Brown_.txt", "input.txt", "data.txt", "train.txt", "test.txt"]
 text = ""
 
-# Define the number of total steps
-total_steps = len(file_list) + 1  # +1 for processing batches and downstream tasks
-
-# Initialize a progress bar with tqdm
-with tqdm(total=total_steps, desc="Total Progress", unit="step") as pbar:
+# Initialize progress bar for reading files
+with tqdm(total=len(file_list), desc="Reading Files") as pbar_files:
     for file_name in file_list:
         with open(file_name, "r", encoding="utf-8") as f:
             text += f.read()  # Concatenate the content of each file
-        pbar.update(1)  # Update progress after reading each file
+        pbar_files.update(1)  # Update progress after reading each file
 
-    # Tokenize the concatenated text using the BPE tokenizer
-    encoded_input = tokenizer.encode(text)
+# Tokenize the concatenated text using the BPE tokenizer
+encoded_input = tokenizer.encode(text)
 
-    # Split the tokenized input into batches
-    batch_size = 1024  # Define the batch size (equal to src_leq_len)
-    input_ids_batches = [encoded_input.ids[i:i + batch_size] for i in range(0, len(encoded_input.ids), batch_size)]
+# Split the tokenized input into batches
+batch_size = 1024  # Define the batch size (equal to src_leq_len)
+input_ids_batches = [encoded_input.ids[i:i + batch_size] for i in range(0, len(encoded_input.ids), batch_size)]
 
-    # Initialize a list to store embeddings for all batches
-    all_embeddings = []
+# Initialize a list to store embeddings for all batches
+all_embeddings = []
 
-    # Process each batch independently
+# Process each batch independently with a progress bar
+with tqdm(total=len(input_ids_batches), desc="Processing Batches") as pbar_batches:
     for batch in input_ids_batches:
         # Ensure the input batch has the correct type and batch dimension and move it to the GPU
         input_ids = torch.tensor([batch], dtype=torch.long).to(device)
@@ -67,40 +65,39 @@ with tqdm(total=total_steps, desc="Total Progress", unit="step") as pbar:
 
         # Collect embeddings for this batch
         all_embeddings.append(embeddings.squeeze(0).detach().cpu())  # Move the embeddings to CPU for further processing
+        pbar_batches.update(1)  # Update progress for each batch processed
 
-    # Concatenate all batch embeddings into a single tensor
-    all_embeddings_tensor = torch.cat(all_embeddings, dim=0)
+# Concatenate all batch embeddings into a single tensor
+all_embeddings_tensor = torch.cat(all_embeddings, dim=0)
 
-    # Convert the embeddings tensor to numpy for further processing
-    embedding_np = all_embeddings_tensor.numpy()
+# Convert the embeddings tensor to numpy for further processing
+embedding_np = all_embeddings_tensor.numpy()
 
-    # Calculate distances and apply dimensionality reduction
-    distances = pdist(embedding_np)
-    distance_matrix = squareform(distances)
-
-    # Perform PCA reduction
+# Perform PCA reduction with progress bar
+with tqdm(desc="PCA Reduction", total=1) as pbar_pca:
     pca = PCA(n_components=3)
     reduced_embeddings_pca = pca.fit_transform(embedding_np)
+    pbar_pca.update(1)
 
-    # UMAP Reduction
+# Perform UMAP reduction with progress bar
+with tqdm(desc="UMAP Reduction", total=1) as pbar_umap:
     umap_reducer = umap.UMAP(n_components=3, random_state=42)
     reduced_embeddings_umap = umap_reducer.fit_transform(embedding_np)
+    pbar_umap.update(1)
 
-    # Update progress after all processing
-    pbar.update(1)
+# Plotting
+fig, ax = plt.subplots()
+ax.scatter(reduced_embeddings_umap[:, 0], reduced_embeddings_umap[:, 1], alpha=0.5)
+ax.set_title('UMAP Projection of the Embeddings')
+plt.show()
 
-    # Plotting
-    fig, ax = plt.subplots()
-    ax.scatter(reduced_embeddings_umap[:, 0], reduced_embeddings_umap[:, 1], alpha=0.5)
-    ax.set_title('UMAP Projection of the Embeddings')
-    plt.show()
-
-    # Cosine similarity
+# Calculate cosine similarity with a progress bar
+with tqdm(desc="Calculating Cosine Similarities", total=1) as pbar_cosine:
     cos_sim_matrix = cosine_similarity(embedding_np)
+    pbar_cosine.update(1)
 
-    # Plotting cosine similarity matrix
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(cos_sim_matrix, cmap='viridis', xticklabels=False, yticklabels=False)
-    plt.title('Cosine Similarity Matrix')
-    plt.show()
-
+# Plotting cosine similarity matrix
+plt.figure(figsize=(10, 8))
+sns.heatmap(cos_sim_matrix, cmap='viridis', xticklabels=False, yticklabels=False)
+plt.title('Cosine Similarity Matrix')
+plt.show()
