@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from transformers import AdamW
-import embeddings  # Assuming custom embeddings logic in embeddings.py
+import embeddings  # Custom embeddings logic in embeddings.py
 from tqdm import tqdm
 import tokenizer  # Custom tokenizer from tokenizer.py
 
@@ -78,8 +78,8 @@ class SentientSculptorConfig:
 class SentientSculptor(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.config = config
         # Load custom embeddings from embeddings.py
+        self.config = config
         self.transformer = nn.ModuleDict({
             'wte': embeddings.load_pretrained_embeddings(),  # Load custom embeddings
             'wpe': nn.Embedding(config.block_size, config.n_embd),  # Positional encodings
@@ -130,23 +130,76 @@ class SentientSculptor(nn.Module):
         output_text = self.tokenizer.decode(input_ids[0].tolist())
         return output_text
 
-# Function to count parameters
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+# Custom Dataset Class
+class TextDataset(Dataset):
+    def __init__(self, texts, tokenizer):
+        self.texts = texts
+        self.tokenizer = tokenizer
+
+    def __len__(self):
+        return len(self.texts)
+
+    def __getitem__(self, idx):
+        input_ids = self.tokenizer.encode(self.texts[idx])
+        target_ids = input_ids[1:]  # Next token prediction task
+        return torch.tensor(input_ids[:-1], dtype=torch.long), torch.tensor(target_ids, dtype=torch.long)
+
+
 
 # Example usage with Sentient Sculptor model
-model_config = SentientSculptorConfig()  # Initialize a smaller custom GPT configuration
-model = SentientSculptor(model_config)  # Randomly initialized Sentient Sculptor model
+if __name__ == "__main__":
+    model_config = SentientSculptorConfig()  # Initialize custom GPT configuration
+    model = SentientSculptor(model_config)  # Initialize Sentient Sculptor model
 
-total_params = count_parameters(model)
-print(f'Total number of trainable parameters: {total_params}')
 
-# Set device (CPU or GPU)
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(device)
-model.to(device)
+    # Set device (CPU or GPU)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f'Using device: {device}')
+    model.to(device)
 
-# Get user prompt
-prompt = input("Enter a prompt: ")
-generated_text = model.generate_text(prompt, max_length=50)
-print(generated_text)
+    # Prepare your dataset
+    texts = ["The medical diagnosis reveals a pattern.", "The MRI scan shows abnormal growth."]
+    dataset = TextDataset(texts, model.tokenizer)
+    dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
+
+    # Define loss function and optimizer
+    loss_fn = nn.CrossEntropyLoss()
+    optimizer = AdamW(model.parameters(), lr=1e-4)
+
+    # Training Loop
+    model.train()  # Set the model to training mode
+    epochs = 3  # Number of epochs
+
+    for epoch in range(epochs):
+        loop = tqdm(dataloader, leave=True)
+        for input_ids, target_ids in loop:
+            optimizer.zero_grad()
+
+            input_ids = input_ids.to(device)
+            target_ids = target_ids.to(device)
+
+            # Forward pass
+            outputs = model(input_ids)
+
+            # Shift logits for next-token prediction
+            logits = outputs[..., :-1, :].contiguous()
+            shift_labels = target_ids[..., 1:].contiguous()
+
+            # Calculate loss
+            loss = loss_fn(logits.view(-1, logits.size(-1)), shift_labels.view(-1))
+
+            # Backpropagation
+            loss.backward()
+            optimizer.step()
+
+            loop.set_description(f"Epoch {epoch}")
+            loop.set_postfix(loss=loss.item())
+
+    # Save the trained model
+    torch.save(model.state_dict(), "sentient_sculptor_trained_model.pth")
+
+    # Generate text
+    print(model.eval())  # Set model to eval mode for generation
+    prompt = "The patient exhibits"
+    generated_text = model.generate_text(prompt, max_length=50)
+    print("Generated Text:", generated_text)
