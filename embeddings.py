@@ -1,17 +1,16 @@
 import torch
 import torch.nn as nn
 from tokenizers import Tokenizer
-from Transformer import model  # Ensure this module is correctly defined with build_transformer method
-import numpy as np
+from Transformer import model  # Ensure this is the correct module and function
 from sklearn.decomposition import PCA
 from scipy.spatial.distance import pdist, squareform
 import umap
+import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  # For 3D plotting
 from sklearn.metrics.pairwise import cosine_similarity
 import seaborn as sns
 from tqdm import tqdm
-import numba
-from concurrent.futures import ThreadPoolExecutor
 
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -20,63 +19,84 @@ print(f"Using device: {device}")
 # Load the BPE tokenizer
 tokenizer = Tokenizer.from_file("bpe_token.json")
 
-# Initialize the transformer model with specified configuration
+# Initialize the transformer model
 d_model = 512  # Embedding dimension
 src_leq_len = 1064  # Maximum sequence length per batch
 src_vocab_size = len(tokenizer.get_vocab())  # Vocabulary size from the BPE tokenizer
 tgt_vocab_size = src_vocab_size  # Assuming the same vocab size for target
 
-transformer_model = model.build_transformer(src_vocab_size, tgt_vocab_size, src_leq_len, src_leq_len, d_model).to(device)
+# Build transformer model with manageable sequence length and move it to the GPU
+transformer_model = model.build_transformer(src_vocab_size, tgt_vocab_size, src_leq_len=src_leq_len, tgt_seq_len=src_leq_len, d_model=d_model).to(device)
+
+# Set model to evaluation mode (no gradient tracking needed for inference)
 transformer_model.eval()
 
-# Function to process a single batch and generate embeddings
-def process_batch(batch):
-    input_ids = torch.tensor([batch], dtype=torch.long).to(device)
-    with torch.no_grad():
-        embeddings = transformer_model.encode(input_ids, None)
-    return embeddings.squeeze(0).detach().cpu().numpy()
-
-# Read and tokenize input text from files
+# Read input text from files and concatenate them
 file_list = ["ACS_CA3_Book.txt", "Genomes_3 - T.A. Brown_.txt", "input.txt", "data.txt", "train.txt", "test.txt"]
 text = ""
-for file_name in file_list:
-    with open(file_name, "r", encoding="utf-8") as f:
-        text += f.read()
 
+# Initialize progress bar for reading files
+with tqdm(total=len(file_list), desc="Reading Files") as pbar_files:
+    for file_name in file_list:
+        with open(file_name, "r", encoding="utf-8") as f:
+            text += f.read()  # Concatenate the content of each file
+        pbar_files.update(1)  # Update progress after reading each file
+
+# Tokenize the concatenated text using the BPE tokenizer
 encoded_input = tokenizer.encode(text)
-input_ids_batches = [encoded_input.ids[i:i + src_leq_len] for i in range(0, len(encoded_input.ids), src_leq_len)]
 
-# Use ThreadPoolExecutor to process batches in parallel
-with ThreadPoolExecutor(max_workers=4) as executor:
-    all_embeddings = list(tqdm(executor.map(process_batch, input_ids_batches), total=len(input_ids_batches), desc="Processing Batches"))
+# Split the tokenized input into batches
+batch_size = 1024  # Define the batch size (equal to src_leq_len)
+input_ids_batches = [encoded_input.ids[i:i + batch_size] for i in range(0, len(encoded_input.ids), batch_size)]
 
-# Concatenate all embeddings into a single NumPy array
-embedding_np = np.vstack(all_embeddings)
+# Initialize a list to store embeddings for all batches
+all_embeddings = []
 
-# Optimized Cosine Similarity Calculation using Numba
-@numba.jit(nopython=True, parallel=True)
-def fast_cosine_similarity(data):
-    norms = np.linalg.norm(data, axis=1, keepdims=True)
-    normalized_data = data / norms
-    return np.dot(normalized_data, normalized_data.T)
+# Process each batch independently with a progress bar
+with tqdm(total=len(input_ids_batches), desc="Processing Batches") as pbar_batches:
+    for batch in input_ids_batches:
+        # Ensure the input batch has the correct type and batch dimension and move it to the GPU
+        input_ids = torch.tensor([batch], dtype=torch.long).to(device)
 
-cos_sim_matrix = fast_cosine_similarity(embedding_np)
+        # Generate embeddings from the transformer encoder for this batch
+        with torch.no_grad():
+            src_mask = None  # Optionally set mask for attention
+            embeddings = transformer_model.encode(input_ids, src_mask)
 
-# Perform PCA Reduction
-pca = PCA(n_components=3)
-reduced_embeddings_pca = pca.fit_transform(embedding_np)
+        # Collect embeddings for this batch
+        all_embeddings.append(embeddings.squeeze(0).detach().cpu())  # Move the embeddings to CPU for further processing
+        pbar_batches.update(1)  # Update progress for each batch processed
 
-# Perform UMAP Reduction
-umap_reducer = umap.UMAP(n_components=3, random_state=42)
-reduced_embeddings_umap = umap_reducer.fit_transform(embedding_np)
+# Concatenate all batch embeddings into a single tensor
+all_embeddings_tensor = torch.cat(all_embeddings, dim=0)
 
-# Plotting UMAP results
-plt.figure(figsize=(10, 8))
-plt.scatter(reduced_embeddings_umap[:, 0], reduced_embeddings_umap[:, 1], alpha=0.5)
-plt.title('UMAP Projection of the Embeddings')
+# Convert the embeddings tensor to numpy for further processing
+embedding_np = all_embeddings_tensor.numpy()
+
+# Perform PCA reduction with progress bar
+with tqdm(desc="PCA Reduction", total=1) as pbar_pca:
+    pca = PCA(n_components=3)
+    reduced_embeddings_pca = pca.fit_transform(embedding_np)
+    pbar_pca.update(1)
+
+# Perform UMAP reduction with progress bar
+with tqdm(desc="UMAP Reduction", total=1) as pbar_umap:
+    umap_reducer = umap.UMAP(n_components=3, random_state=42)
+    reduced_embeddings_umap = umap_reducer.fit_transform(embedding_np)
+    pbar_umap.update(1)
+
+# Plotting
+fig, ax = plt.subplots()
+ax.scatter(reduced_embeddings_umap[:, 0], reduced_embeddings_umap[:, 1], alpha=0.5)
+ax.set_title('UMAP Projection of the Embeddings')
 plt.show()
 
-# Plotting Cosine Similarity Matrix
+# Calculate cosine similarity with a progress bar
+with tqdm(desc="Calculating Cosine Similarities", total=1) as pbar_cosine:
+    cos_sim_matrix = cosine_similarity(embedding_np)
+    pbar_cosine.update(1)
+
+# Plotting cosine similarity matrix
 plt.figure(figsize=(10, 8))
 sns.heatmap(cos_sim_matrix, cmap='viridis', xticklabels=False, yticklabels=False)
 plt.title('Cosine Similarity Matrix')
