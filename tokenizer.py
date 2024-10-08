@@ -2,22 +2,30 @@ from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
 from tokenizers.pre_tokenizers import Whitespace
+import os
 
-# Initialize a tokenizer with BPE model
-tokenizer = Tokenizer(BPE())
+def create_tokens(vocab_size=20000, special_tokens=None):
+    if special_tokens is None:
+        special_tokens = ["<pad>", "<unk>", "<s>", "</s>", "<cls>", "<sep>", "<mask>", "<eot>", "<bos>", "<eos>"]
+    tokenizer = Tokenizer(BPE())
+    tokenizer.pre_tokenizer = Whitespace()
+    trainer = BpeTrainer(vocab_size=vocab_size, special_tokens=special_tokens)
+    return tokenizer, trainer
 
-# Configure the tokenizer to split by whitespace
-tokenizer.pre_tokenizer = Whitespace()
+def train_tokenizer(tokenizer, trainer, files):
+    valid_files = [file for file in files if os.path.isfile(file)]
+    if not valid_files:
+        raise ValueError("No valid files found for training.")
+    tokenizer.train(valid_files, trainer)
 
-# Train the tokenizer on your dataset
-trainer = BpeTrainer(vocab_size=199997, special_tokens=["<pad>", "<unk>", "<s>", "</s>"])
-files = ["data.txt", "healthcare_dataset.csv", "ACS_CA3_Book.txt", "Genomes_3 - T.A. Brown_.txt", "train.txt", "test.txt"]  # Path to your dataset
-tokenizer.train(files, trainer)
+def save_tokenizer(tokenizer, path="bpe_token.json"):
+    tokenizer.save(path)
 
-# Save the tokenizer
-tokenizer.save("bpe_token.json")
+def load_tokenizer(path="bpe_token.json"):
+    return Tokenizer.from_file(path)
 
-
-def load_tokenizer():
-    # Load the tokenizer from the saved BPE model
-    return Tokenizer.from_file("bpe_token.json")
+# Example Usage
+files = ["data.txt", "healthcare_dataset.csv", "ACS_CA3_Book.txt", "Genomes_3 - T.A. Brown_.txt", "train.txt", "test.txt"]
+tokenizer, trainer = create_tokens(vocab_size=199997)
+train_tokenizer(tokenizer, trainer, files)
+save_tokenizer(tokenizer)
