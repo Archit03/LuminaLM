@@ -81,7 +81,7 @@ with tqdm(desc="PCA Reduction", total=1) as pbar_pca:
 
 # Perform UMAP reduction with progress bar
 with tqdm(desc="UMAP Reduction", total=1) as pbar_umap:
-    umap_reducer = umap.UMAP(n_components=3, random_state=42)
+    umap_reducer = umap.UMAP(n_components=3, random_state=None)
     reduced_embeddings_umap = umap_reducer.fit_transform(embedding_np)
     pbar_umap.update(1)
 
