@@ -1,11 +1,10 @@
-torch  # or your preferred version of PyTorch
-transformers  # Hugging Face transformers library
-tokenizers  # For the BPE tokenizer
-scikit-learn  # For t-SNE, PCA, and other machine learning utilities
-umap-learn  # For UMAP dimensionality reduction
+torch
+transformers
+tokenizers
+scikit-learn
+umap-learn
 matplotlib
-numpy
+numpy<2
 pandas
 seaborn
-tbb == 2021.13.1 
-seaborn 
+tbb>=2021.6.0
