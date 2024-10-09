@@ -196,7 +196,7 @@ if __name__ == "__main__":
             loop.set_postfix(loss=loss.item())
 
     # Save the trained model
-    torch.save(model.state_dict(), "sentient_sculptor_trained_model.pth")
+    model.load_state_dict(torch.load("sentient_sculptor_trained_model.pth"))
 
     # Generate text
     print(model.eval())  # Set model to eval mode for generation

@@ -7,7 +7,6 @@ from scipy.spatial.distance import pdist, squareform
 import umap
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D  # For 3D plotting
 from sklearn.metrics.pairwise import cosine_similarity
 import seaborn as sns
 from tqdm import tqdm
@@ -45,8 +44,8 @@ with tqdm(total=len(file_list), desc="Reading Files") as pbar_files:
 # Tokenize the concatenated text using the BPE tokenizer
 encoded_input = tokenizer.encode(text)
 
-# Split the tokenized input into batches
-batch_size = 1024  # Define the batch size (equal to src_leq_len)
+# Adjust the batch size to a smaller value
+batch_size = 512  # Reduced batch size (you can decrease further if needed)
 input_ids_batches = [encoded_input.ids[i:i + batch_size] for i in range(0, len(encoded_input.ids), batch_size)]
 
 # Initialize a list to store embeddings for all batches
@@ -81,7 +80,7 @@ with tqdm(desc="PCA Reduction", total=1) as pbar_pca:
 
 # Perform UMAP reduction with progress bar
 with tqdm(desc="UMAP Reduction", total=1) as pbar_umap:
-    umap_reducer = umap.UMAP(n_components=3, random_state=None)
+    umap_reducer = umap.UMAP(n_components=3)
     reduced_embeddings_umap = umap_reducer.fit_transform(embedding_np)
     pbar_umap.update(1)
 
