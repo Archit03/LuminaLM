@@ -7,5 +7,5 @@ matplotlib
 numpy
 pandas
 seaborn
-tbb >= 2021.6.0 
+tbb == 2021.13.1 
 seaborn 
