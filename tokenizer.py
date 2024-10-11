@@ -50,7 +50,7 @@ def load_tokenizer(path="bpe_token.json"):
     return Tokenizer.from_file(path)
 
 # Example Usage
-directory = "Sentient-Sculptor-LLM\\Data"  # Replace with the directory path containing your .txt and .csv files
+directory = "C:\\Users\\LENOVO\\Desktop\\Sentient-Sculptor-LLM\\Data"  # Replace with the directory path containing your .txt and .csv files
 tokenizer, trainer = create_tokens(vocab_size=199997)
 train_tokenizer(tokenizer, trainer, directory)
 save_tokenizer(tokenizer)
