@@ -1,10 +1,7 @@
 import torch
 import torch.nn as nn
-import torch_xla.core.xla_model as xm  # Import for TPU support
-import torch_xla.distributed.parallel_loader as pl
+import torch_xla.core.xla_model as xm  # TPU support
 import torch_xla.utils.utils as xu
-import torch_xla.core.xla_model as xm
-import torch_xla.core.xla_model as xmp
 from tokenizers import Tokenizer
 from Transformer import model  # Ensure this is the correct module and function
 from sklearn.decomposition import PCA
@@ -34,7 +31,7 @@ transformer_model = model.build_transformer(src_vocab_size, tgt_vocab_size, src_
 transformer_model.eval()
 
 # Specify the directory containing the text files
-directory_path = "/content/drive/MyDrive/Sentient-Sculptor-LLM/Data"  # Replace with the path to your directory
+directory_path = "/content/drive/MyDrive/Sentient-Sculptor-LLM/Data"  # Path to your directory
 
 # Read input text from all files in the directory and concatenate them
 text = ""
@@ -89,7 +86,7 @@ with tqdm(desc="UMAP Reduction", total=1) as pbar_umap:
     reduced_embeddings_umap = umap_reducer.fit_transform(embedding_np)
     pbar_umap.update(1)
 
-# Plotting
+# Plotting UMAP projection
 fig, ax = plt.subplots()
 ax.scatter(reduced_embeddings_umap[:, 0], reduced_embeddings_umap[:, 1], alpha=0.5)
 ax.set_title('UMAP Projection of the Embeddings')
