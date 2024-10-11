@@ -8,4 +8,3 @@ numpy<2
 pandas
 seaborn
 tbb == 2021.13.1
-torch-xla
