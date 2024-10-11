@@ -1,0 +1,109 @@
+Title: Thalassemia
+
+
+Thalassemias are inherited blood disorders that result in abnormal hemoglobin.[7] Symptoms depend on the type of thalassemia and can vary from none to severe.[1] Often there is mild to severe anemia (low red blood cells or hemoglobin) as thalassemia can affect the production of red blood cells and also affect how long the red blood cells live.[1] Symptoms of anemia include feeling tired and having pale skin.[1] Other symptoms of thalassemia include bone problems, an enlarged spleen, yellowish skin, pulmonary hypertension, and dark urine.[1] Slow growth may occur in children.[1] Symptoms and presentations of thalassemia can change over time. Older terms included Cooley's anemia and Mediterranean anemia for beta-thalassemia.  These have been superseded by the terms Transfusion-Dependent Thalassemia (TDT) and non-Transfusion-Dependent Thalassemia (NTDT).  Patients with TDT require regular transfusions, typically every two to five weeks.  TDTs include Beta-thalassemia major, nondeletional HbH disease, survived Hb Bart's disease, and severe HbE/beta-thalassemia.[8]
+
+Thalassemias are genetic disorders.[2] There are two main types, alpha thalassemia and beta thalassemia.[7] The severity of alpha and beta thalassemia depends on how many of the four genes for alpha globin or two genes for beta globin are missing.[2] Diagnosis is typically by blood tests including a complete blood count, special hemoglobin tests, and genetic tests.[3] Diagnosis may occur before birth through prenatal testing.[9]
+
+Treatment depends on the type and severity.[4] Treatment for those with more severe disease often includes regular blood transfusions, iron chelation, and folic acid.[4] Iron chelation may be done with deferoxamine, deferasirox or deferiprone.[4][10] Occasionally, a bone marrow transplant may be an option.[4] Complications may include iron overload from the transfusions with resulting heart or liver disease, infections, and osteoporosis.[1] If the spleen becomes overly enlarged, surgical removal may be required.[1] Thalassemia patients who do not respond well to blood transfusions can take hydroxyurea or thalidomide, and sometimes a combination of both.[11] Hydroxyurea is the only FDA approved drug for thalassemia. Patients who took 10 mg/kg of hydroxyurea every day for a year had significantly higher hemoglobin levels, and it was a well-tolerated treatment for patients who did not respond well to blood transfusions.[12] Other known hemoglobin-inducers include thalidomide, but it has not been tested in a clinical setting. The combination of thalidomide and hydroxyurea resulted in hemoglobin levels increasing significantly in transfusion-dependent and non-transfusion dependent patients [13]
+
+As of 2015, thalassemia occurs in about 280 million people, with about 439,000 having severe disease.[14] It is most common among people of Greek, Italian, Middle Eastern, South Asian, and African descent.[7] Males and females have similar rates of disease.[citation needed] It resulted in 16,800 deaths in 2015, down from 36,000 deaths in 1990.[6][15] Those who have minor degrees of thalassemia, in common with those who have sickle-cell trait, have some protection against malaria, explaining why sickle-cell trait and thalassemia are more common in regions of the world where the risk of malaria is higher.[16] An estimated 1/3 of people with thalassemia have "non-transfusion dependent thalassemia" and do not depend on regularly continuing blood transfusions to survive.
+
+Normal human hemoglobins are tetrameric proteins composed of two pairs of globin chains, each of which contains one alpha-like (α-like) chain and one beta-like (β-like) chain. Each globin chain is associated with an iron-containing heme moiety. Throughout life, the synthesis of the alpha-like and the beta-like (also called non-alpha-like) chains is balanced so that their ratio is relatively constant and there is no excess of either type.[23]
+
+The specific alpha and beta-like chains that are incorporated into Hb are highly regulated during development:
+
+Both α- and β-thalassemias are often inherited in an autosomal recessive manner. Cases of dominantly inherited α- and β-thalassemias have been reported, the first of which was in an Irish family with two deletions of 4 and 11 bp in exon 3 interrupted by an insertion of 5 bp in the β-globin gene. For the autosomal recessive forms of the disease, both parents must be carriers for a child to be affected. If both parents carry a hemoglobinopathy trait, the risk is 25% for each pregnancy for an affected child.[27]
+
+The genes involved in thalassemia control the production of healthy hemoglobin. Hemoglobin binds oxygen in the lungs and releases it when the red cells reach peripheral tissues, such as the liver. The binding and release of oxygen by hemoglobin are essential for survival.[citation needed]
+
+Having a single genetic variant for thalassemia may protect against malaria and thus can be an advantage.[28]
+
+People diagnosed with heterozygous (carrier) β-thalassemia have some protection against coronary heart disease.[29]
+
+Normally, the majority of adult hemoglobin (HbA) is composed of four protein chains, two α and two β-globin chains arranged into a heterotetramer. In thalassemia, patients have defects in the noncoding region of either the α or β-globin genes, causing ineffective production of normal alpha- or beta-globin chains, which can lead to ineffective erythropoiesis, premature red blood cell destruction, and anemia.[8]
+
+The thalassemias are classified according to which chain of the hemoglobin molecule is affected. In α-thalassemias, production of the α-globin chain is affected, while in β-thalassemia, production of the β-globin chain is affected.[30]
+
+The β-globin chains are encoded by a single gene on chromosome 11; α-globin chains are encoded by two closely linked genes on chromosome 16.[31] Thus, in a healthy person with two copies of each chromosome, two loci encode the β chain, and four loci encode the α chain. Deletion of one of the α loci has a high prevalence in people of African or Asian descent, making them more likely to develop α-thalassemia. β-thalassemias are not only common in Africans, but also in Greeks and Turks.[citation needed]
+
+The α-thalassemias involve the genes HBA1[32] and HBA2,[33] inherited in a Mendelian recessive fashion. Two gene loci and so four alleles exist. Two genetic loci exist for α-globin, thus four alleles are in diploid cells. Two alleles are maternal and two alleles are paternal in origin. The severity of the α-thalassemias is correlated with the number of affected α-globin; alleles: the greater, the more severe will be the manifestations of the disease.[34] Alpha-thalassemias result in decreased alpha-globin production; therefore, fewer alpha-globin chains are produced, resulting in an excess of β chains in adults and excess γ chains in newborns. The excess β chains form unstable tetramers (called hemoglobin H or HbH of 4 beta chains), which have abnormal oxygen dissociation curves. Alpha thalassemias often are found in people from Southeast Asia, the Middle East, China, and in those of African descent.[35]
+
+Beta thalassemias are due to mutations in the HBB gene on chromosome 11,[36] also inherited in an autosomal, recessive fashion. The severity of the disease depends on the nature of the mutation and on the presence of mutations in one or both alleles.
+Mutated alleles are called β+ when partial function is conserved (either the protein has a reduced function, or it functions normally but is produced in reduced quantity) or βo, when no functioning protein is produced.
+The situation of both alleles determines the clinical picture:
+
+Beta thalassemia most often occurs in people of Mediterranean origin. To a lesser extent, Chinese, other Asians, and African Americans can be affected.[35]
+
+As well as alpha and beta chains present in hemoglobin, about 3% of adult hemoglobin is made of alpha and delta chains. Just as with beta thalassemia, mutations that affect the ability of this gene to produce delta chains can occur.[37][38]
+
+Thalassemia can coexist with other hemoglobinopathies. The most common of these are:
+
+Thalassemia can be diagnosed via a complete blood count, hemoglobin electrophoresis or high-performance liquid chromatography, and DNA testing.[40][41] Hemoglobin electrophoresis is not widely available in developing countries, but the Mentzer index can also be used for diagnosis of thalassemia; it is not a definitive test but it can suggest the possibility of thalassemia. The Mentzer index can be calculated from a complete blood count report.[42]
+
+Endocrine Complications in Thalassemia
+
+1) Hypogonadism: iron overload in pituitary gonadotropic cells  causes decreased gonadotrophin secretion which leads to delayed, slow or arrested puberty.
+
+2) Hypoparathyroidism: chronic anemia causes hematopoiesis which results in bone reabsorption which decreases parathyroid secretion.
+
+3) Adrenal insufficiency: Decreased growth of pubic and axillary hair in adolescent TM patients. This is due to excess iron deposition which causes adrenal dysfunction.
+
+4) Hypothyroidism: Increase in weight and retarded growth in adolescent patients. Secondary is rare and majority suffers from primary hypothyroidism.
+
+[85]
+
+Given the range of severities, some people require no treatment (those who are asymptomatic) while some people require regular blood transfusions for survival.[43] People with severe thalassemia require medical treatment and the main treatment is usually a red blood cell transfusion.
+
+Blood transfusions are the main treatment approach for prolonging life.[44] The approach and frequency needed varies in each person depending on severity, age, if the person has stunted growth, presence of extramedullary erythropoiesis (pediatrics), if a person is pregnant, and heart health. Blood transfusions come with risks including making iron overload worse, the risk of infections, risk of red blood cell antibody formation, increased risk of the development of hypersensitivity reactions, and the risk of gall bladder inflammation (cholecystitis).[43]
+
+Multiple blood transfusions may result in iron overload. The iron overload related to thalassemia may be treated by chelation therapy with the medications deferoxamine, deferiprone, or deferasirox.[45][46][47] These treatments have resulted in longer life expectancy for those with thalassemia major.[45] Deferoxamine is only effective as a daily injection, complicating its long-term use. However, it is inexpensive and safe. Adverse effects include primary skin reactions around the injection site and hearing loss.[45] Deferasirox and deferiprone are both oral medications, whose common side effects include nausea, vomiting and diarrhea. When comparing effectiveness, there is no evidence that deferasirox or deferiprone is superior, however, a long term comparison has not been performed.[47] Deferasirox is not effective for all patients and may not be suitable for those with significant cardiac issues related to iron overload, while deferiprone appears to be the most effective agent when the heart is involved. Furthermore, the cost of deferasirox is also significant.[45] Combining calcium channel blocker medications with iron chelation therapy is under study, however, the benefits are not clear from clinical trials conducted.[48]
+
+There is some evidence that growth hormone replacement therapy may help to increase the rate at which children with thalassemia grow taller.[49]
+
+Bone-marrow transplantation may offer the possibility of a cure in young people who have an HLA-matched donor.[50] Success rates have reached the 80–90% range.[50] Mortality from the procedure is about 3%.[51] There are no randomized controlled trials that have tested the safety and efficacy of non-identical donor bone-marrow transplantation in persons with β- thalassemia who are dependent on blood transfusion.[52]
+
+Graft-versus-host diseases (GvHD) are one relevant side effect of bone-marrow transplantation. Further research is necessary to evaluate whether mesenchymal stromal cells can be used as prophylaxis or treatment for GvHD.[53]
+
+If the person does not have an HLA-matched compatible donor, bone-marrow transplantation from haploidentical mother to child (mismatched donor) may be attempted. In a study of 31 people, the thalassemia-free survival rate was 70%, rejection 23% and mortality 7%. The most positive results tend to occur with very young people.[54]
+
+Betibeglogene autotemcel, sold under the brand name Zynteglo, is a gene therapy for the treatment for beta thalassemia.[55] It was approved for medical use in the European Union in May 2019,[56]  and in the United States in August 2022.[57][58] Betibeglogene autotemcel is indicated for the treatment of people twelve years and older with transfusion-dependent beta thalassemia who do not have a β0/β0 genotype, for whom hematopoietic stem cell (HSC) transplantation is appropriate but a human leukocyte antigen (HLA)-matched related HSC donor is not available.
+
+The procedure involves collecting hematopoietic stem cells (HSCs) from the affected person's blood. The HSCs then have a beta-globin gene added using a lentiviral vector. After destroying the affected person's bone marrow with a dose of chemotherapy (a myeloablative conditioning regimen), the altered HSCs are infused back into the affected person where they become engrafted in the bone marrow where they proliferate. This potentially results in a progressive increase in hemoglobin A2 synthesis in all subsequent developing red blood cells, with resultant resolution of the anemia.[59]
+
+Exagamglogene autotemcel, sold under the brand name Casgevy, is a gene therapy for the treatment of transfusion-dependent beta thalassemia. It was developed by Vertex Pharmaceuticals and CRISPR Therapeutics.[60]
+
+The treatment was approved in the United Kingdom for the treatment of transfusion-dependent beta thalassemia in November 2023[61][62][63] and in the United States in January 2024.[64][65][66]
+
+Exagamglogene autotemcel is the first cell-based gene therapy treatment utilizing CRISPR/Cas9 gene editing technology to be approved by the US Food and Drug Administration (FDA).[64]
+
+The gene therapy is made from the recipient's own blood stem cells, which are modified, and are given back as a one-time, single-dose infusion as part of a hematopoietic stem cell transplant. Prior to treatment, the recipient's own stem cells are collected, and then the recipient must undergo myeloablative conditioning (high-dose chemotherapy), a process that removes cells from the bone marrow so they can be replaced with the modified cells in exagamglogene autotemcel. The modified blood stem cells are transplanted back into the recipient where they engraft within the bone marrow and increase the production of fetal hemoglobin (HbF), a type of hemoglobin that facilitates oxygen delivery.
+
+Hydroxyurea treatment with the goal of reactivating gamma‐genes to produce HbF does not have any high quality evidence supporting its effectiveness.[67]
+
+There is no evidence from randomized controlled trials to support zinc supplementation for those with thalassemia.[68] Computer programs or mobile applications have been suggested as tools to help people manage thalassemia and follow their therapies including iron chelation therapy. The effectiveness of these applications has not been well investigated.[69]
+
+People with thalassemia are at a higher risk of osteoporosis.[70] Treatment options include bisphosphonates and sometimes the addition of hormonal therapy. Other treatments have been suggested including calcitonin, zinc, hydroxyurea, and calcium supplementation. The effectiveness of bisphosphonates and zinc is not clear and further studies are required.[70]
+
+Helping people with thalassemia with dental care and treating dental problems can be challenging due to the underlying condition. Overload of iron due to blood transfusions may lead to iron deposition in the teeth and discolouration, and there is an increased risk for infection.[71] Treatment options for people with thalassemia need to be modified to ensure that the needs of the person are considered and early detection and early management of any problems is strongly suggested in order to reduce the risk of the person needing more complicated dental treatments.[71] The evidence supporting the effectiveness of dental treatments on people with thalassemia is weak and higher quality clinical trials are needed.[71]
+
+People with thalassemia traits do not require medical or follow-up care after the initial diagnosis is made.[44] People with β-thalassemia trait should be warned that their condition can be misdiagnosed as the more common iron-deficiency anemia. They should avoid routine use of iron supplements, but iron deficiency may develop during pregnancy or from chronic bleeding.[72] Genetic counseling is indicated for all persons with genetic disorders, especially when the family is at risk of a severe form of disease that may be prevented.[73]
+
+The American College of Obstetricians and Gynecologists recommends all people thinking of becoming pregnant be tested to see if they have thalassemia.[74] Genetic counseling and genetic testing are recommended for families who carry a thalassemia trait.[27] Understanding the genetic risk, ideally before a family is started, would hopefully allow families to understand more about the condition and make an informed decision that is best for their family.[27]
+
+A screening policy exists in Cyprus to reduce the rate of thalassemia, which, since the program's implementation in the 1970s (also including prenatal screening and abortion), has reduced the number of children born with the disease from one of every 158 births to almost zero.[75] Greece also has a screening program to identify people who are carriers.[76]
+
+In Iran as a premarital screening, the man's red cell indices are checked first. If he has microcytosis (mean cell hemoglobin < 27 pg or mean red cell volume < 80 fl), the woman is tested. When both are microcytic, their hemoglobin A2 concentrations are measured. If both have a concentration above 3.5% (diagnostic of thalassemia trait) they are referred to the local designated health post for genetic counseling.[77]
+
+Large-scale awareness campaigns are being organized in India[78] both by government and non-government organizations to promote voluntary premarital screening, with marriage between carriers strongly discouraged.
+
+The beta form of thalassemia is particularly prevalent among Mediterranean peoples, and this geographical association is responsible for its original name.[79] Thalassemia resulted in 25,000 deaths in 2013 down from 36,000 deaths in 1990.[15]
+
+In Europe, the highest concentrations of the disease are found in Greece, coastal regions in Turkey (particularly the Aegean Region such as İzmir, Balıkesir, Aydın, Muğla, and Mediterranean Region such as Antalya, Adana, Mersin), in southern Spain, in parts of Italy, particularly southern Italy. With the exception of the Balearics, the major Mediterranean Islands, such as Sicily, Sardinia, Malta, Corsica, Cyprus, and Crete are heavily affected. Other Mediterranean peoples, as well as those in the vicinity of the Mediterranean, also have high rates of thalassemia, including people from North Africa and West Asia. Far from the Mediterranean, South Asians are also affected, with the world's highest concentration of carriers (16–18% of the population) in the Maldives.[80]
+
+The disease is also found in populations living in Africa, the Americas, and in Tharu people in the Terai region of Nepal and India.[81] It is believed to account for much lower rates of malaria illnesses and deaths,[82] accounting for the historic ability of Tharus to survive in areas with heavy malaria infestation while others could not. Thalassemias are particularly associated with people of Mediterranean origin, Arabs (especially Palestinians and people of Palestinian descent), and Asians.[83] The estimated prevalence is 16% in people from Cyprus, 1%[84] in Thailand, and 3–8% in populations from Bangladesh, China, India, Malaysia and Pakistan.
+
+Estimates suggest that approximately 1.5% of the global population (80 – 90 million people) are β-thalassemia carriers.[85] However, exact data on carrier rates in many populations are lacking, particularly in developing areas of the world known or expected to be heavily affected.[86][87] Because of the prevalence of the disease in countries with little knowledge of thalassemia, access to proper treatment and diagnosis can be difficult.[88] While there are some diagnostic and treatment facilities in developing countries, in most cases these are not provided by government services and are available only to patients who can afford them. In general, poorer populations only have access to limited diagnostic facilities and blood transfusions. In some developing countries, there are virtually no facilities for diagnosis or management of thalassemia.[88]
+
+
+The word thalassemia (/θælɪˈsiːmiə/) derives from the Greek  thalassa (θάλασσα), "sea",[89] and Neo-Latin -emia (from the Greek compound stem -aimia (-αιμία), from haima (αἷμα), "blood").[90] It was coined because the condition called "Mediterranean anemia" was first described in people of Mediterranean ethnicities. "Mediterranean anemia" was renamed thalassemia major once the genetics were better understood. The word thalassemia was first used in 1932.[79]: 877 [91]

@@ -1,0 +1,52 @@
+Title: Splenomegaly
+Splenomegaly is an enlargement of the spleen.[1] The spleen usually lies in the left upper quadrant (LUQ) of the human abdomen. Splenomegaly is one of the four cardinal signs of hypersplenism which include: some reduction in number of circulating blood cells affecting granulocytes, erythrocytes or platelets in any combination; a compensatory proliferative response in the bone marrow; and the potential for correction of these abnormalities by splenectomy. Splenomegaly is usually associated with increased workload (such as in hemolytic anemias), which suggests that it is a response to hyperfunction. It is therefore not surprising that splenomegaly is associated with any disease process that involves abnormal red blood cells being destroyed in the spleen. Other common causes include congestion due to portal hypertension and infiltration by leukemias and lymphomas. Thus, the finding of an enlarged spleen, along with caput medusae, is an important sign of portal hypertension.[2]
+
+The standard system for classifying splenomegaly on radiography is:[3][4]
+
+Also, a cutoff of a craniocaudal height of 13 cm is also used to define splenomegaly.[5] In addition, individual intervals have been established:
+
+For children, the cutoffs for splenomegaly are given in this table, when measuring the greatest length of the spleen between its dome and its tip, in the coronal plane through its hilum while breathing quietly.[7]
+
+At autopsy, splenomegaly can be defined as a spleen weight above the upper limit of the standard reference range of 230 g (8.1 oz).[8][9]
+
+Splenomegaly refers strictly to spleen enlargement, and is distinct from hypersplenism, which connotes overactive function by a spleen of any size. Splenomegaly and hypersplenism should not be confused.  Each may be found separately, or they may coexist. Clinically, if a spleen is palpable (felt via external examination), it means it is enlarged as it has to undergo at least twofold enlargement to become palpable. However, the tip of the spleen may be palpable in a newborn baby up to three months of age.[10]
+
+Calculators have been developed for measurements of spleen size based on CT, US, and MRI findings.[11]
+
+Symptoms may include abdominal pain, chest pain, chest pain similar to pleuritic pain when stomach, bladder or bowels are full, back pain, early satiety due to splenic encroachment, or the symptoms of anemia due to accompanying cytopenia.
+
+Signs of splenomegaly may include a palpable left upper quadrant abdominal mass or splenic rub. It can be detected on physical examination by using Castell's sign, Traube's space percussion or Nixon's sign, but an ultrasound can be used to confirm diagnosis. In patients where the likelihood of splenomegaly is high, the physical exam is not sufficiently sensitive to detect it; abdominal imaging is indicated in such patients.[12]
+
+In cases of infectious mononucleosis splenomegaly is a common symptom and health care providers may consider using abdominal ultrasonography to get insight into a person's condition.[13] However, because spleen size varies greatly, ultrasonography is not a valid technique for assessing spleen enlargement and should not be used in typical circumstances or to make routine decisions about fitness for playing sports.[13]
+
+The most common causes of splenomegaly in developed countries are infectious mononucleosis, splenic infiltration with cancer cells from a hematological malignancy and portal hypertension (most commonly secondary to liver disease, and sarcoidosis). Splenomegaly may also come from bacterial infections, such as syphilis or an infection of the heart's inner lining (endocarditis).[14] Splenomegaly also occurs in mammals parasitized by Cuterebra fontinella.[15]
+
+The possible causes of moderate splenomegaly (spleen <1000 g) are many, and include:
+
+Immune hyperplasia
+
+Response to infection (viral, bacterial, fungal, parasitic)
+
+Disordered immunoregulation
+
+Extramedullary hematopoiesis
+
+Vascular
+
+Infections
+
+Benign and malignant "infiltrations"
+
+The causes of massive splenomegaly (spleen >1000 g) are
+
+Splenomegaly can be classified based on its pathophysiologic mechanism:
+
+[1]
+
+Abdominal CT is the most accurate. The spleen needs to be 2–3 times larger than normal to be palpable below the costal margin in physical examination.
+
+If the splenomegaly underlies hypersplenism, a splenectomy is indicated and will correct the hypersplenism. However, the underlying cause of the hypersplenism will most likely remain; consequently, a thorough diagnostic workup is still indicated, as, leukemia, lymphoma and other serious disorders can cause hypersplenism and splenomegaly. After splenectomy, however, patients have an increased risk for infectious diseases.
+
+Patients undergoing splenectomy should be vaccinated against Haemophilus influenzae, Streptococcus pneumoniae, and Meningococcus. They should also receive annual influenza vaccinations. Long-term prophylactic antibiotics may be given in certain cases.
+
+An enlarged spleen may be an inherited, adaptive trait selected in populations that need extra oxygen carry capacity such as deep sea divers.[22][23] The Sama-Bajau people, notable for free-diving, have spleens that are 50% larger than those of nearby ethnic groups.[24][23]

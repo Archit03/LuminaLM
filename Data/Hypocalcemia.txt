@@ -1,0 +1,17 @@
+Title: Hypocalcemia
+Hypocalcemia is a medical condition characterized by low calcium levels in the blood serum.[5] The normal range of blood calcium is typically between 2.1–2.6 mmol/L (8.8–10.7 mg/dL, 4.3–5.2 mEq/L), while levels less than 2.1 mmol/L are defined as hypocalcemic.[1][3][6] Mildly low levels that develop slowly often have no symptoms.[2][4] Otherwise symptoms may include numbness, muscle spasms, seizures, confusion, or in extreme cases cardiac arrest.[1][2]
+
+The most common cause for hypocalcemia is iatrogenic hypoparathyroidism.[2] Other causes include other forms of hypoparathyroidism, vitamin D deficiency, kidney failure, pancreatitis, calcium channel blocker overdose, rhabdomyolysis, tumor lysis syndrome, and medications such as bisphosphonates or denosumab.[1] Diagnosis should generally be confirmed by determining the corrected calcium or ionized calcium level.[2] Specific changes may also be seen on an electrocardiogram (ECG).[1]
+
+Initial treatment for severe disease is with intravenous calcium chloride and possibly magnesium sulfate.[1] Other treatments may include vitamin D, magnesium, and calcium supplements.[2] If due to hypoparathyroidism, hydrochlorothiazide, phosphate binders, and a low salt diet may also be recommended.[2] About 18% of people who are being treated in hospital have hypocalcemia.[4]
+
+The neuromuscular symptoms of hypocalcemia are caused by a positive bathmotropic effect (i.e. increased responsiveness) due to the decreased interaction of calcium with sodium channels. Since calcium blocks sodium channels and inhibits depolarization of nerve and muscle fibers, reduced calcium lowers the threshold for depolarization.[7] The symptoms can be recalled by the mnemonic "CATs go numb" - convulsions, arrhythmias, tetany, and numbness in the hands and feet and around the mouth.[citation needed]
+
+Hypoparathyroidism is a common cause of hypocalcemia.[9] Calcium is tightly regulated by the parathyroid hormone (PTH). In response to low calcium levels, PTH levels rise, and conversely if there are high calcium levels then PTH secretion declines.[10] However, in the setting of absent, decreased, or ineffective PTH hormone, the body loses this regulatory function, and hypocalcemia ensues. Hypoparathyroidism is commonly due to surgical destruction of the parathyroid glands.[9] Hypoparathyroidism may also be due to autoimmune problem.[11][12] Some causes of hypocalcaemia are as follows:[citation needed]
+
+Physiologically, blood calcium is tightly regulated within a narrow range for proper cellular processes. Calcium in the blood exists in three primary states: bound to proteins (mainly albumin), bound to anions such as phosphate and citrate, and as free (unbound) ionized calcium. Only the unbound ionized calcium is physiologically active. Normal blood calcium level is between 8.5 and 10.5 mg/dL (2.12 to 2.62 mmol/L) and that of unbound calcium is 4.65 to 5.25 mg/dL (1.16 to 1.31 mmol/L).[19]
+
+Because a significant portion of calcium is bound to albumin, any alteration in the level of albumin will affect the measured level of calcium. A corrected calcium level based on the albumin level is: Corrected calcium (mg/dL) = measured total Ca (mg/dL) + 0.8 * (4.0 - serum albumin [g/dL]).[20]
+Since calcium is also bound to small anions, it may be more useful to correct total calcium for both albumin and the anion gap.[21][22]
+
+Management of this condition includes:

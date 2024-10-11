@@ -1,0 +1,136 @@
+Title: Atopic dermatitis
+
+
+Atopic dermatitis (AD), also known as atopic eczema, is a long-term type of inflammation of the skin.[2] AD is also often called simply eczema but the same term is also used to refer to dermatitis, the larger group of skin conditions.[2][5] AD results in itchy, red, swollen, and cracked skin.[2] Clear fluid may come from the affected areas, which can thicken over time.[2]
+
+Atopic dermatitis affects about 20% of people at some point in their lives.[2][4] It is more common in younger children.[3] Females are affected slightly more often than males.[6] Many people outgrow the condition.[3]
+
+While the condition may occur at any age, it typically starts in childhood, with changing severity over the years.[2][3] In children under one year of age, the face and limbs and much of the body may be affected.[3] As children get older, the areas on the insides of the knees and folds of the elbows and around the neck are most commonly affected.[3] In adults, the hands and feet are commonly affected.[3] Scratching the affected areas worsens the eczema and increases the risk of skin infections.[2] Many people with atopic dermatitis develop hay fever or asthma.[2]
+
+The cause is unknown but believed to involve genetics, immune system dysfunction, environmental exposures, and difficulties with the permeability of the skin.[2][3] If one identical twin is affected, the other has an 85% chance of having the condition.[7] Those who live in cities and dry climates are more commonly affected.[2] Exposure to certain chemicals or frequent hand washing makes symptoms worse.[2] While emotional stress may make the symptoms worse, it is not a cause.[2] The disorder is not contagious.[2] A diagnosis is typically based on the signs, symptoms and family history.[3]
+
+Treatment involves avoiding things that make the condition worse, enhancing the skin barrier through skin care and treating the underlying skin inflammation. Moisturising creams are used to make the skin less dry and prevent AD flare-ups. Anti-inflammatory corticosteroid creams are used to control flares-ups.[3] Creams based on calcineurin inhibitors (tacrolimus or pimecrolimus) may also be used to control flares if other measures are not effective.[2][8] Certain antihistamine pills might help with itchiness.[3] Things that commonly make it worse include house dust mite, stress and seasonal factors.[9] Phototherapy may be useful in some people.[2] Antibiotics (either by mouth or topically) are usually not helpful unless there is secondary bacterial infection or the person is unwell.[10] Dietary exclusion does not benefit most people and it is only needed if food allergies are suspected.[11] More severe AD cases may need systemic medicines such as cyclosporin, methotrexate, dupilumab or baricitinib.
+
+Other names of the condition include "infantile eczema", "flexural eczema", "prurigo Besnier", "allergic eczema", and "neurodermatitis".[1]
+
+
+Symptoms refer to the sensations that people with AD feel, whereas signs refers to a description of the visible changes that result from AD.
+The main symptom of AD is itching which can be intense. Some people experience burning or soreness or pain.[2]
+
+People with AD often have a generally dry skin that can look greyish in people with darker skin tones of colour. Areas of AD are not well defined, and they are typically inflamed (red in a light coloured skin or purple or dark brown in people with dark skin of colour).[12] Surface changes include:
+
+Eczema often starts on the cheeks and outer limbs and body in infants and frequently settles in the folds of the skin such as behind the knees, folds of the elbows, around the neck, wrists and under the buttock folds as the child grows.[13] Any part of the body can be affected by AD.[14]
+
+AD commonly affects the eyelids, where an extra prominent crease can form under the eyelid due to skin swelling known as Dennie-Morgan infraorbital folds.[15] Cracks can form under the ears which can be painful (infra-auricular fissure).[16][15]
+
+The inflammation from AD often leaves "footprints" known as postinflammatory pigmentation that can be lighter than the normal skin or darker. These marks are not scars and eventually go back to normal over a period of months providing the underlying AD is treated effectively.[17]
+
+People with AD often have dry and scaly skin that spans the entire body, except perhaps the diaper area, and intensely itchy red, splotchy, raised lesions to form in the bends of the arms or legs, face, and neck.[18][19][20][21][22]
+
+The cause of AD is not known, although some evidence indicates environmental, immunologic, and potential genetic factors.[23]
+
+Since 1970, the rates of atopic dermatitis in the US and UK have increased 3-6 fold.[24] Even today, people who migrate from developing nations before the age of 4 years to industrialized nations experience a dramatic rise in the risk of atopic dermatitis and have an additional risk when living in urbanized areas of the industrial nation.[25] Recent work has shed light on these and other data strongly suggesting that early life industrial exposures may cause atopic dermatitis.[24][26] Chemicals such as (di)isocyanates and xylene prevent the skin bacteria from producing ceramide-sphingolipid family lipids.[24][26] Early life deficiency in these lipids predictive which children will go on to develop atopic dermatitis.[27][28][29][30] These chemicals also directly activate an itch receptor in the skin known as TRPA1.[31] The industrial manufacturing and use of both xylene and diisocyanates greatly increased starting in 1970, which greatly expanded the average exposure to these substances. For example, these chemicals are components of several exposures known to increase the risk of atopic dermatitis or worsen symptoms including: wildfires, automobile exhaust, wallpaper adhesives, paints, non-latex foam furniture, cigarette smoke, and are elements of fabrics like polyester, nylon, and spandex.[25][24][26]
+
+Low humidity, and low temperature increase the prevalence and risk of flares in patients with atopic dermatitis.[32]
+
+Many people with AD have a family history or a personal history of atopy. Atopy is a term used to describe individuals who produce substantial amounts of IgE. Such individuals have an increased tendency to develop asthma, hay fever, eczema, urticaria and allergic rhinitis.[18][19] Up to 80% of people with atopic dermatitis have elevated total or allergen-specific IgE levels.[33]
+
+About 30% of people with atopic dermatitis have mutations in the gene for the production of filaggrin (FLG), which increase the risk for early onset of atopic dermatitis and developing asthma.[34][35] However, expression of filaggrin protein or breakdown products offer no predictive utility in atopic dermatitis risk.[28]
+
+According to the hygiene hypothesis, early childhood exposure to certain microorganisms (such as gut flora and helminth parasites) protects against allergic diseases by contributing to the development of the immune system.[36] This exposure is limited in a modern "sanitary" environment, and the incorrectly developed immune system is prone to develop allergies to harmless substances.
+
+Some support exists for this hypothesis with respect to AD.[37] Those exposed to dogs while growing up have a lower risk of atopic dermatitis.[38] Also, epidemiological studies support a protective role for helminths against AD.[39] Likewise, children with poor hygiene are at a lower risk for developing AD, as are children who drink unpasteurized milk.[39]
+
+In a small percentage of cases, atopic dermatitis is caused by sensitization to foods[40] such as milk, but there is growing consensus that food allergy most likely arises as a result of skin barrier dysfunction resulting from AD, rather than food allergy causing the skin problems.[41] Atopic dermatitis sometimes appears associated with coeliac disease and non-coeliac gluten sensitivity. Because a gluten-free diet (GFD) improves symptoms in these cases, gluten seems to be the cause of AD in these cases.[42][43] A diet high in fruits seems to have a protective effect against AD, whereas the opposite seems true for heavily processed foods.[39]
+
+Exposure to allergens, either from food or the environment, can exacerbate existing atopic dermatitis.[44] Exposure to dust mites, for example, is believed to contribute to the risk of developing AD.[45]
+
+Colonization of the skin by the bacterium S. aureus is extremely prevalent in those with atopic dermatitis.[46] Abnormalities in the skin barrier of persons with AD are exploited by S. aureus to trigger cytokine expression, thus aggravating the condition.[47] However, atopic dermatitis is non-communicable and therefore could not be directly caused by a highly infectious organism. Furthermore, there is insufficient evidence for the effectiveness of anti-staphylococcal treatments for treating S. aureus in infected or uninfected eczema.[48]
+
+The prevalence of atopic dermatitis in children may be linked to the level of calcium carbonate or "hardness" of household drinking water.[49][50] Living in areas with hard water may also play a part in the development of AD in early life. However, when AD is already established, using water softeners at home does not reduce the severity of the symptoms.[50][51]
+
+Excessive type 2 inflammation underlies the pathophysiology of atopic dermatitis.[52][53]
+
+Disruption of the epidermal barrier is thought to play an integral role in the pathogenesis of AD.[33] Disruptions of the epidermal barrier allows allergens to penetrate the epidermis to deeper layers of the skin. This leads to activation of epidermal inflammatory dendritic and innate lymphoid cells which subsequently attracts Th2 CD4+ helper T cells to the skin.[33] This dysregulated Th2 inflammatory response is thought to lead to the eczematous lesions.[33] The Th2 helper T cells become activated, leading to the release of inflammatory cytokines including IL-4, IL-13 and IL-31 which activate downstream Janus kinase (Jak) pathways. The active Jak pathways lead to inflammation and downstream activation of plasma cells and B lymphocytes which release antigen specific IgE contributing to further inflammation.[33] Other CD4+ helper T-cell pathways thought to be involved in atopic dermatitis inflammation include the Th1, Th17, and Th22 pathways.[33] Some specific CD4+ helper T-cell inflammatory pathways are more commonly activated in specific ethnic groups with AD (for example, the Th-2 and Th-17 pathways are commonly activated in Asian people) possibly explaining the differences in phenotypic presentation of atopic dermatitis in specific populations.[33]
+
+Mutations in the filaggrin gene, FLG, also cause impairment in the skin barrier that contributes to the pathogenesis of AD.[33] Filaggrin is produced by epidermal skin cells (keratinocytes) in the horny layer of the epidermis. Filaggrin stimulates skin cells to release moisturizing factors and lipid matrix material, which cause adhesion of adjacent keratinocytes and contributes to the skin barrier.[33] A loss-of-function mutation of filaggrin causes loss of this lipid matrix and external moisturizing factors, subsequently leading to disruption of the skin barrier. The disrupted skin barrier leads to transdermal water loss (leading to the xerosis or dry skin commonly seen in AD) and antigen and allergen penetration of the epidermal layer.[33] Filaggrin mutations are also associated with a decrease in natural antimicrobial peptides found on the skin; subsequently leading to disruption of skin flora and bacterial overgrowth (commonly Staphylococcus aureus overgrowth or colonization).[33]
+
+Atopic dermatitis is also associated with the release of pruritogens (molecules that stimulate pruritus or itching) in the skin.[33] Keratinocytes, mast cells, eosinophils and T-cells release pruritogens in the skin; leading to activation of Aδ fibers and Group C nerve fibers in the epidermis and dermis contributing to sensations of pruritus and pain.[33] The pruritogens include the Th2 cytokines IL-4, IL-13, IL-31, histamine, and various neuropeptides.[33] Mechanical stimulation from scratching lesions can also lead to the release of pruritogens contributing to the itch-scratch cycle whereby there is increased pruritus or itch after scratching a lesion.[33] Chronic scratching of lesions can cause thickening or lichenification of the skin or prurigo nodularis (generalized nodules that are severely itchy).[33]
+
+AD is typically diagnosed clinically, meaning it is based on signs and symptoms alone, without special testing.[54] Several different criteria developed for research have also been validated to aid in diagnosis.[55] Of these, the UK Diagnostic Criteria, based on the work of Hanifin and Rajka, has been the most widely validated.[55][56]
+
+Other diseases that must be excluded before making a diagnosis include contact dermatitis, psoriasis, and seborrheic dermatitis.[3]
+
+There are no established clinical methods using dietary or topical strategies to inhibit or prevent atopic dermatitis. Specific dietary plans during pregnancy and in early childhood, such as eating fatty fish (or taking omega-3 supplements), are not effective.[57] Taking probiotics (for example Lactobacillus rhamnosus) during pregnancy and feeding probiotics to infants are strategies under research, with only preliminary evidence that they may be preventative.[58][59]
+
+Using moisturizers daily in infants during the first year of life does not help to prevent atopic dermatitis, and might even increase the risk of skin infections.[51][60]
+
+No cure for AD is known, although treatments may reduce the severity and frequency of flares.[18] The most commonly used topical treatments for AD are topical corticosteroids (to get control of flare-ups) and moisturisers (emollients) to help keep control.[61] Clinical trials often measure the efficacy of treatments with a severity scale such as the SCORAD index or the Eczema Area and Severity Index.[54][62]
+
+Daily basic care is intended to stabilize the barrier function of the skin to mitigate its sensitivity to irritation and penetration of allergens. Affected persons often report that improvement of skin hydration parallels with improvement in AD symptoms. Moisturisers (or emollients) can improve skin comfort and may reduce disease flares.[63] They can be used as leave-on treatments, bath additives or soap substitutes. There are many different products but the majority of leave-on treatments (least to most greasy) are lotions, creams, gels or ointments. All of the different types of moisturisers are equally effective so people need to choose one or more products based on what suits them, according to their age, body site effected, climate/season and personal preference.[64] Non-medicated prescription moisturisers may also be no more effective than over-the-counter moisturisers.[65]
+
+The use of emollient bath additives does not provide any additional benefits.[51][66][67]
+
+Creams and ointments containing corticosteroids applied directly on skin (topical) are effective in managing atopic dermatitis.[65][68] Newer (second generation) corticosteroids, such as fluticasone propionate and mometasone furoate, are more effective and safer than older ones. Strong and moderate corticosteroids work better than weaker ones. They are also generally safe and do not cause skin thinning when used in intermittently to treat AD flare-ups. They are also safe when used twice a week for preventing flares (also known as weekend treatment).[69][65][70] Applying once daily is as effective as twice or more daily application.[68]
+
+In addition to topical corticosteroids, topical calcineurin inhibitors such as tacrolimus or pimecrolimus are also recommended as first-line therapies for managing atopic dermatitis.[65][71] Both tacrolimus and pimecrolimus are effective and safe to use in AD.[72][73] Crisaborole, an inhibitor of PDE-4, is also effective and safe as a topical treatment for mild-to-moderate AD.[74][75] Ruxolitinib, a Janus kinase inhibitor, has uncertain efficacy and safety.[65][71]
+
+When topical (on skin) treatments fail to control severe AD flares, medications taken by mouth (systemic treatment) can be used.[51]
+
+Conventional oral medications for AD include systemic immunosuppressants such as ciclosporin, methotrexate, azathioprine, and mycophenolate.[76][77][78][51] Antidepressants and naltrexone may be used to control pruritus (itchiness).[79]
+
+Newer medications such as monoclonal antibodies and JAK inhibitors are highly effective for managing atopic dermatitis, but modestly increase the risk of conjunctivitis. These include dupilumab (Dupixent), tralokinumab (Adtralza, Adbry), abrocitinib (Cibinqo), baricitinib (Olumiant) and upadacitinib (Rinvoq).[76][71][80] Among monoclonal antibodies, dupilumab and tralokinumab are approved to treat moderate-to-severe eczema in the US and the EU.[81][82][83][84] Lebrikizumab is also approved in the EU for treating moderate-to-severe AD[85] but in the US its approval was declined due to manufacturing issues.[86] Abrocitinib and upadacitinib have also been approved in the US for the treatment of moderate-to-severe eczema.[87][88]
+
+Leukotriene receptor antagonists such as montelukast might be a useful for the treatment of AD but their effectiveness has not yet been proven by research.[89][90][91]
+
+Allergen immunotherapy may be effective in relieving symptoms of AD but it also comes with an increased risk of adverse events.[92] This treatment consists of a series of injections or drops under the tongue of a solution containing the allergen.[93]
+
+The skin of people with AD can easily get infected, most commonly by the bacteria Staphylococcus aureus. Signs of this include oozing fluid, a yellow crust on the skin, worsening eczema symptoms and fever. Antibiotics are commonly used to target overgrowth of S. aureus but their benefit is limited and they increase the risk of antimicrobial resistance. For these reasons, they are only recommended for people who not only present symptoms on the skin but feel systematically unwell.[51][48][94]
+
+The role of vitamin D on atopic dermatitis is not clear, but vitamin D supplementation may improve its symptoms.[95][96][97]
+
+There is no clear benefit for pregnant mothers taking omega 3 long-chain polyunsaturated fatty acid (LCPUFA) in preventing the development of AD in their child.[98][99]
+
+Several probiotics seem to have a positive effect, with a roughly 20% reduction in the rate of AD.[100][101][102] Probiotics containing multiple strains of bacteria seem to work the best.[103]
+
+In people with celiac disease or nonceliac gluten sensitivity, a gluten-free diet improves their symptoms and prevents the occurrence of new outbreaks.[42][43]
+
+Use of blood specific IgE or skin prick tests to guide dietary exclusions with the aim of improving disease severity or control is controversial. Clinicians vary in their use of these tests for this purpose and there are very limited evidence of any benefit.[104]
+
+Health professionals often recommend that people with AD bathe regularly in lukewarm baths, especially in salt water, to moisten their skin.[19][105] Dilute bleach baths may be helpful for people with moderate and severe eczema, but only for patients with Staphylococcus aureus.[106]
+
+Avoiding large-diameter woolen clothing or scratchy fibres is usually recommended for people with AD as they can trigger a flare.[107][108] Safe alternatives are clothes made from fabrics with smaller diameters and smooth fibers. These include super- and ultrafine merino wool and fabrics with anti-microbial textile finishes. Wearing silk is also safe but does not improve symptoms of AD.[107][51][109]
+
+Living with AD requires a high level of self-management (for example avoiding triggers) and adherence to treatments (regularly applying medication). Good self-management contributes to better disease outcomes and quality of life.[110][111] However worries about topical treatments, misconceptions about the condition, unclear information and unsuitable communication from doctors can make living with AD more difficult.[51]
+
+People with AD often do not regard eczema as long-term condition and hope they will outgrow or cure it. This can cause worse adherence to the necessary long-term treatment. Doctors should not imply that it is a short-term condition and should emphasise that even though it cannot be cured it can be controlled effectively.[112][111]
+
+Appropriate communication from doctors can support self-management. Doctors need to address concerns about treatments, and provide clear and consistent information about the condition.[112][111] Treatment regimens can be confusing and written action plans may support people to know what treatments to use where and when.[113] A website supporting self-management has been shown to improve AD symptoms for parents, children, adolescents and young adults.[114][115]
+
+Phototherapic treatment involves exposure to broad- or narrow-band ultraviolet (UV) light. UV radiation exposure has been found to have a localized immunomodulatory effect on affected tissues and may be used to decrease the severity and frequency of flares.[116][117] Among the different types of phototherapies only narrowband (NB) ultraviolet B (UVB) exposure might help with the severity of AD and ease itching.[80][118] However, UV radiation has also been implicated in various types of skin cancer, and thus UV treatment is not without risk.[119] UV phototherapy is not indicated in young adults and children due to this risk of skin cancer with prolonged use or exposure.[33]
+
+While several Chinese herbal medicines are intended for treating atopic eczema, there is no evidence showing that these treatments, taken by mouth or applied topically, reduce the severity of eczema in children or adults.[120]
+
+Atopic dermatitis significantly impairs the quality of life of affected individuals.[121][122] The impact of AD extends beyond physical symptoms, encompassing substantial humanistic and psychosocial effects. Its burden is significant, especially given the high indirect costs and psychological impacts on quality of life.[121][123]
+
+According to the Global Burden of Disease Study, AD is the skin disease with the highest disability-adjusted life year burden and ranks in the top 15 of all nonfatal diseases. In comparison with other dermatological conditions like psoriasis and urticaria, AD presents a significantly higher burden.[122]
+
+While AD remains incurable, reducing its severity can significantly alleviate its burden. Understanding the extent of the burden of AD can aid in better resource allocation and prioritization of interventions, benefiting both patients and healthcare systems.[124]
+
+AD significantly decreases the quality of life by affecting various aspects of people's lives. The psychological impact, often resulting in conditions like depression and anxiety, is a major factor leading to decreased quality of life. Sleep disturbances, commonly reported in people with AD, further contribute to the humanistic burden, affecting daily productivity and concentration.[121]
+
+Economically, AD imposes a substantial burden on healthcare systems, with the average direct cost per patient estimated at 4411 USD and the average indirect cost reaching 9068 USD annually.[121] These figures highlight the considerable financial impact of the disease on healthcare systems and people with the condition.[125][126]
+
+AD also has a marked impact on productivity. The total number of days lost annually due to these factors is about 68.8 days for the general AD population, with presenteeism accounting for the majority of these days.[121] The impact on productivity varies significantly with the severity of AD, with more severe cases resulting in higher numbers of days lost.[121][127]
+
+Atopic dermatitis leads to the highest loss in disability-adjusted life years compared to other skin diseases in the Middle East and Africa.[128] Patients with AD in these regions lose approximately 0.19 quality-adjusted life years (QALYs) annually due to the disease. Egypt experiences the highest QALY loss and Kuwait the lowest.[128]
+
+The average annual healthcare cost per patient varies is highest in the United Arab Emirates, estimated at US $3569, and lowest in Algeria at US $312. These costs are influenced by the economic status of each country and the cost of healthcare. Advanced treatments like targeted therapies and phototherapy are among the main cost drivers.[128]
+
+Indirect costs, primarily due to productivity loss from absenteeism and presenteeism average about 67% in these countries. Indirect costs in Saudi Arabia are the highest in the area, estimated at US $364 million.[128] Factors like mental health impact, side effects of treatments, and other indirect costs such as personal care products are not fully accounted for in these estimates, suggesting that the actual burden might be even higher.[128]
+
+To mitigate the burden of AD, experts recommend strategic actions across five key domains: capacity building, guidelines, research, public awareness, and patient support and education. Key measures include increasing the number of dermatologists, establishing evidence-based treatment guidelines, investing in patient education, and enhancing public awareness to reduce stigma.[129] Improving access to effective treatments and conducting further research on AD's impact are also crucial for reducing the disease's clinical, economic, and humanistic burdens in the MEA.[129]
+
+Since the beginning of the 20th century, many inflammatory skin disorders have become more common; AD is a classic example of such a disease. Although AD was previously considered primarily a childhood disease, it is now recognized as highly prevalent in adults, with an estimated adult prevalence of 3-5% globally.[121][122] It now affects 15–30% of children and 2–10% of adults in developed countries, and in the United States has nearly tripled in the past 30–40 years.[19][130] Over 15 million American adults and children have AD.[131]
+
+A number of false and conspiratorial claims about AD have emerged on the internet and have been amplified by social media. These conspiracy theories include, among others, claims that AD is caused by 5G, formaldehyde in food, vaccines, and topical steroids. Various unproven theories also claim that vegan diets, apple cider vinegar, calendula, and witch hazel can cure AD and that air purifiers reduce the risk of developing AD.[132]

@@ -1,0 +1,91 @@
+Title: Hyperglycemia
+Hyperglycemia or Hyperglycaemia  is a condition in which an excessive amount of glucose (glucotoxicity) circulates in the blood plasma. This is generally a blood sugar level higher than 11.1 mmol/L (200 mg/dL), but symptoms may not start to become noticeable until even higher values such as 13.9–16.7 mmol/L (~250–300 mg/dL). A subject with a consistent fasting blood glucose range between ~5.6 and ~7 mmol/L (100–126 mg/dL) (American Diabetes Association guidelines) is considered slightly hyperglycemic, and above 7 mmol/L (126 mg/dL) is generally held to have diabetes. For diabetics, glucose levels that are considered to be too hyperglycemic can vary from person to person, mainly due to the person's renal threshold of glucose and overall glucose tolerance. On average, however, chronic levels above 10–12 mmol/L (180–216 mg/dL) can produce noticeable organ damage over time.
+
+The degree of hyperglycemia can change over time depending on the metabolic cause, for example, impaired glucose tolerance or fasting glucose, and it can depend on treatment.[1] Temporary hyperglycemia is often benign and asymptomatic. Blood glucose levels can rise well above normal and cause pathological and functional changes for significant periods without producing any permanent effects or symptoms.[1] During this asymptomatic period, an abnormality in carbohydrate metabolism can occur, which can be tested by measuring plasma glucose.[1] Chronic hyperglycemia at above normal levels can produce a very wide variety of serious complications over a period of years, including kidney damage, neurological damage, cardiovascular damage, damage to the retina or damage to feet and legs. Diabetic neuropathy may be a result of long-term hyperglycemia. Impairment of growth and susceptibility to certain infections can occur as a result of chronic hyperglycemia.[1]
+
+Acute hyperglycemia involving glucose levels that are extremely high is a medical emergency and can rapidly produce serious complications (such as fluid loss through osmotic diuresis). It is most often seen in persons who have uncontrolled insulin-dependent diabetes.[citation needed]
+
+The following symptoms may be associated with acute or chronic hyperglycemia, with the first three composing the classic hyperglycemic triad:[2]
+
+Frequent hunger without other symptoms can also indicate that blood sugar levels are too low. This may occur when people who have diabetes take too much oral hypoglycemic medication or insulin for the amount of food they eat. The resulting drop in blood sugar level to below the normal range prompts a hunger response.[citation needed]
+
+Polydipsia and polyuria occur when blood glucose levels rise high enough to result in excretion of excess glucose via the kidneys, which leads to the presence of glucose in the urine. This produces an osmotic diuresis.[citation needed]
+
+Signs and symptoms of diabetic ketoacidosis may include:[citation needed]
+
+Hyperglycemia causes a decrease in cognitive performance, specifically in processing speed, executive function, and performance.[5] Decreased cognitive performance may cause forgetfulness and concentration loss.[5]
+
+In untreated hyperglycemia, a condition called ketoacidosis may develop because decreased insulin levels increase the activity of hormone sensitive lipase.[6] The degradation of triacylglycerides by hormone-sensitive lipase produces free fatty acids that are eventually converted to acetyl-coA by beta-oxidation.[citation needed]
+
+Ketoacidosis is a life-threatening condition which requires immediate treatment. Symptoms include: shortness of breath, breath that smells fruity (such as pear drops), nausea and vomiting, and very dry mouth.
+Chronic hyperglycemia (high blood sugar) injures the heart in patients without a history of heart disease or diabetes and is strongly associated with heart attacks and death in subjects with no coronary heart disease or history of heart failure.[7]
+
+Also, a life-threatening consequence of hyperglycemia can be nonketotic hyperosmolar syndrome.[1]
+
+Perioperative hyperglycemia has been associated with immunosuppression, increased infections, osmotic diuresis, delayed wound healing, delayed gastric emptying, sympatho-adrenergic stimulation, and increased mortality. In addition, it reduces skin graft success, exacerbates brain, spinal cord, and renal damage by ischemia, worsens neurologic outcomes in traumatic head injuries, and is associated with postoperative cognitive dysfunction following CABG.[8]
+
+Furthermore, hyperglycemia has been linked to increased susceptibility to a range of infectious diseases. This susceptibility can be attributed to the impairment of the immune system's response, which is often compromised in hyperglycemic conditions. Hyperglycemia also leads to biochemical changes in the body; both of these factors result in increased severity of respiratory infections and vulnerability to pathogens.[9] Hyperglycemic individuals face the most pronounced risk from such types of ailments, including tuberculosis, the flu, and COVID-19. These risks can be compounded even further by the effects of physiological stress. 
+
+Importantly, hyperglycemia affects the function of neutrophils, which are white blood cells responsible for responding to infection. In hyperglycemic individuals, the ability for neutrophils to move towards infection sites, ingest bacteria, and kill them are often impaired, leading to reduced effectiveness in combating infections.[10]
+
+Hyperglycemia also creates microbiological changes within the body: hyperglycemia can lead to rapid changes in blood pH and cell viscosity, weakening the cells and making it more conducive for infectious agents to thrive and dampen inflammatory responses. This is because hyperglycemia impacts a few factors such as microenvironment of immune cells, or even bacteria’s supply of energy, adding on stress to the bacterial proliferation metabolism.[9]
+
+The chronic inflammatory state induced by high glucose levels can also lead to dysfunction in various parts of the immune system. For example, advanced glycation end products (AGEs), which are more prevalent in hyperglycemic conditions, can interfere with the normal function of the immune system and contribute to the pathogenesis of infections.[11] AGEs, whose cross-links are permanent will continue to harm the surrounding tissue until the proteins are destroyed. In addition, they can interact with the RAGE receptor to cause oxidative stress, apoptosis, and inflammation.
+
+Due to neutrophil changes, microbiological changes, and chronic inflammation, patients with hyperglycemia are thus more prone to severe respiratory infections. This increased risk is particularly pronounced with pathogens like Mycobacterium tuberculosis (the bacterium responsible for tuberculosis) and the flu.[12] In recent history, hyperglycemic individuals have also responded more severely to the symptoms of COVID-19. Another example is diabetes. Hyperglycemia and risk of severe infectious outcomes can even further be complicated by physiological stress. For instance, elevated blood glucose levels can actively contribute to pathophysiology of this disease, by exacerbating existing inflammation, impairing cellular immune responses, and increasing oxidative stress, which can also lead to more severe infection. In addition, patients with acute hyperglycemia who don’t have a history of diabetes can experience higher rates of mortality and complications.
+
+Hyperglycemia may be caused by: diabetes, various (non-diabetic) endocrine disorders (insulin resistance and thyroid, adrenal, pancreatic, and pituitary disorders), sepsis and certain infections, intracranial diseases (e.g. encephalitis, brain tumors (especially if near the pituitary gland), brain haemorrhages, and meningitis) (frequently overlooked), convulsions, end-stage terminal disease, prolonged/major surgeries,[13] stress,[14] and excessive eating of carbohydrates.[15]
+
+Chronic, persistent hyperglycaemia is most often a result of diabetes.[citation needed] Several hormones act to increase blood glucose levels and may thus cause hyperglycaemia when present in excess, including: cortisol, catecholamines, growth hormone, glucagon,[16] and thyroid hormones.[17] Hyperglycaemia may thus be seen in: Cushing's syndrome,[18] pheochromocytoma,[19] acromegaly,[20] hyperglucagonemia,[21] and hyperthyroidism.[17]
+
+Chronic hyperglycemia that persists even in fasting states is most commonly caused by diabetes mellitus. In fact, chronic hyperglycemia is the defining characteristic of the disease. Intermittent hyperglycemia may be present in prediabetic states. Acute episodes of hyperglycemia without an obvious cause may indicate developing diabetes or a predisposition to the disorder.[citation needed]
+
+In diabetes mellitus, hyperglycemia is usually caused by low insulin levels (diabetes mellitus type 1) and/or by resistance to insulin at the cellular level (diabetes mellitus type 2), depending on the type and state of the disease.[22] Low insulin levels and/or insulin resistance prevent the body from converting glucose into glycogen (a starch-like source of energy stored mostly in the liver), which in turn makes it difficult or impossible to remove excess glucose from the blood. With normal glucose levels, the total amount of glucose in the blood at any given moment is only enough to provide energy to the body for 20–30 minutes, and so glucose levels must be precisely maintained by the body's internal control mechanisms. When the mechanisms fail in a way that allows glucose to rise to abnormal levels, hyperglycemia is the result.[citation needed]
+
+Ketoacidosis may be the first symptom of immune-mediated diabetes, particularly in children and adolescents. Also, patients with immune-mediated diabetes can change from modest fasting hyperglycemia to severe hyperglycemia and even ketoacidosis as a result of stress or an infection.[1]
+
+Obesity has been contributing to increased insulin resistance in the global population. Insulin resistance increases hyperglycemia because the body becomes over saturated by glucose. Insulin resistance desensitizes insulin receptors, preventing insulin from lowering blood sugar levels.[23]
+
+The leading cause of hyperglycemia in type 2 diabetes is the failure of insulin to suppress glucose production by glycolysis and gluconeogenesis due to insulin resistance.[24] Insulin normally inhibits glycogenolysis, but fails to do so in a condition of insulin resistance, resulting in increased glucose production.[25] In the liver, Fox06 normally promotes gluconeogenesis in the fasted state, but insulin blocks Fox06 upon feeding.[26] In a condition of insulin resistance insulin fails to block Fox06, resulting in continued gluconeogenesis even upon feeding.[26]
+
+Certain medications increase the risk of hyperglycemia, including: corticosteroids, octreotide, beta blockers, epinephrine, thiazide diuretics, statins, niacin, pentamidine, protease inhibitors, L-asparaginase,[27] and antipsychotics.[28] The acute administration of stimulants such as amphetamines typically produces hyperglycemia; chronic use, however, produces hypoglycemia.[citation needed]
+
+Thiazides are used to treat type 2 diabetes but it also causes severe hyperglycemia.[1]
+
+A high proportion of patients with an acute stress such as stroke or myocardial infarction may develop hyperglycemia, even in the absence of a diagnosis of diabetes. (Or perhaps stroke or myocardial infarction was caused by hyperglycemia and undiagnosed diabetes.)[citation needed] Human and animal studies suggest that this is not benign, and that stress-induced hyperglycemia is associated with a high risk of mortality after both stroke and myocardial infarction.[29] Somatostatinomas and aldosteronoma-induced hypokalemia can cause hyperglycemia but usually disappears after the removal of the tumour.[1]
+
+Stress causes hyperglycaemia via several mechanisms, including through metabolic and hormonal changes, and via increased proinflammatory cytokines that interrupt carbohydrate metabolism, leading to excessive glucose production and reduced uptake in tissues, can cause hyperglycemia.[30]
+
+Hormones such as the growth hormone, glucagon, cortisol and catecholamines, can cause hyperglycemia when they are present in the body in excess amounts.[1]
+
+It is critical for patients who monitor glucose levels at home to be aware of which units of measurement their glucose meter uses.
+Glucose levels are measured in either:[citation needed]
+
+Scientific journals are moving towards using mmol/L; some journals now use mmol/L as the primary unit but quote mg/dL in parentheses.[31]
+
+Glucose levels vary before and after meals, and at various times of day; the definition of "normal" varies among medical professionals. In general, the normal range for most people (fasting adults) is about 4 to 6 mmol/L or 80 to 110 mg/dL. (where 4 mmol/L or 80 mg/dL is "optimal".)  A subject with a consistent range above 7 mmol/L or 126 mg/dL is generally held to have hyperglycemia, whereas a consistent range below 4 mmol/L or 70 mg/dL is considered hypoglycemic.  In fasting adults, blood plasma glucose should not exceed 7 mmol/L or 126 mg/dL.  Sustained higher levels of blood sugar cause damage to the blood vessels and to the organs they supply, leading to the complications of diabetes.[32]
+
+Chronic hyperglycemia can be measured via the HbA1c test. The definition of acute hyperglycemia varies by study, with mmol/L levels from 8 to 15 (mg/dL levels from 144 to 270).[33]
+
+Defects in insulin secretion, insulin action, or both, results in hyperglycemia.[1]
+
+
+Chronic hyperglycemia can be measured by clinical urine tests which can detect sugar in the urine or microalbuminuria which could be a symptom of diabetes.[34]
+
+Treatment of hyperglycemia requires elimination of the underlying cause, such as diabetes. Acute hyperglycemia can be treated by direct administration of insulin in most cases. Severe hyperglycemia can be treated with oral hypoglycemic therapy and lifestyle modification.[35]
+In diabetes mellitus (by far the most common cause of chronic hyperglycemia), treatment aims at maintaining blood glucose at a level as close to normal as possible, in order to avoid serious long-term complications.  This is done by a combination of proper diet, regular exercise, and insulin or other medication such as metformin, etc.[citation needed]
+
+Those with hyperglycaemia can be treated using sulphonylureas or metformin or both. These drugs help by improving glycaemic control.[36] Dipeptidyl peptidase-4 inhibitor alone or in combination with basal insulin can be used as a treatment for hyperglycemia with patients still in hospital.[30]
+
+Hyperglycemia can also be improved through minor lifestyle changes. Increasing aerobic exercise to at least 30 minutes a day causes the body to make better use of accumulated glucose   since the glucose is being converted to energy by the muscles.[37] Calorie
+monitoring, with restriction as necessary, can reduce over-eating, which contributes to hyperglycemia.[38]
+
+Diets higher in healthy unsaturated fats and whole wheat carbohydrates such as the Mediterranean diet can help reduce carbohydrate intake to better control hyperglycemia.[39] Diets such as intermittent fasting and ketogenic diet help reduce calorie consumption which could significantly reduce hyperglycemia.[citation needed]
+
+Carbohydrates are the main cause for hyperglycemia—whole-wheat items should be substituted for non-whole-wheat items. Although fruits are a part of a complete nutritious diet, fruit intake should be limited due to high sugar content.[40]
+
+Hyperglycemia is lower in higher income groups since there is access to better education, healthcare and resources. Low-middle income groups are more likely to develop hyperglycemia, due in part to a limited access to education and a reduced availability of healthy food options.[41] Living in warmer climates can reduce hyperglycemia due to increased physical activity while people are less active in colder climates.[42]
+
+Hyperglycemia is one of the main symptoms of diabetes and it has substantially affected the population making it an epidemic due to the population's increased calorie consumption.[43] Healthcare providers are trying to work more closely with people allowing them more freedom with interventions that suit their lifestyle.[44] As physical inactivity and calorie consumption increases it makes individuals more susceptible to developing hyperglycemia.[45] Hyperglycemia is caused by type 1 diabetes and non-whites have a higher susceptibility for it.[46]
+
+The origin of the term is Greek: prefix ὑπέρ- hyper- "over-", γλυκός glycos "sweet wine, must", αἷμα haima "blood", -ία, -εια -ia suffix for abstract nouns of feminine gender.[citation needed]

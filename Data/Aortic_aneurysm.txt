@@ -1,0 +1,70 @@
+Title: Aortic aneurysm
+
+
+An aortic aneurysm is an enlargement (dilatation) of the aorta to greater than 1.5 times normal size.[1] Typically, there are no symptoms except when the aneurysm dissects or ruptures, which causes sudden, severe pain in the abdomen and lower back.[2][3]
+
+The etiology remains an area of active research. Known causes include trauma, infection, and inflammatory disorders. Risk factors include cigarette smoking, extreme alcoholism, advanced age, dyslipidemia, hypertension, and coronary artery disease.[4] The pathophysiology of the disease is related to an initial arterial insult causing a cascade of inflammation and extracellular matrix protein breakdown by proteinases leading to arterial wall weakening.[5] They are most commonly located in the abdominal aorta, but can also be located in the thoracic aorta.
+
+Aortic aneurysms result from a weakness in the wall of the aorta and increase the risk of aortic rupture. When rupture occurs, massive internal bleeding results and, unless treated immediately, shock and death can occur. One review stated that up to 81% of people having abdominal aortic aneurysm rupture will die, with 32% dying before reaching a hospital.[6]
+
+According to a review of global data through 2019, the prevalence of abdominal aortic aneurysm worldwide was about 0.9% in people under age 79 years, and is about four times higher in men than in women at any age.[4] Death occurs in about 55-64% of people having rupture of the AAA.[4]
+
+Screening with ultrasound is indicated in those at high risk. Prevention is by decreasing risk factors, such as smoking, and treatment is either by open or endovascular surgery. Aortic aneurysms resulted in about 152,000 deaths worldwide in 2013, up from 100,000 in 1990.[7]
+
+Aortic aneurysms are classified by their location on the aorta.
+
+Most intact aortic aneurysms do not produce symptoms. As they enlarge, symptoms such as abdominal pain and back pain may develop. Compression of nerve roots may cause leg pain or numbness. Untreated, aneurysms tend to become progressively larger, although the rate of enlargement is unpredictable for any individual. Rarely, clotted blood which lines most aortic aneurysms can break off and result in an embolus.[8]
+
+Aneurysms cannot be found on physical examination. Medical imaging is necessary to confirm the diagnosis and to determine the anatomic extent of the aneurysm. In people presenting with aneurysm of the arch of the aorta, a common sign is a hoarse voice from stretching of the left recurrent laryngeal nerve, a branch of the vagus nerve that winds around the aortic arch to supply the muscles of the larynx.[10]
+
+Abdominal aortic aneurysms (AAAs) are more common than their thoracic counterpart. One reason for this is that elastin, the principal load-bearing protein present in the wall of the aorta, is reduced in the abdominal aorta as compared to the thoracic aorta. Another is that the abdominal aorta does not possess vasa vasorum, the nutrient-supplying blood vessels within the wall of the aorta. Most AAA are true aneurysms that involve all three layers (tunica intima, tunica media and tunica adventitia). The prevalence of AAAs increases with age, with an average age of 65–70 at the time of diagnosis. AAAs have been attributed to atherosclerosis, though other factors are involved in their formation.[8] Risk factors for AAA include the male gender, aging, a history of smoking, hypercholesterolemia, and hypertension.[4][8][11] Reviews reported estimates for prevalence rates of AAA were 0.9-9% in men and 1–2% in women, where, generally, the incidence of AAA is four times greater in men compared to women at the same age.[4][8]
+
+The risk of rupture of an AAA is related to its diameter; once the aneurysm reaches about 5 cm, the yearly risk of rupture may exceed the risks of surgical repair for an average-risk patient. Rupture risk is also related to shape; so-called "fusiform" (long) aneurysms are considered less rupture-prone than "saccular" (shorter, bulbous) aneurysms, the latter having more wall tension in a particular location in the aneurysm wall.[12]
+
+The prevalence of AAA worldwide in 2019 was about 0.9% in people under age 79 years,[4] whereas a 2014 review reported a range of 2-12%, occurring in about 8% of men more than 65 years of age.[13] Men are about four times more likely to have AA compared to women at any age, with death occurring in about 55-64% of people having AAA rupture.[4]
+
+Before rupture, an AAA may present as a large, pulsatile mass above the umbilicus. A bruit may be heard from the turbulent flow in the aneurysm. Rupture may be the first sign of AAA. Once an aneurysm has ruptured, it presents with classic symptoms of abdominal pain which is severe, constant, and radiating to the back.[8]
+
+The diagnosis of an abdominal aortic aneurysm can be confirmed by the use of ultrasound. Rupture may be indicated by the presence of free fluid in the abdomen. A contrast-enhanced abdominal CT scan is the best test to diagnose an AAA and guide treatment options.[14]
+
+In 2019, some 170,000 people worldwide died from AAA rupture, with aging, smoking, and hypertension as principal factors.[4][11] Annual mortality from ruptured aneurysms in the United States is about 15,000.[15]
+
+An aortic aneurysm can rupture from wall weakness. Aortic rupture is a surgical emergency and has a high mortality even with prompt treatment. Weekend admission for a ruptured aortic aneurysm is associated with increased mortality compared with admission on a weekday, and this is likely due to several factors including a delay in prompt surgical intervention.[16]
+
+An aortic aneurysm can occur as a result of trauma, infection, or, most commonly, from an intrinsic abnormality in the elastin and collagen components of the aortic wall. While definite genetic abnormalities were identified in true genetic syndromes (Marfan, Elher-Danlos and others) associated with aortic aneurysms, both thoracic and abdominal aortic aneurysms demonstrate a strong genetic component in their aetiology.[19]
+
+The risk of aneurysm enlargement may be diminished with attention to the patient's blood pressure, smoking and cholesterol levels. There have been proposals to introduce ultrasound scans as a screening tool for those most at risk: men over the age of 65.[20][21]
+
+Anacetrapib is a cholesteryl ester transfer protein inhibitor that raises high-density lipoprotein (HDL) cholesterol and reduces low-density lipoprotein (LDL) cholesterol.
+Anacetrapib reduces progression of atherosclerosis, mainly by reducing non-HDL-cholesterol, improves lesion stability and adds to the beneficial effects of atorvastatin[22]
+Elevating the amount of HDL cholesterol in the abdominal area of the aortic artery in mice both reduced the size of aneurysms that had already grown and prevented abdominal aortic aneurysms from forming at all. In short, raising HDL cholesterol is beneficial because it induces programmed cell death. The walls of a failing aorta are replaced and strengthened. New lesions should not form at all when using this drug.[23]
+
+Screening for an aortic aneurysm so that it may be detected and treated prior to rupture is the best way to reduce the overall mortality of the disease. The most cost-efficient screening test is an abdominal aortic ultrasound study. Noting the results of several large, population-based screening trials, the US Centers for Medicare and Medicaid Services (CMS) now provides payment for one ultrasound study in all smokers aged 65 years or older ("SAAAVE Act").[24]
+
+Surgery (open or endovascular) is the definitive treatment of an aortic aneurysm. Medical therapy is typically reserved for smaller aneurysms or for elderly, frail patients where the risks of surgical repair exceed the risks of non-operative therapy (observation alone).
+
+Medical therapy of aortic aneurysms involves strict blood pressure control. This does not treat the aortic aneurysm per se, but control of hypertension within tight blood pressure parameters may decrease the rate of expansion of the aneurysm.
+
+The medical management of patients with aortic aneurysms, reserved for smaller aneurysms or frail patients, involves cessation of smoking, blood pressure control, use of statins and occasionally beta blockers. Ultrasound studies are obtained on a regular basis (i.e. every 6 or 12 months) to follow the size of the aneurysm.
+
+Despite optimal medical therapy, patients with large aneurysms are likely to have continued aneurysm growth and risk of aneurysm rupture without surgical repair.[25]
+
+Decisions about repairing an aortic aneurysm are based on the balance between the risk of aneurysm rupture without treatment versus the risks of the treatment itself. For example, a small aneurysm in an elderly patient with severe cardiovascular disease would not be repaired. The chance of the small aneurysm rupturing is overshadowed by the risk of cardiac complications from the procedure to repair the aneurysm.
+
+The risk of the repair procedure is two-fold. First, there is consideration of the risk of problems occurring during and immediately after the procedure itself ("peri-procedural" complications). Second, the effectiveness of the procedure must be taken into account, namely whether the procedure effectively protects the patient from aneurysm rupture over the long term, and whether the procedure is durable so that secondary procedures, with their attendant risks, are not necessary over the life of the patient. A less invasive procedure (such as endovascular aneurysm repair) may be associated with fewer short-term risks to the patient (fewer peri-procedural complications) but secondary procedures may be necessary over long-term follow-up.
+
+The determination of surgical intervention is determined on a per-case basis. The diameter of the aneurysm, its rate of growth, the presence or absence of Marfan syndrome, Ehlers–Danlos syndromes or similar connective tissue disorders, and other co-morbidities are all important factors in the overall treatment.
+
+A large, rapidly expanding, or symptomatic aneurysm should be repaired, as it has a greater chance of rupture. Slowly expanding aortic aneurysms may be followed by routine diagnostic testing (i.e.: CT scan or ultrasound imaging).
+
+For abdominal aneurysms, the current treatment guidelines for abdominal aortic aneurysms suggest elective surgical repair when the diameter of the aneurysm is greater than 5 cm (2 in). However, recent data on patients aged 60–76 suggest medical management for abdominal aneurysms with a diameter of less than 5.5 cm (2 in).[26]
+
+Open surgery starts with exposure of the dilated portion of the aorta via an incision in the abdomen or abdomen and chest, followed by insertion of a synthetic (Dacron or Gore-Tex) graft (tube) to replace the diseased aorta. The graft is sewn in by hand to the non-diseased portions of the aorta, and the aneurysmal sac is closed around the graft.
+
+The aorta and its branching arteries are cross-clamped during open surgery. This can lead to inadequate blood supply to the spinal cord, resulting in paraplegia. A 2004 systematic review and meta analysis found that cerebrospinal fluid drainage (CFSD), when performed in experienced centers, reduces the risk of ischemic spinal cord injury by increasing the perfusion pressure to the spinal cord.[27] A 2012 Cochrane systematic review noted that further research regarding the effectiveness of CFSD for preventing a spinal cord injury is required.[28] A 2023 systematic review suggested that rates of postoperative spinal cord ischaemia can be kept at low levels after open repair of thoracoabdominal aneurysm with the adequate precautions and perioperative manoeuvres.[29] The majority of the surgeons believe prophylactic lumbar drains are effective in reducing spinal cord ischaemia.[30] Neuromonitoring with motor-evoked potentials (MEP) can provide the surgeon objective criteria to direct selective intercostal reconstruction or other protective anaesthetic and surgical manoeuvres. Simultaneous monitoring of MEP and somatosensory-evoked potentials (SSEP) seems to be the most reliable method.[29]
+
+Endovascular treatment of aortic aneurysms is a minimally invasive alternative to open surgery repair. It involves the placement of an endo-vascular stent through small incisions at the top of each leg into the aorta.
+
+As compared to open surgery, EVAR has a lower risk of death in the short term and a shorter hospital stay but may not always be an option.[2][31][32] There does not appear to be a difference in longer term outcomes between the two.[33] After EVAR, repeat procedures are more likely to be needed.[34]
+
+Globally, aortic aneurysms resulted in about ~170,000 deaths in 2017.[4] This figure represents an increase from approximately ~100,000 in 1990.[7]

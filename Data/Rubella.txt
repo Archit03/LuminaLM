@@ -1,0 +1,80 @@
+Title: Rubella
+
+
+Rubella, also known as German measles or three-day measles,[6] is an infection caused by the rubella virus.[3] This disease is often mild, with half of people not realizing that they are infected.[1][7] A rash may start around two weeks after exposure and last for three days.[1] It usually starts on the face and spreads to the rest of the body.[1] The rash is sometimes itchy and is not as bright as that of measles.[1] Swollen lymph nodes are common and may last a few weeks.[1] A fever, sore throat, and fatigue may also occur.[1][2] Joint pain is common in adults.[1] Complications may include bleeding problems, testicular swelling, encephalitis, and inflammation of nerves.[1] Infection during early pregnancy may result in a miscarriage or a child born with congenital rubella syndrome (CRS).[3] Symptoms of CRS manifest as problems with the eyes such as cataracts, deafness, as well as affecting the heart and brain.[3] Problems are rare after the 20th week of pregnancy.[3]
+
+Rubella is usually spread from one person to the next through the air via coughs of people who are infected.[3][4] People are infectious during the week before and after the appearance of the rash.[1] Babies with CRS may spread the virus for more than a year.[1] Only humans are infected.[3] Insects do not spread the disease.[1] Once recovered, people are immune to future infections.[3] Testing is available that can verify immunity.[3] Diagnosis is confirmed by finding the virus in the blood, throat, or urine.[1] Testing the blood for antibodies may also be useful.[1]
+
+Rubella is preventable with the rubella vaccine with a single dose being more than 95% effective.[3] Often it is given in combination with the measles vaccine and mumps vaccine, known as the MMR vaccine.[1] When some, but less than 80%, of a population is vaccinated, more women may reach childbearing age without developing immunity by infection or vaccination, thus possibly raising CRS rates.[3] Once infected there is no specific treatment.[2]
+
+Rubella is a common infection in many areas of the world.[2] Each year about 100,000 cases of congenital rubella syndrome occur.[3] Rates of disease have decreased in many areas as a result of vaccination.[2][7] There are ongoing efforts to eliminate the disease globally.[3] In April 2015, the World Health Organization declared the Americas free of rubella transmission.[8][9] The name "rubella" is from Latin and means little red.[1] It was first described as a separate disease by German physicians in 1814, resulting in the name "German measles".[1]
+
+Rubella has symptoms similar to those of flu. However, the primary symptom of rubella virus infection is the appearance of a rash (exanthem) on the face which spreads to the trunk and limbs and usually fades after three days, which is why it is often referred to as three-day measles. The facial rash usually clears as it spreads to other parts of the body. Other symptoms include low-grade fever, swollen glands (sub-occipital and posterior cervical lymphadenopathy), joint pains, headache, and conjunctivitis.[11]
+
+The swollen glands or lymph nodes can persist for up to a week and the fever rarely rises above 38 °C (100.4 °F). The rash of rubella is typically pink or light red. The rash causes itching and often lasts for about three days. The rash disappears after a few days with no staining or peeling of the skin. When the rash clears up, the skin might shed in very small flakes where the rash covered it. Forchheimer spots occur in 20% of cases and is characterized by small, red papules on the area of the soft palate.[12]
+
+Rubella can affect anyone of any age. Adult females are particularly prone to arthritis and joint pains.[13]
+
+In children, rubella normally causes symptoms that last two days and include:
+
+In older children and adults, additional symptoms may be present, including[citation needed]
+
+Severe complications of rubella include:
+
+Coryza in rubella may convert to pneumonia, either direct viral pneumonia or secondary bacterial pneumonia, and bronchitis (either viral bronchitis or secondary bacterial bronchitis).[16]
+
+Rubella can cause congenital rubella syndrome in the newborn, this being the most severe sequela of rubella. The syndrome (CRS) follows intrauterine infection by the rubella virus and comprises cardiac, cerebral, ophthalmic, and auditory defects.[17] It may also cause prematurity, low birth weight, neonatal thrombocytopenia, anemia, and hepatitis. The risk of major defects in organogenesis is highest for infection in the first trimester. CRS is the main reason a vaccine for rubella was developed.[18]
+
+80–90% of mothers who contract rubella within the critical first trimester have either a miscarriage or a stillborn baby.[11] If the fetus survives the infection, it can be born with severe heart disorders (patent ductus arteriosus being the most common), blindness, deafness, or other life-threatening organ disorders. The skin manifestations are called "blueberry muffin lesions".[18] For these reasons, rubella is included in the TORCH complex of perinatal infections.[19][20]
+
+About 100,000 cases of this condition occur each year.[3]
+
+The disease is caused by the rubella virus, in the genus Rubivirus from the family Matonaviridae,[21] that is enveloped and has a single-stranded RNA genome.[22] The virus is transmitted by the respiratory route and replicates in the nasopharynx and lymph nodes. The virus is found in the blood 5 to 7 days after infection and spreads throughout the body. The virus has teratogenic properties and is capable of crossing the placenta and infecting the fetus where it stops cells from developing or destroys them.[11] During this incubation period, the patient is contagious typically for about one week before he/she develops a rash and for about one week thereafter.[1]
+
+Increased susceptibility to infection might be inherited as there is some indication that HLA-A1 or factors surrounding A1 on extended haplotypes are involved in virus infection or non-resolution of the disease.[23][24]
+
+Rubella virus specific IgM antibodies are present in people recently infected by rubella virus, but these antibodies can persist for over a year, and a positive test result needs to be interpreted with caution.[25] The presence of these antibodies along with, or a short time after, the characteristic rash confirms the diagnosis.[26]
+
+Rubella infections are prevented by active immunization programs using live attenuated virus vaccines. Two live attenuated virus vaccines, RA 27/3 and Cendehill strains, were effective in the prevention of adult disease. However, their use in prepubertal females did not produce a significant fall in the overall incidence rate of CRS in the UK. Reductions were only achieved by immunisation of all children.[27]
+
+The vaccine is now usually given as part of the MMR vaccine. The WHO recommends the first dose be given at 12 to 18 months of age with a second dose at 36 months. Pregnant women are usually tested for immunity to rubella early on. Women found to be susceptible are not vaccinated until after the baby is born because the vaccine contains live virus.[28]
+
+The immunisation program has been quite successful. Cuba declared the disease eliminated in the 1990s, and in 2004 the Centers for Disease Control and Prevention announced that both the congenital and acquired forms of rubella had been eliminated from the United States.[29][30] The World Health Organization declared Australia rubella free in October 2018.[31]
+
+Screening for rubella susceptibility by history of vaccination or by serology is recommended in the United States for all women of childbearing age at their first preconception counseling visit to reduce incidence of congenital rubella syndrome (CRS).[32] It is recommended that all susceptible non-pregnant women of childbearing age should be offered rubella vaccination.[32] Due to concerns about possible teratogenicity, use of MMR vaccine is not recommended during pregnancy.[32] Instead, susceptible pregnant women should be vaccinated as soon as possible in the postpartum period.[32]
+
+In susceptible people passive immunization, in the form of polyclonal immunoglobulins, appears effective up to the fifth day post-exposure.[33]
+
+There is no specific treatment for rubella; however, management is a matter of responding to symptoms to diminish discomfort. Treatment of newborn babies is focused on management of the complications. Congenital heart defects and cataracts can be corrected by direct surgery.[13][34]
+
+Management for ocular congenital rubella syndrome (CRS) is similar to that for age-related macular degeneration, including counseling, regular monitoring, and the provision of low vision devices, if required.[35]
+
+Rubella infection of children and adults is usually mild, self-limiting, and often asymptomatic. The prognosis in children born with CRS is poor.[36]
+
+Rubella occurs worldwide. The virus tends to peak during the spring in countries with temperate climates. Before the vaccine against rubella was introduced in 1969, widespread outbreaks usually occurred every 6–9 years in the United States and 3–5 years in Europe, mostly affecting children in the 5–9 year old age group.[37] Since the introduction of vaccine, occurrences have become rare in those countries with high uptake rates.[citation needed]
+
+Vaccination has interrupted the transmission of rubella in the Americas: no endemic case has been observed since February 2009.[38] Vaccination is still strongly recommended as the virus could be reintroduced from other continents should vaccination rates in the Americas drop.[39] During the epidemic in the US between 1962 and 1965, rubella virus infections during pregnancy were estimated to have caused 30,000 stillbirths and 20,000 children to be born impaired or disabled as a result of CRS.[40][41] Universal immunisation producing a high level of herd immunity is important in the control of epidemics of rubella.[42]
+
+In the UK, there remains a large population of men susceptible to rubella who have not been vaccinated. Outbreaks of rubella occurred amongst many young men in the UK in 1993 and in 1996 the infection was transmitted to pregnant women, many of whom were immigrants and were susceptible. Outbreaks still arise, usually in developing countries where the vaccine is not as accessible.[43] The complications encountered in pregnancy from rubella infection (miscarriage, fetal death, congenital rubella syndrome) are more common in Africa and Southeast Asia at a rate of 121 per 100,000 live births compared to 2 per 100,000 live births in the Americas and Europe.[44]
+
+In Japan, 15,000 cases of rubella and 43 cases of congenital rubella syndrome were reported to the National Epidemiological Surveillance of Infectious Diseases between October 15, 2012, and March 2, 2014, during the 2012–13 rubella outbreak in Japan. They mainly occurred in men aged 31–51 and young adults aged 24–34.[45]
+
+Rubella was first described in the mid-eighteenth century. German physician and chemist, Friedrich Hoffmann, made the first clinical description of rubella in 1740,[46] which was confirmed by de Bergen in 1752 and Orlow in 1758.[47]
+
+In 1814, George de Maton first suggested that it be considered a disease distinct from both measles and scarlet fever. All these physicians were German, and the disease was known as Rötheln (contemporary German Röteln). (Rötlich means "reddish" or "pink" in German.) The fact that three Germans described it led to the common name of "German measles."[48] Henry Veale, an English Royal Artillery surgeon, described an outbreak in India. He coined the name "rubella" (from the Latin word, meaning "little red") in 1866.[46][49][50][51]
+
+It was formally recognised as an individual entity in 1881, at the International Congress of Medicine in London.[52] In 1914, Alfred Fabian Hess theorised that rubella was caused by a virus, based on work with monkeys.[53] In 1938, Hiro and Tosaka confirmed this by passing the disease to children using filtered nasal washings from acute cases.[50]
+
+In 1940, there was a widespread epidemic of rubella in Australia. Subsequently, ophthalmologist Norman McAllister Gregg found 78 cases of congenital cataracts in infants and 68 of them were born to mothers who had caught rubella in early pregnancy.[49][50] Gregg published an account, Congenital Cataract Following German Measles in the Mother, in 1941. He described a variety of problems now known as congenital rubella syndrome (CRS) and noticed that the earlier the mother was infected, the worse the damage was. Since no vaccine was yet available, some popular magazines promoted the idea of "German measles parties" for infected children to spread the disease to other children (especially girls) to immunize them for life and protect them from later catching the disease when pregnant.[54] The virus was isolated in tissue culture in 1962 by two separate groups led by physicians Paul Douglas Parkman and Thomas Huckle Weller.[49][51]
+
+There was a pandemic of rubella between 1962 and 1965, starting in Europe and spreading to the United States.[51] In the years 1964–65, the United States had an estimated 12.5 million rubella cases (1964–1965 rubella epidemic). This led to 11,000 miscarriages or therapeutic abortions and 20,000 cases of congenital rubella syndrome. Of these, 2,100 died as neonates, 12,000 were deaf, 3,580 were blind, and 1,800 were intellectually disabled. In New York alone, CRS affected 1% of all births.[55][56]
+
+In 1967, the molecular structure of rubella was observed under electron microscopy using antigen-antibody complexes by Jennifer M. Best, June Almeida, J E Banatvala and A P Waterson.[57][58]
+
+In 1969, a live attenuated virus vaccine was licensed.[50] In the early 1970s, a triple vaccine containing attenuated measles, mumps and rubella (MMR) viruses was introduced.[51] By 2006, confirmed cases in the Americas had dropped below 3000 a year. However, a 2007 outbreak in Argentina, Brazil, and Chile pushed the cases to 13,000 that year.[8]
+
+On January 22, 2014, the World Health Organization (WHO) and the Pan American Health Organization declared and certified Colombia free of rubella and became the first Latin American country to eliminate the disease within its borders.[59][60] On April 29, 2015, the Americas became the first WHO region to officially eradicate the disease. The last non-imported cases occurred in 2009 in Argentina and Brazil. The Pan American Health Organization director remarked, "The fight against rubella has taken more than 15 years, but it has paid off with what I believe will be one of the most important pan-American public health achievements of the 21st Century."[61] The declaration was made after 165 million health records and genetically confirming that all recent cases were caused by known imported strains of the virus.  Rubella is still common in some regions of the world and Susan E. Reef, team lead for rubella at the CDC's global immunization division, who joined in the announcement, said there was no chance it would be eradicated worldwide before 2020.[8] Rubella is the third disease to be eliminated from the Western Hemisphere with vaccination after smallpox and polio.[8][9]
+
+From "rubrum" the Latin for "red",  rubella means "reddish and small". "German" measles derives from "germanus" which means "similar" in this context.[62]
+
+The name rubella is sometimes confused with rubeola, an alternative name for measles in English-speaking countries; the diseases are unrelated.[63][64] In some other European languages, like Spanish, rubella and rubeola are synonyms, and rubeola is not an alternative name for measles. Thus, in Spanish, rubeola refers to rubella and sarampión refers to measles.[65][66]

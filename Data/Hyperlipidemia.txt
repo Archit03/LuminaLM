@@ -1,0 +1,87 @@
+Title: Hyperlipidemia
+Hyperlipidemia is abnormally high levels of any or all lipids (e.g. fats, triglycerides, cholesterol, phospholipids) or lipoproteins in the blood.[2] The term hyperlipidemia refers to the laboratory finding itself and is also used as an umbrella term covering any of various acquired or genetic disorders that result in that finding.[3] Hyperlipidemia represents a subset of dyslipidemia and a superset of hypercholesterolemia. Hyperlipidemia is usually chronic and requires ongoing  medication to control blood lipid levels.[3]
+
+Lipids (water-insoluble molecules) are transported in a protein capsule.[4] The size of that capsule, or lipoprotein, determines its density.[4] The lipoprotein density and type of apolipoproteins it contains determines the fate of the particle and its influence on metabolism.
+
+Hyperlipidemias are divided into primary and secondary subtypes. Primary hyperlipidemia is usually due to genetic causes (such as a mutation in a receptor protein), while secondary hyperlipidemia arises due to other underlying causes such as diabetes. Lipid and lipoprotein abnormalities are common in the general population and are regarded as modifiable risk factors for cardiovascular disease due to their influence on atherosclerosis.[5] In addition, some forms may predispose to acute pancreatitis.
+
+Hyperlipidemias may basically be classified as either familial (also called primary[6]) when caused by specific genetic abnormalities or acquired (also called secondary)[6] when resulting from another underlying disorder that leads to alterations in plasma lipid and lipoprotein metabolism.[6] Also, hyperlipidemia may be idiopathic, that is, without a known cause.[7]
+
+Hyperlipidemias are also classified according to which types of lipids are elevated, that is hypercholesterolemia, hypertriglyceridemia or both in combined hyperlipidemia. Elevated levels of Lipoprotein(a) may also be classified as a form of hyperlipidemia.[8]
+
+Familial hyperlipidemias are classified according to the Fredrickson classification, which is based on the pattern of lipoproteins on electrophoresis or ultracentrifugation.[9] It was later adopted by the World Health Organization (WHO).[10] It does not directly account for HDL, and it does not distinguish among the different genes that may be partially responsible for some of these conditions.[citation needed]
+
+
+Type I hyperlipoproteinemia exists in several forms:
+
+Type I hyperlipoproteinemia usually presents in childhood with eruptive xanthomata and abdominal colic. Complications include retinal vein occlusion, acute pancreatitis, steatosis, and organomegaly, and lipemia retinalis.
+
+Hyperlipoproteinemia type II is further classified into types IIa and IIb, depending mainly on whether elevation in the triglyceride level occurs in addition to LDL cholesterol.
+
+This may be sporadic (due to dietary factors), polygenic, or truly familial as a result of a mutation either in the LDL receptor gene on chromosome 19 (0.2% of the population) or the ApoB gene (0.2%). The familial form is characterized by tendon xanthoma, xanthelasma, and premature cardiovascular disease.  The incidence of this disease is about one in 500 for heterozygotes, and one in 1,000,000 for homozygotes.[citation needed]
+
+HLPIIa is a rare genetic disorder characterized by increased levels of LDL cholesterol in the blood due to the lack of uptake (no Apo B receptors) of LDL particles. This pathology, however, is the second-most common disorder of the various hyperlipoproteinemias, with individuals with a heterozygotic predisposition of one in every 500 and individuals with homozygotic predisposition of one in every million. These individuals may present with a unique set of physical characteristics such as xanthelasmas (yellow deposits of fat underneath the skin often presenting in the nasal portion of the eye), tendon and tuberous xanthomas, arcus juvenilis (the graying of the eye often characterized in older individuals), arterial bruits, claudication, and of course atherosclerosis. Laboratory findings for these individuals are significant for total serum cholesterol levels two to three times greater than normal, as well as increased LDL cholesterol, but their triglycerides and VLDL values fall in the normal ranges.[citation needed]
+
+To manage persons with HLPIIa, drastic measures may need to be taken, especially if their HDL cholesterol levels are less than 30 mg/dL and their LDL levels are greater than 160 mg/dL. A proper diet for these individuals requires a decrease in total fat to less than 30% of total calories with a ratio of monounsaturated:polyunsaturated:saturated fat of 1:1:1. Cholesterol should be reduced to less than 300 mg/day, thus the avoidance of animal products and to increase fiber intake to more than 20 g/day with 6g of soluble fiber/day.[18] Exercise should be promoted, as it can increase HDL. The overall prognosis for these individuals is in the worst-case scenario if uncontrolled and untreated individuals may die before the age of 20, but if one seeks a prudent diet with correct medical intervention, the individual may see an increased incidence of xanthomas with each decade, and Achilles tendinitis and accelerated atherosclerosis will occur.[citation needed]
+
+The high VLDL levels are due to overproduction of substrates, including triglycerides, acetyl-CoA, and an increase in B-100 synthesis. They may also be caused by the decreased clearance of LDL. Prevalence in the population is 10%.[citation needed]
+
+This form is due to high chylomicrons and IDL (intermediate density lipoprotein). Also known as broad beta disease or dysbetalipoproteinemia, the most common cause for this form is the presence of ApoE E2/E2 genotype. It is due to cholesterol-rich VLDL (β-VLDL). Its prevalence has been estimated to be approximately 1 in 10,000.[12]
+
+It is associated with hypercholesterolemia (typically 8–12 mmol/L), hypertriglyceridemia (typically 5–20 mmol/L), a normal ApoB concentration, and two types of skin signs (palmar xanthomata or orange discoloration of skin creases, and tuberoeruptive xanthomata on the elbows and knees). It is characterized by the early onset of cardiovascular disease and peripheral vascular disease. Remnant hyperlipidemia occurs as a result of abnormal function of the ApoE receptor, which is normally required for clearance of chylomicron remnants and IDL from the circulation. The receptor defect causes levels of chylomicron remnants and IDL to be higher than normal in the blood stream. The receptor defect is an autosomal recessive mutation or polymorphism.[citation needed]
+
+Familial hypertriglyceridemia is an autosomal dominant condition occurring in approximately 1% of the population.[19]
+
+This form is due to high triglyceride level. Other lipoprotein levels are normal or increased a little.[citation needed]
+
+Treatment include diet control, fibrates and niacins. Statins are not better than fibrates when lowering triglyceride levels.[citation needed]
+
+Hyperlipoproteinemia type V, also known as mixed hyperlipoproteinemia familial or mixed hyperlipidemia,[20] is very similar to type I, but with high VLDL in addition to chylomicrons.
+
+It is also associated with glucose intolerance and hyperuricemia.[citation needed]
+
+In medicine, combined hyperlipidemia (or -aemia) (also known as "multiple-type hyperlipoproteinemia") is a commonly occurring form of hypercholesterolemia (elevated cholesterol levels) characterized by increased LDL and triglyceride concentrations, often accompanied by decreased HDL.[21] On lipoprotein electrophoresis (a test now rarely performed) it shows as a hyperlipoproteinemia type IIB. It is the most common inherited lipid disorder, occurring in about one in 200 persons. In fact, almost one in five individuals who develop coronary heart disease before the age of 60 has this disorder.
+The elevated triglyceride levels (>5 mmol/L) are generally due to an increase in very low density lipoprotein (VLDL), a class of lipoprotein prone to cause atherosclerosis.[citation needed]
+
+Both conditions are treated with fibrate drugs, which act on the peroxisome proliferator-activated receptors (PPARs), specifically PPARα, to decrease free fatty acid production.
+Statin drugs, especially the synthetic statins (atorvastatin and rosuvastatin) can decrease LDL levels by increasing hepatic reuptake of LDL due to increased LDL-receptor expression.
+
+These unclassified forms are extremely rare:
+
+Acquired hyperlipidemias (also called secondary dyslipoproteinemias) often mimic primary forms of hyperlipidemia and can have similar consequences.[6] They may result in increased risk of premature atherosclerosis or, when associated with marked hypertriglyceridemia, may lead to pancreatitis and other complications of the chylomicronemia syndrome.[6] The most common causes of acquired hyperlipidemia are:
+
+Other conditions leading to acquired hyperlipidemia include:
+
+Treatment of the underlying condition, when possible, or discontinuation of the offending drugs usually leads to an improvement in the hyperlipidemia.
+
+Another acquired cause of hyperlipidemia, although not always included in this category, is postprandial hyperlipidemia, a normal increase following ingestion of food.[21][22]
+
+Hyperlipidemia predisposes a person to atherosclerosis. Atherosclerosis is the accumulation of lipids, cholesterol, calcium, fibrous plaques within the walls of arteries.[23] This accumulation narrows the blood vessel and reduces blood flow and oxygen to muscles of the heart.[23][24] Over time fatty deposits can build up, hardening and narrowing the arteries until organs and tissues don't receive enough blood to properly function.[25]  If arteries that supply the heart with blood are affected, a person might have angina (chest pain).[26] Complete blockage of the artery causes infarction of the myocardial cells, also known as heart attack.[27] Fatty buildup in the arteries can also lead to stroke, if a blood clot blocks blood flow to the brain.[26]
+
+Adults 20 years and older should have the cholesterol checked every four to six years.[28] Serum level of  Low Density Lipoproteins (LDL) cholesterol, High Density Lipoproteins (HDL) Cholesterol, and triglycerides are commonly tested in primary care setting using a lipid panel.[29] Quantitative levels of lipoproteins and triglycerides contribute toward cardiovascular disease risk stratification via models/calculators such as Framingham Risk Score, ACC/AHA Atherosclerotic Cardiovascular Disease Risk Estimator, and/or Reynolds Risk Scores. These models/calculators may also take into account of family history (heart disease and/or high blood cholesterol), age, gender, Body-Mass-Index, medical history (diabetes, high cholesterol, heart disease), high sensitivity CRP levels, coronary artery calcium score, and ankle-brachial index.[30] The cardiovascular stratification further determines what medical intervention may be necessary to decrease the risk of future cardiovascular disease.[citation needed]
+
+The combined quantity of LDL and HDL. A total cholesterol of higher than 240 mg/dL is abnormal, but medical intervention is determined by the breakdown of LDL and HDL levels.[31]
+
+LDL, commonly known as "bad cholesterol", is associated with increased risk of cardiovascular disease.[32][33]  LDL cholesterol transports cholesterol particles throughout the body, and can build up in the walls of the arteries, making them hard and narrow.[26] LDL cholesterol is produced naturally by the body, but eating a diet high in saturated fat, trans fats, and cholesterol can increase LDL levels.[34] Elevated LDL levels are associated with diabetes, hypertension, hypertriglyceridemia, and atherosclerosis. In a fasting lipid panel, a LDL greater than 160 mg/dL is abnormal.[30][31]
+
+HDL, also known as "good cholesterol", is associated with decreased risk of cardiovascular disease.[33] HDL cholesterol carries cholesterol from other parts of the body back to the liver and then removes the cholesterol from the body.[35] It can be affected by acquired or genetic factors, including tobacco use, obesity, inactivity, hypertriglyceridemia, diabetes, high carbohydrate diet, medication side effects (beta-blockers, androgenic steroids, corticosteroids, progestogens, thiazide diuretics, retinoic acid derivatives, oral estrogens, etc.) and genetic abnormalities (mutations ApoA-I, LCAT, ABC1).[30] Low level is defined as less than 40 mg/dL.[31][36]
+
+Triglyceride level is an independent risk factor for cardiovascular disease and/or metabolic syndrome.[30] Food intake prior to testing may cause elevated levels, up to 20%. Normal level is defined as less than 150 mg/dL.[37] Borderline high is defined as 150 to 199 mg/dL.[37] High level is between 200 and 499 mg/dL.[37] Greater than 500 mg/dL is defined as very high,[37] and is associated with pancreatitis and requires medical treatment.[38]
+
+Health organizations does not have a consensus on the age to begin screening for hyperlipidemia.[30] The CDC recommends cholesterol screenings once between ages 9 and 11, once again between 17 and 21, and every 4 to 6 years in adulthood.[39] Doctors may recommend more frequent screenings for people with a family history of early heart attacks, heart disease, or if a child has obesity or diabetes.[39] USPSTF recommends men older than 35 and women older than 45 to be screened.[40][41] NCE-ATP III recommends all adults older than 20 to be screened as it may lead potential lifestyle modification that can reduce risks of other diseases.[42]  However, screening should be done for those with known CHD or risk-equivalent conditions (e.g. Acute Coronary Syndrome, history of heart attacks, Stable or Unstable angina, Transient ischemic attacks, Peripheral arterial disease of atherosclerotic origins, coronary or other arterial revascularization).[30]
+
+Adults 20 years and older should have the cholesterol checked every four to six years,[28] and most screening guidelines recommends testing every 5 years.[30] USPSTF recommends increased frequency for people with elevated risk of CHD, which may be determined using cardiovascular disease risk scores.[41]
+
+Management of hyperlipidemia includes maintenance of a normal body weight, increased physical activity, and decreased consumption of refined carbohydrates and simple sugars.[43] Prescription drugs may be used to treat some people having significant risk factors,[43] such as cardiovascular disease, LDL cholesterol greater than 190 mg/dL or diabetes. Common medication therapy is a statin.[43][44]
+
+Competitive inhibitors of HMG-CoA reductase, such as lovastatin, atorvastatin, fluvastatin, pravastatin, simvastatin, rosuvastatin, and pitavastatin, inhibit the synthesis of mevalonate, a precursor molecule to cholesterol.[45] This medication class is especially effective at decreasing elevated LDL cholesterol.[45] Major side effects include elevated transaminases and myopathy.[45]
+
+Fibric acid derivatives, such as gemfibrozil and fenofibrate, function by increasing the lipolysis in adipose tissue via activation of peroxisome proliferator-activated receptor-α.[45] They decrease VLDL – very low density lipoprotein – and LDL in some people.[45]  Major side effects include rashes, GI upset, myopathy, or increased transaminases.[45]
+
+Niacin, or vitamin B3 has a mechanism of action that is poorly understood, however it has been shown to decrease LDL cholesterol and triglycerides, and increase HDL cholesterol.[45]  The most common side effect is flushing secondary to skin vasodilation.[45] This effect is mediated by prostaglandins and can be decreased by taking concurrent aspirin.[45]
+
+Bile acid binding resins, such as colestipol, cholestyramine, and colesevelam, function by binding bile acids, increasing their excretion.[45] They are useful for decreasing LDL cholesterol.[45] The most common side effects include bloating and diarrhea.[45]
+
+Inhibitors of intestinal sterol absorption, such as ezetimibe, function by decreasing the absorption of cholesterol in the GI tract by targeting NPC1L1, a transport protein in the gastrointestinal wall.[45] This results in decreased LDL cholesterol.[45]
+
+Quitting smoking, lowering intake of saturated fat and alcohol, losing excess body weight, and eating a low-salt diet that emphasizes fruits, vegetables, and whole grains can help reduce blood cholesterol.[26][28][37]

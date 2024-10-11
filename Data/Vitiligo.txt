@@ -1,0 +1,80 @@
+Title: Vitiligo
+
+
+
+
+Vitiligo (/ˌvɪtɪˈlaɪɡoʊ/) is a chronic autoimmune disorder that causes patches of skin to lose pigment or color.[1] The cause of vitiligo is unknown, but it may be related to immune system changes, genetic factors, stress, or sun exposure.[5][6] Treatment options include topical medications, light therapy, surgery and cosmetics.[6] The condition can show up on any skin type as a light peachy color and can appear on any place on the body in all sizes. The spots on the skin known as vitiligo are also able to “change” as spots lose and regain pigment; they will stay in relatively the same areas but can move over time and some big patches can move through the years but never disappear overnight.
+
+The only sign of vitiligo is the presence of pale patchy areas of depigmented skin which tend to occur on the extremities.[7][8] Some people may experience itching before a new patch appears.[9] The patches are initially small, but often grow and change shape.[7][10] When skin lesions occur, they are most prominent on the face, hands and wrists.[7][8] The loss of skin pigmentation is particularly noticeable around body orifices, such as the mouth, eyes, nostrils, genitalia and umbilicus.[7][8] Some lesions have increased skin pigment around the edges.[11] Those affected by vitiligo who are stigmatized for their condition may experience depression and similar mood disorders.[12]
+
+Although multiple hypotheses have been suggested as potential triggers that cause vitiligo, studies strongly imply that changes in the immune system are responsible for the condition.[2][13] Vitiligo has been proposed to be a multifactorial disease with genetic susceptibility and environmental factors both thought to play a role.[2] It is hypothesized that damaging environmental factors can disrupt redox reactions necessary for protein folding, so skin cells may initiate the unfolded protein response which releases cytokines, thus mounting an immune response [14][15]
+
+The National Institutes of Health states that sometimes an event, like a sunburn, emotional distress, or exposure to a chemical, can trigger or exacerbate the condition,[16] Skin depigmentation in particular areas in vitiligo can also be triggered by mechanical trauma: this is an example of the Koebner phenomenom.[17] Unlike in other skin diseases, this can be caused by daily activities, especially chronic friction on particular areas of the body.[17]
+
+Melanin is the pigment that gives skin its color; it is produced by skin cells called melanocytes.
+
+Variations in genes that are part of the immune system or part of melanocytes have both been associated with vitiligo.[2] It is also thought to be caused by the immune system attacking and destroying the melanocytes of the skin.[18] A genome wide association study found approximately 36 independent susceptibility loci for generalized vitiligo.[19]
+
+The TYR gene encodes the protein tyrosinase, which is not a component of the immune system, but is an enzyme of the melanocyte that catalyzes melanin biosynthesis, and a major autoantigen in generalized vitiligo.[2]
+
+Vitiligo is sometimes associated with autoimmune and inflammatory diseases such as Hashimoto's thyroiditis, scleroderma, rheumatoid arthritis, type 1 diabetes mellitus, psoriasis, Addison's disease, pernicious anemia, alopecia areata, systemic lupus erythematosus, and celiac disease.[2][20]
+
+Among the inflammatory products of NLRP1 are caspase 1 and caspase 7, which activate the inflammatory cytokine interleukin-1β. Interleukin-1β and interleukin-18 are expressed at high levels in people with vitiligo.[21] In one of the mutations, the amino acid leucine in the NALP1 protein was replaced by histidine (Leu155 → His). The original protein and sequence is highly conserved in evolution, and is found in humans, chimpanzee, rhesus monkey, and the bush baby. Addison's disease (typically an autoimmune destruction of the adrenal glands) may also be seen in individuals with vitiligo.[22][23]
+
+Numerous whole-exome sequencing studies have demonstrated that vitiligo is associated with polymorphisms in genes involved in the response to oxidative stress such as CAT, SOD1, SOD2, SOD3, NFE2L2, HMOX1, GST-M1 or GST-T1 supporting the association of elevated levels of reactive oxygen species in melanocytes with the induction of an auto-immune response.[24][25]
+
+Thus, diseases presenting with altered mitochondrial function such as MELAS, Vogt-Koyanagi-Harada syndrome, Kabuki syndrome are associated with increased risk of vitiligo. [26][27][28]
+
+In line with these observations, genetic alterations in mitochondrial DNA (mtDNA) of melanocytes associated with altered mitochondrial function lead to a release of mtDNA that can be detected in the skin of vitiligo patients. [29][30] This mtDNA can be sensed by the cGAS-STING pathway resulting in pro-inflammatory cytokine and chemokines production promoting the recruitment of cytotoxic CD8+ T cells. The use of mitochondrial antioxidants, NRF2 inhibitors and TBK1 inhibitors is emerging as potential therapeutic options to block this cascade of event.[29]
+
+An ultraviolet light can be used in the early phase of this disease for identification and to determine the effectiveness of treatment.[31] Using a Wood's light, skin will change colour (fluoresce) when it is affected by certain bacteria, fungi, and changes to pigmentation of the skin.[32]
+
+Classification attempts to quantify vitiligo have been analyzed as being somewhat inconsistent,[33] while recent consensus have agreed to a system of segmental vitiligo (SV) and non-segmental vitiligo (NSV). NSV is the most common type of vitiligo.[2]
+
+In non-segmental vitiligo (NSV), there is usually some form of symmetry in the location of the patches of depigmentation. New patches also appear over time and can be generalized over large portions of the body or localized to a particular area. Extreme cases of vitiligo, to the extent that little pigmented skin remains, are referred to as vitiligo universalis. NSV can come about at any age (unlike segmental vitiligo, which is far more prevalent in teenage years).[11]
+
+Classes of non-segmental vitiligo include the following:
+
+Segmental vitiligo (SV) differs in appearance, cause, and frequency of associated illnesses. Its treatment is different from that of NSV. It tends to affect areas of skin that are associated with dorsal roots from the spinal cord and is most often unilateral.[2][35] It is much more stable/static in course and its association with autoimmune diseases appears to be weaker than that of generalized vitiligo.[35] SV does not improve with topical therapies or UV light; however, surgical treatments such as cellular grafting can be effective.[11]
+
+Chemical leukoderma is a similar condition due to multiple exposures to chemicals.[1] Vitiligo however is a risk factor.[1] Triggers may include inflammatory skin conditions, burns, intralesional steroid injections and abrasions.[1]
+
+Other conditions with similar symptoms include the following:
+
+There is no cure for vitiligo but several treatment options are available.[2] The best evidence is for applied steroids and ultraviolet light in combination with creams.[36] Due to the higher risks of skin cancer, the United Kingdom's National Health Service suggests phototherapy be used only if primary treatments are ineffective.[37] Lesions located on the hands, feet, and joints are the most difficult to repigment; those on the face are easiest to return to the natural skin color as the skin is thinner.[2]
+
+Topical preparations of immune suppressing medications including glucocorticoids (such as 0.05% clobetasol or 0.10% betamethasone) and calcineurin inhibitors (such as tacrolimus or pimecrolimus) are considered to be first-line vitiligo  treatments.[2]
+
+In July 2022, ruxolitinib cream (sold under the brand name Opzelura) was approved for medical use in the United States for the treatment of vitiligo.[38]
+
+Phototherapy is considered a second-line treatment for vitiligo.[2] Exposing the skin to light from UVB lamps is the most common treatment for vitiligo. The treatments can be done at home with an UVB lamp or in a clinic. The exposure time is managed so that the skin does not suffer overexposure. Treatment can take a few weeks if the spots are on the neck and face and if they existed not more than 3 years. If the spots are on the hands and legs and have been there for more than 3 years, it can take a few months. Phototherapy sessions are done 2–3 times a week. Spots on a large area of the body may require full body treatment in a clinic or hospital. UVB broadband and narrowband lamps can be used,[39][40] but narrowband ultraviolet peaked around 311 nm is the choice. It has been constitutively reported that a combination of UVB phototherapy with other topical treatments improves re-pigmentation. However, some people with vitiligo may not see any changes to skin or re-pigmentation occurring. A serious potential side effect involves the risk of developing skin cancer, the same risk as an overexposure to natural sunlight.[citation needed]
+
+Ultraviolet light (UVA) treatments are normally carried out in a hospital clinic. Psoralen and ultraviolet A light (PUVA) treatment involves taking a drug that increases the skin's sensitivity to ultraviolet light, then exposing the skin to high doses of UVA light. Treatment is required twice a week for 6–12 months or longer. Because of the high doses of UVA and psoralen, PUVA may cause side effects such as sunburn-type reactions or skin freckling.[37]
+
+Narrowband ultraviolet B (NBUVB) phototherapy lacks the side-effects caused by psoralens and is as effective as PUVA.[2] As with PUVA, treatment is carried out twice weekly in a clinic or every day at home, and there is no need to use psoralen.[37] Longer treatment is often recommended, and at least 6 months may be required for effects to phototherapy.[41] NBUVB phototherapy appears better than PUVA therapy with the most effective response on the face and neck.[41]
+
+With respect to improved repigmentation: topical calcineurin inhibitors plus phototherapy are better than phototherapy alone,[42] hydrocortisone plus laser light is better than laser light alone, ginkgo biloba is better than placebo, and oral mini-pulse of prednisolone (OMP) plus NB-UVB is better than OMP alone.[9]
+
+In mild cases, vitiligo patches can be hidden with makeup or other cosmetic camouflage solutions. If the affected person is pale-skinned, the patches can be made less visible by avoiding tanning of unaffected skin.[34]
+
+In cases of extensive vitiligo the option to depigment the unaffected skin with topical drugs like monobenzone, mequinol, or hydroquinone may be considered to render the skin an even color. The removal of all the skin pigment with monobenzone is permanent and vigorous. Sun-safety must be adhered to for life to avoid severe sunburn and melanomas. Depigmentation takes about a year to complete.[37]
+
+Descriptions of a disease believed to be vitiligo date back to a passage in the medical text Ebers Papyrus c. 1500 BC in ancient Egypt. Also, the Hebrew word "Tzaraath" from the Old Testament book of Leviticus[43] dating to 1280 BC[44] (or 1312 BC[45]) described a group of skin diseases associated with white spots, and a subsequent translation to Greek led to continued conflation of those with vitiligo with leprosy and spiritual uncleanliness.[43]
+
+Medical sources in the ancient world such as Hippocrates often did not differentiate between vitiligo and leprosy, often grouping these diseases together. The name "vitiligo" was first used by the Roman physician Aulus Cornelius Celsus in his classic medical text De Medicina.[43]
+
+The term vitiligo is believed to be derived from "vitium", meaning "defect" or "blemish".[43]
+
+The change in appearance caused by vitiligo can affect a person's emotional and psychological well-being and may create difficulty in becoming or remaining employed, particularly if vitiligo develops on visible areas of the body, such as the face, hands or arms. Participating in a vitiligo support group may improve social coping skills and emotional resilience.[46]
+
+Notable cases include American pop singer Michael Jackson,[47] Canadian fashion model Winnie Harlow,[48] New Zealand singer-songwriter Kimbra,[49] American actor David Dastmalchian and Argentine musician Charly García. Professional wrestler Bryan Danielson[50] and French actor Michaël Youn are also affected,[51] as is former French Prime Minister Édouard Philippe,[52] and TV host, model and former Miss Colombia 2007, Taliana Vargas.[53][54]
+
+The Adult Swim animated sitcom The Boondocks satirizes the idea of vitiligo in Uncle Ruckus, one of the show's characters. Ruckus, who is black, frequently claims to be white, often stating that he has "Re-vitiligo, the opposite of what Michael Jackson had." He frequently uses this argument to maintain that he is actually white, leading him to commit delusional and racist antics in nearly every episode.[55]
+
+As of July 2013[update], afamelanotide is in phase II and III clinical trials for vitiligo and other skin diseases.[56]
+
+A medication for rheumatoid arthritis, tofacitinib, has been tested for the treatment of vitiligo.[57]
+
+In October 1992, a scientific report was published of successfully transplanting melanocytes to vitiligo-affected areas, effectively repigmenting the region.[58] The procedure involved taking a thin layer of pigmented skin from the person's gluteal region. Melanocytes were then separated out to a cellular suspension that was expanded in culture. The area to be treated was then denuded with a dermabrader and the melanocytes graft applied. Between 70 and 85 percent of people with vitiligo experienced nearly complete repigmentation of their skin. The longevity of the repigmentation differed from person to person.[59]
+
+Current research suggests that the Janus kinase/signal transducer and activator of transcription pathway (JAK/STAT pathway) plays a crucial role in the loss of epidermal melanocytes. This pathway is activated by CXCR3+ CD8+ T cells, creating a positive-feedback loop with interferon-gamma (IFN-γ) chemokines from keratinocytes, potentially contributing to vitiligo.[60] JAK inhibitors like ruxolitinib show promise in targeting the IFN-γ-chemokine signaling axis implicated in vitiligo pathogenesis, and improving nonsegmental vitiligo.[60][61][62]
