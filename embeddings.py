@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-import torch_xla.core.xla_model as xm  # TPU support
-import torch_xla.utils.utils as xu
 from tokenizers import Tokenizer
 from Transformer import model  # Ensure this is the correct module and function
 from sklearn.decomposition import PCA
@@ -13,8 +11,8 @@ import seaborn as sns
 from tqdm import tqdm
 import os
 
-# Check if TPU is available
-device = xm.xla_device()  # This will switch to TPU
+# Check if CUDA is available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 # Load the BPE tokenizer
@@ -26,7 +24,7 @@ src_leq_len = 1064  # Maximum sequence length per batch
 src_vocab_size = len(tokenizer.get_vocab())  # Vocabulary size from the BPE tokenizer
 tgt_vocab_size = src_vocab_size  # Assuming the same vocab size for target
 
-# Build transformer model with manageable sequence length and move it to the TPU
+# Build transformer model with manageable sequence length and move it to the GPU
 transformer_model = model.build_transformer(src_vocab_size, tgt_vocab_size, src_leq_len=src_leq_len, tgt_seq_len=src_leq_len, d_model=d_model).to(device)
 transformer_model.eval()
 
@@ -47,8 +45,8 @@ with tqdm(total=len(file_list), desc="Reading Files") as pbar_files:
 # Tokenize the concatenated text using the BPE tokenizer
 encoded_input = tokenizer.encode(text)
 
-# Adjust the batch size to a smaller value
-batch_size = 512  # Reduced batch size
+# Adjust the batch size to 512
+batch_size = 512
 input_ids_batches = [encoded_input.ids[i:i + batch_size] for i in range(0, len(encoded_input.ids), batch_size)]
 
 # Initialize a list to store embeddings for all batches
@@ -59,7 +57,7 @@ with tqdm(total=len(input_ids_batches), desc="Processing Batches") as pbar_batch
     for batch in input_ids_batches:
         input_ids = torch.tensor([batch], dtype=torch.long).to(device)
 
-        # TPU Execution with `torch_xla`
+        # Forward pass through the transformer model
         with torch.no_grad():
             src_mask = None  # Optional mask
             embeddings = transformer_model.encode(input_ids, src_mask)
