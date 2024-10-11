@@ -29,7 +29,7 @@ transformer_model = model.build_transformer(src_vocab_size, tgt_vocab_size, src_
 transformer_model.eval()
 
 # Specify the directory containing the text files
-directory_path = "/content/drive/MyDrive/Sentient-Sculptor-LLM/Data"  # Path to your directory
+directory_path = "/content/Sentient-Sculptor-LLM/Data"  # Path to your directory
 
 # Read input text from all files in the directory and concatenate them
 text = ""
