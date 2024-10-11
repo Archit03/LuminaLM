@@ -1,9 +1,10 @@
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
-from tokenizers.pre_tokenizers import Whitespace, ByteLevel
+from tokenizers.pre_tokenizers import ByteLevel
 import os
 
+# Create a function to handle tokenization
 def create_tokens(vocab_size=20000, special_tokens=None):
     if special_tokens is None:
         special_tokens = ["<pad>", "<unk>", "<s>", "</s>", "<cls>", "<sep>", "<mask>", "<eot>", "<bos>", "<eos>"]
@@ -12,37 +13,44 @@ def create_tokens(vocab_size=20000, special_tokens=None):
     trainer = BpeTrainer(vocab_size=vocab_size, special_tokens=special_tokens)
     return tokenizer, trainer
 
+# Custom function for preprocessing CSV files
 def preprocess_csv(file):
-    # Custom preprocessing for CSV files
     import pandas as pd
     df = pd.read_csv(file)
     text_data = " ".join(df.astype(str).values.flatten())
     return text_data
 
-def preprocess_files(files):
+# Function to preprocess files from a directory
+def preprocess_files_from_directory(directory):
     all_text = ""
-    for file in files:
-        if file.endswith(".csv"):
-            all_text += preprocess_csv(file)
-        elif file.endswith(".txt"):
-            with open(file, 'r') as f:
-                all_text += f.read()
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            file_path = os.path.join(root, file)
+            if file_path.endswith(".csv"):
+                all_text += preprocess_csv(file_path)
+            elif file_path.endswith(".txt"):
+                # Open the file with utf-8 encoding
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    all_text += f.read()
     return all_text
 
-def train_tokenizer(tokenizer, trainer, files):
-    text_data = preprocess_files(files)
+# Train the tokenizer on preprocessed text
+def train_tokenizer(tokenizer, trainer, directory):
+    text_data = preprocess_files_from_directory(directory)
     if text_data.strip() == "":
         raise ValueError("No valid text data found for training.")
     tokenizer.train_from_iterator([text_data], trainer)
 
+# Save the tokenizer to a file
 def save_tokenizer(tokenizer, path="bpe_token.json"):
     tokenizer.save(path)
 
+# Load the tokenizer from a saved file
 def load_tokenizer(path="bpe_token.json"):
     return Tokenizer.from_file(path)
 
 # Example Usage
-files = ["data.txt", "healthcare_dataset.csv", "ACS_CA3_Book.txt", "Genomes_3 - T.A. Brown_.txt", "train.txt", "test.txt"]
+directory = "C:\\Users\\LENOVO\\Desktop\\Sentient-Sculptor-LLM\\Data"  # Replace with the directory path containing your .txt and .csv files
 tokenizer, trainer = create_tokens(vocab_size=199997)
-train_tokenizer(tokenizer, trainer, files)
+train_tokenizer(tokenizer, trainer, directory)
 save_tokenizer(tokenizer)

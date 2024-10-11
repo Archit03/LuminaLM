@@ -1,0 +1,50 @@
+Title: Pericarditis
+Pericarditis is inflammation of the pericardium, the fibrous sac surrounding the heart.[8] Symptoms typically include sudden onset of sharp chest pain, which may also be felt in the shoulders, neck, or back.[1] The pain is typically less severe when sitting up and more severe when lying down or breathing deeply.[1] Other symptoms of pericarditis can include fever, weakness, palpitations, and shortness of breath.[1] The onset of symptoms can occasionally be gradual rather than sudden.[8]
+
+The cause of pericarditis often remains unknown but is believed to be most often due to a viral infection.[4][8] Other causes include bacterial infections such as tuberculosis, uremic pericarditis, heart attack, cancer, autoimmune disorders, and chest trauma.[4][5] Diagnosis is based on the presence of chest pain, a pericardial rub, specific electrocardiogram (ECG) changes, and fluid around the heart.[6] A heart attack may produce similar symptoms to pericarditis.[1]
+
+Treatment in most cases is with NSAIDs and possibly the anti-inflammatory medication colchicine.[6] Steroids may be used if these are not appropriate.[6] Symptoms usually improve in a few days to weeks but can occasionally last months.[3] Complications can include cardiac tamponade, myocarditis, and constrictive pericarditis.[1][2] Pericarditis is an uncommon cause of chest pain.[9] About 3 per 10,000 people are affected per year.[2] Those most commonly affected are males between the ages of 20 and 50.[10] Up to 30% of those affected have more than one episode.[10]
+
+Substernal or left precordial pleuritic chest pain with radiation to the trapezius ridge (the bottom portion of scapula on the back) is the characteristic pain of pericarditis. The pain is usually relieved by sitting up or bending forward, and worsened by lying down (both recumbent and supine positions) or by inspiration (taking a breath in).[11] The pain may resemble that of angina but differs in that pericarditis pain changes with body position, where heart attack pain is generally constant and pressure-like. Other symptoms of pericarditis may include dry cough, fever, fatigue, and anxiety.[citation needed]
+
+Due to its similarity to the pain of myocardial infarction (heart attack), pericarditis can be misdiagnosed as a heart attack. Acute myocardial infarction can also cause pericarditis, but the presenting symptoms often differ enough to warrant diagnosis. The following table organizes the clinical presentation of pericarditis differential to myocardial infarction:[11]
+
+The classic sign of pericarditis is a friction rub heard with a stethoscope on the cardiovascular examination, usually on the lower left sternal border.[11] Other physical signs include a person in distress, positional chest pain, diaphoresis (excessive sweating); possibility of heart failure in form of pericardial tamponade causing pulsus paradoxus, and the Beck's triad of low blood pressure (due to decreased cardiac output), distant (muffled) heart sounds, and distension of the jugular vein (JVD).the presence of a triphasic pericardial friction rub on auscultation. A bedside electrocardiogram (ECG) shows widespread concave ST elevation and PR depression throughout most of the limb and precordial leads.
+
+Pericarditis can progress to pericardial effusion and eventually cardiac tamponade. This can be seen in people who are experiencing the classic signs of pericarditis but then show signs of relief, and progress to show signs of cardiac tamponade which include decreased alertness and lethargy, pulsus paradoxus (decrease of at least 10 mmHg of the systolic blood pressure upon inspiration), low blood pressure (due to decreased cardiac index), (jugular vein distention from right sided heart failure and fluid overload), distant heart sounds on auscultation, and equilibration of all the diastolic blood pressures on cardiac catheterization due to the constriction of the pericardium by the fluid.[citation needed]
+
+In such cases of cardiac tamponade, EKG or Holter monitor will then depict electrical alternans indicating wobbling of the heart in the fluid filled pericardium, and the capillary refill might decrease, as well as severe vascular collapse and altered mental status due to hypoperfusion of body organs by a heart that can not pump out blood effectively.[citation needed]
+
+The diagnosis of tamponade can be confirmed with trans-thoracic echocardiography (TTE), which should show a large pericardial effusion and diastolic collapse of the right ventricle and right atrium. Chest X-ray usually shows an enlarged cardiac silhouette ("water bottle" appearance) and clear lungs. Pulmonary congestion is typically not seen because equalization of diastolic pressures constrains the pulmonary capillary wedge pressure to the intra-pericardial pressure (and all other diastolic pressures).[citation needed]
+
+Pericarditis may be caused by viral, bacterial, or fungal infection.
+
+In the developing world the bacterial disease tuberculosis is a common cause, whereas in the developed world viruses are believed to be the cause of about 85% of cases.[6] Viral causes include coxsackievirus, herpesvirus, mumps virus, and HIV among others.[4]
+
+Pneumococcus or tuberculous pericarditis are the most common bacterial forms. Anaerobic bacteria can also be a rare cause.[13] Fungal pericarditis is usually due to histoplasmosis, or in immunocompromised hosts Aspergillus, Candida, and Coccidioides.[citation needed] The most common cause of pericarditis worldwide is infectious pericarditis with tuberculosis.[citation needed]
+
+The preferred initial diagnostic testing is the ECG, which may demonstrate a 12-lead electrocardiogram with diffuse, non-specific, concave ("saddle-shaped"), ST-segment elevations in all leads except aVR and V1[11] and PR-segment depression possible in any lead except aVR;[11] sinus tachycardia, and low-voltage QRS complexes can also be seen if there is subsymptomatic levels of pericardial effusion. The PR depression is often seen early in the process as the thin atria are affected more easily than the ventricles by the inflammatory process of the pericardium.[citation needed]
+
+Since the mid-19th century, retrospective diagnosis of pericarditis has been made upon the finding of adhesions of the pericardium.[20]
+
+When pericarditis is diagnosed clinically, the underlying cause is often never known; it may be discovered in only 16–22 percent of people with acute pericarditis.[citation needed]
+
+On MRI T2-weighted spin-echo images, inflamed pericardium will show high signal intensity. Late gadolinium contrast will show uptake of contrast by the inflamed pericardium. Normal pericardium will not show any contrast enhancement.[21]
+
+Laboratory values can show increased blood urea nitrogen (BUN), or increased blood creatinine in cases of uremic pericarditis. Generally, however, laboratory values are normal, but if there is a concurrent myocardial infarction (heart attack) or great stress to the heart, laboratory values may show increased cardiac markers like Troponin (I, T), CK-MB, Myoglobin, and LDH1 (lactase dehydrogenase isotype 1).[citation needed]
+
+Pericarditis can be classified according to the composition of the fluid that accumulates around the heart.[22]
+
+Types of pericarditis include the following:[citation needed]
+
+Depending on the time of presentation and duration, pericarditis is divided into "acute" and "chronic" forms. Acute pericarditis is more common than chronic pericarditis, and can occur as a complication of infections, immunologic conditions, or even as a result of a heart attack (myocardial infarction), as Dressler's syndrome. Chronic pericarditis however is less common, a form of which is constrictive pericarditis. The following is the clinical classification of acute vs. chronic:[citation needed]
+
+The treatment in viral or idiopathic pericarditis is with aspirin,[11] or non-steroidal anti-inflammatory drugs (NSAIDs such as ibuprofen).[4] Colchicine may be added to the above as it decreases the risk of further episodes of pericarditis.[4][23]The drug that helps treat the condition that has developed is aspirin. In this case, the patient is experiencing post-myocardial infarction pericarditis (PIP), which is characterized by chest pain, low-grade fever, and specific findings on physical examination and electrocardiogram. Aspirin is the drug of choice for PIP and is usually already prescribed for secondary prevention following a myocardial infarction. Aspirin acts as an anti-inflammatory drug and helps alleviate the symptoms of pericarditis
+
+Severe cases may require one or more of the following:[citation needed]
+
+Recurrent pericarditis resistant to colchicine and anti-inflammatory steroids may benefit from a number of medicines that affect the action of interleukin 1; they cannot be taken in tablet form. These are anakinra, canakinumab and rilonacept.[24][25] Rilonacept has been specifically approved as an orphan drug for use in this situation.[26] Immunosuppressive agents, such as Azathioprine and intravenous immunoglobulins, are a novel therapeutic agent which have been effective in treating and preventing recurrent pericarditis, though research on these therapies is limited.[25][27][28][29]
+
+Surgical removal of the pericardium, pericardiectomy, may be used in severe cases and where the pericarditis is causing constriction, impairing cardiac function. It is less effective if the pericarditis is a consequence of trauma, in elderly patients, and if the procedure is done incompletely. It carries a risk of death between 5 and 10%.[25]
+
+About 30% of people with viral pericarditis or pericarditis of an unknown cause have one or several recurrent episodes.[6]

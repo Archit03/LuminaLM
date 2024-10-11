@@ -1,0 +1,166 @@
+Title: Bladder cancer
+
+
+Bladder cancer is any of several types of cancer arising from the tissues of the urinary bladder.[1] Symptoms include blood in the urine, pain with urination, and low back pain.[1] It is caused when epithelial cells that line the bladder become malignant.[4]
+
+Risk factors for bladder cancer include smoking, family history, prior pelvic radiation therapy, frequent bladder infections, and exposure to certain chemicals.[1] The most common type is transitional cell carcinoma.[1] Other types include squamous cell carcinoma and adenocarcinoma.[1] Diagnosis is typically by cystoscopy with tissue biopsies.[5] Staging of the cancer is determined by transurethral resection of the bladder tumor (TURBT) and medical imaging.[1][6][7]
+
+Treatment depends on the stage of the cancer.[1] It may include some combination of surgery, radiation therapy, chemotherapy, or immunotherapy.[1] Surgical options may include transurethral resection, partial or complete removal of the bladder, or urinary diversion.[1] The typical five-year survival rates in the United States is 77%, Canada is 75%, and Europe is 68%.[2][8][9]
+
+Bladder cancer, as of 2018, affected about 1.6 million people globally with 549,000 new cases and 200,000 deaths.[3] Age of onset is most often between 65 and 84 years of age.[2] Males are more often affected than females, with the lifetime risk in males being 1.1% and 0.27% in females.[10][2] In 2018, the highest rate of bladder cancer occurred in Southern and Western Europe followed by North America with rates of 15, 13, and 12 cases per 100,000 people.[3] The highest rates of bladder cancer deaths were seen in Northern Africa and Western Asia followed by Southern Europe.[3]
+
+The most common symptom of bladder cancer is visible blood in the urine (haematuria) despite painless urination. This affects around 75% of people eventually diagnosed with the disease.[11] Some instead have "microscopic haematuria" – small amounts of blood in the urine that can only be seen under a microscope during urinalysis – pain while urinating, or no symptoms at all (their tumors are detected during unrelated medical imaging).[11][12] Less commonly, a tumor can block the flow of urine into the bladder, causing pain along the flank of the body (between the ribs and the hips).[13] Most people with blood in the urine do not have bladder cancer; up to 22% of those with visible haematuria and 5% with microscopic haematuria are diagnosed with the disease.[11] Women with bladder cancer and haematuria are often misdiagnosed with urinary tract infections, delaying appropriate diagnosis and treatment.[12]
+
+People with advanced disease may have pelvic or bony pain, lower-extremity swelling, or flank pain.[14]
+
+Those suspected of having bladder cancer can undergo several tests to assess the presence and extent of any tumors. First, many undergo a physical examination that can involve a digital rectal exam and pelvic exam, where a doctor feels the pelvic area for unusual masses that could be tumors.[15] Severe bladder tumors often shed cells into the urine; these can be detected by urine cytology, where cells are collected from a urine sample, and viewed under a microscope.[15][16] Cytology can detect around two thirds of high-grade tumors, but detects just 1 in 8 low-grade tumors.[17] Additional urine tests can be used to detect molecules associated with bladder cancer. Some detect the proteins bladder tumor antigen or NMP22 that tend to be elevated in the urine of those with bladder cancer; some detect mRNA of tumor-associated genes; some use fluorescence microscopy to detect cancerous cells more sensitively than regular cytology.[17]
+
+Many also undergo cystoscopy, wherein a flexible camera is threaded up the urethra and into the bladder to visually inspect for cancerous tissue.[15] Cystoscopy is most sensitive to papillary tumors (tumors with a finger-like shape that grow into the urine-holding part of the bladder); it is less sensitive to small, low-lying carcinoma in situ (CIS).[18] CIS detection is improved by blue light cystoscopy, where a dye (hexaminolevulinate) that accumulates in cancer cells is injected into the bladder during cystoscopy. The dye fluoresces when the cystoscope shines blue light on it, allowing for more sensitive detection of small tumors.[15][18] After the initial TURBT, in cases of incomplete tumor resection (as determined by pathology), lack of detrusor muscle on biopsy (indicating an inadequate initial resection), high grade disease on biopsy or with high risk microscopic pathological features; repeat cystoscopy with restaging TURBT is indicated 4-6 weeks later due to a high risk of recurrent or persistent tumor.[10]
+
+The upper urinary tract (ureters and kidney) is also imaged for tumors that could cause blood in the urine. This is typically done by injecting a dye into the blood that the kidneys will filter into the urinary tract, then imaging by computed tomography scanning. Those whose kidneys are not functioning well enough to filter the dye may instead be scanned by magnetic resonance imaging.[13] Alternatively, the upper urinary tract can also be imaged with ultrasound, although in those at high risk of having bladder cancer based on age, amount of cumulative lifetime tobacco use and amount of hematuria on urinalysis, a CT urogram or MRI are the preferred imaging modalities.[10]
+
+Suspected tumors are removed by threading a device up the urethra in a process called "transurethral resection of bladder tumor" (TURBT). All tumors are removed, as well as a piece of the underlying bladder muscle. Removed tissue is examined by a pathologist to determine if it is cancerous.[15][19]
+
+Bladder tumors are classified by their appearance under the microscope, and by their cell type of origin. Over 90% of bladder tumors arise from the cells that form the bladder's inner lining, called urothelial cells or transitional cells; the tumor is then classified as urothelial cancer or transitional cell cancer.[20][21] Around 5% of cases are squamous cell cancer (from a rarer cell in the bladder lining), particularly common in places with schistosomiasis.[21] Up to 2% of cases are adenocarcinoma (from mucus-producing gland cells).[21] The remaining cases are sarcomas (from the bladder muscle) or small-cell cancer (from neuroendocrine cells), both of which are relatively rare.[21]
+
+The pathologist also grades the tumor sample based on how distinct the cancerous cells look from healthy cells. Bladder cancer is divided into either low-grade (more similar to healthy cells) or high-grade (less similar). High-grade cancer is further subdivided into "non-muscle-invasive bladder cancer" (NMIBC) or the more aggressive "muscle-invasive bladder cancer" (MIBC) based on whether the tumor has grown into the surrounding bladder muscle.[20]
+
+Each bladder cancer case is assigned a stage based on the TNM system defined by the American Joint Committee on Cancer.[20] A tumor is assigned three scores based on the extent of the primary tumor (T), its spread to nearby lymph nodes (N), and metastasis to distant sites (M).[22] The T score represents the extent of the original tumor: Ta or Tis for tumors that are confined to the innermost layer of the bladder; T1 for tumors that extend into the bladder's connective tissue; T2 for extension into the muscle; T3 for extension through the muscle into the surrounding fatty tissue; and T4 for extension fully outside the bladder.[22] The N score represents spread to nearby lymph nodes: N0 for no spread; N1 for spread to a single nearby lymph node; N2 for spread to several nearby lymph nodes; N3 for spread to more distant lymph nodes outside the pelvis.[22] The M score designates spread to more distant organs: M0 for a tumor that has not spread; M1 to one that has.[22]
+
+Ta and T1 are classified as non-muscle layer invasive bladder cancer (NMIBC) and T2-4 cancers are classified as muscle invasive bladder cancer (MIBC). MIBC is associated with a worse prognosis.[10] The TNM scores are combined to determine the cancer case's stage on a scale of 0 to 4, with a higher stage representing a more extensive cancer with a poorer prognosis.[23]
+
+People with non-muscle invasive bladder cancer (NMIBC), are risk-stratified based on clinical and pathological factors so that they are treated appropriately depending on their probability of having progression and/or recurrence.[25] People with non-muscle invasive tumors are categorized into low-risk, intermediate-risk and high-risk or provided with a numerical risk score. Risk-stratification framework is provided by American Urology Association/Society of Urological Oncology (AUA/SUO stratification), European Association of Urology (EAU) guidelines, European Organization for Research and Treatment of Cancer (EORTC) risk tables and Club Urológico Español de Tratamiento Oncológico (CUETO) scoring model.[26][27][28]
+
+The treatment of bladder cancer depends on how deeply the tumor invades into the bladder wall. The first step is surgery, transurethral resection of bladder tumor (TURBT), which is both a diagnostic procedure and the initial treatment step. [29]
+
+Treatment strategies for bladder cancer include:[30][31]
+
+NMIBC is primarily treated by surgically removing all tumors by TURBT in the same procedure used to collect biopsy tissue for diagnosis.[32][33] For those with a relatively low risk of tumors recurring, a single dose of chemotherapy (mitomycin C, epirubicin, or gemcitabine) injected into the bladder within 24 hours of TURBT reduces the risk of tumor occurrence by about 39%.[10][34] Those with higher risk are instead treated with bladder injections of the BCG vaccine (a live bacterial vaccine, usually used for tuberculosis), administered weekly for six weeks. This nearly halves the rate of tumor recurrence.[32] Recurrence risk is further reduced by a series of "maintenance" BCG injections, given regularly for at least a year.[32][35] Those whose tumors do recur may receive a second round of BCG injections.[32] Tumors that do not respond to BCG may be treated with the alternative immune stimulants nadofaragene firadenovec (sold as "Adstiladrin", a gene therapy that makes bladder cells produce an immunostimulant protein), nogapendekin alfa inbakicept ("Anktiva", a combination of immunostimulant proteins), or pembrolizumab ("Keytruda", an immune checkpoint inhibitor).[36]
+
+People whose tumors continue to grow are often treated with surgery to remove the bladder and surrounding organs, called radical cystectomy.[37] The bladder, several adjacent lymph nodes, the lower ureters, and nearby genital organs – in men the prostate and seminal vesicles; in women the uterus and part of the vaginal wall – are all removed.[37] Surgeons also construct a new way for urine to leave the body. The most common method is by ileal conduit, where a piece of the ileum (part of the small intestine) is removed and used to transport urine from the ureters to a new surgical opening (stoma) in the abdomen. Urine drains passively into an ostomy bag worn outside the body, which can be emptied regularly by the wearer.[38] Alternatively, one can have a continent urinary diversion, where the ureters are attached to a piece of ileum that includes the valve between the small and large intestine; this valve naturally closes, allowing urine to be retained in the body rather than in an ostomy bag. The affected person empties the new urine reservoir serveral times each day by self-catheterization – passing a narrow tube through the stoma.[39][40] Some can instead have the piece of ileum attached directly to the urethra, allowing the affected person to urinate through the urethra as they would pre-surgery – although without the original bladder nerves, they will no longer have the urge to urinate when the urine reservoir is full.[41]
+
+Those not well enough or unwilling to undergo radical cystectomy may instead benefit from further bladder injections of chemotherapy – mitomycin C, gemcitabine, docetaxel, or valrubicin – or intravenous injection of pembrolizumab.[32] Around 1 in 5 people with NMIBC will eventually progress to MIBC.[42]
+
+Side effects of BCG therapy include cystitis, prostatitis, epididymo-orchitis, balanitis, ureteral obstruction, bladder contraction, mycobacterial osteomyelitis, reactive arthritis, mycobacterial pneumonia, granulomatous hepatitis, granulomatous nephritis, interstitial nephritis, infectious vasculitis and disseminated infection.[43][44]
+
+Local infection (i.e. prostatitis, epididymo-orchitis, balanitis) because of BCG should be treated with triple tubercular therapy, with one of the drug being fluoroquinolone for 3 to 6 months. In people with systemic infections, BCG therapy should be stopped and anti-tubercular multidrug treatment for at-least 6 months should be started. Medications that can be used for this treatment are INH, rifampicin, ethambutol, fluoroquinolones, clarithromycin, aminoglycosides, and doxycycline. BCG strains are not sensitive to pyrazinamide therefore, it should not be a part of anti-tubercular treatment.[45]
+
+Most people with muscle-invasive bladder cancer are treated with radical cystectomy, which cures around half of those affected.[40] Treating with chemotherapy prior to surgery (called "neoadjuvant therapy") using a cisplatin-containing drug combination (gemcitabine plus cisplatin; or methotrexate, vinblastine, doxorubicin, and cisplatin) improves survival an addition 5 to 10%.[40][47]
+
+Radical cystectomy has a significant morbidity associated with it. About 50-65% of the people experience complication within 90 days of surgery.[48][49] Mortality rates was 7% within 90 days of surgery. High volume centers have better outcomes than low volume centers.[50] Some centers are implementing Enhanced Recovery After Surgery (ERAS) society recommendations to decrease morbidity after radical cystectomy. However, due to lack of specific evidence in urologic surgery, ERAS protocol has not been widely incorporated in urologic clinical care.[51]
+
+Those with certain types of lower-risk disease may instead receive bladder-sparing therapy. People with just a single tumor at the back of the bladder can undergo partial cystectomy, with the tumor and surrounding area removed, and the bladder repaired.[40] Those with no CIS or urinary blockage may undergo TURBT to remove visible tumors, followed by chemotherapy and radiation; around two thirds of these people are permanently cured, while those whose tumors recur are treated with radical cystectomy.[40]
+
+Radiation therapy is via external bean radiotherapy (EBRT) with a target curative dose of 64-66 Gy.[52] Surveillance for progression or recurrence should conducted with the aid of CT scans, cystoscopies and urine cytology.[53] Side effects of chemoradiation include nausea, vomiting, loss of appetite, hair loss, mouth sores, diarrhea, constipation, increased risk of infections and bleeding and fatigue.[54]
+
+Even after surgical removal of bladder, 50% of the people with muscle invasive disease (T2-T4) develop metastatic disease within two years due to micrometastasis.[55]
+
+Cisplatin-containing combination chemotherapy is the standard of care for metastatic bladder care.[56] Fitness for receiving cisplatin based chemotherapy is assessed before treatment. A person is deemed unfit if anyone of the following is true.[57]
+
+People who are deemed fit receive platinum based regimens; methotrexate, vinblastine, doxorubicin, with cisplatin (MVAC) or gemcitabine with cisplatin (GC). Alternative regimens include paclitaxel with gemcitabine and cisplatin (PCG, triple therapy) and cisplatin, methotrexate and vinblastine (CMV). Response rate for cisplatin-based combination ranges from 39 to 65% and complete response is seen in 12-35% of the people.[58] MVAC is better tolerated if it is combined with granulocyte colony-stimulating factor and the regimen is known as dose dense MVAC regimen (DDMVAC). This combination has shown to decease all cause mortality.[59] MVAC regimen is aggressive. Febrile neutropenia (fever due to decrease in white blood cells) occurs in 10 to 14% and death due to toxicity in about 3-4%. Common side effects of MVAC include suppression of bone marrow, fever due to decrease in white blood cells, sepsis, mucositis, and nausea and vomiting.[58] In contrast, the GC regimen has shown lower rates of neutropenic sepsis and grade 3/4 mucositis compared to MVAC.[60] Efforts have been made to increase tolerance of cisplatin-based regimen by replacing it with carboplatin-based chemotherapy. However, cisplatin-based therapy is superior to carboplatin-based chemotherapy in achieving overall and complete response.[61] Nevertheless, nearly half of the people with metastatic disease are "unfit" for cisplatin-based therapy. In such persons a combination of carboplatin and gemcitabine (GemCarbo) can be used as first line chemotherapy.[62] In people who are not eligible for any platinum based chemotherapy and have PD-L1 expression, Atezolizumab and Pembrolizumab can be used.[citation needed]
+
+People with bone metastasis should receive bisphosphonates or denosumab to prevent skeletal related events (e.g. fractures, spinal cord compression, bone pain).[63]
+
+Vinblastine (3 mg/m2 IV) - day 2
+
+Doxorubicin (30 mg/m2 IV) - day 2
+
+Cisplatin (70 mg/m2 IV) - day 2
+
+Granulocyte colony-stimulating factor (G-CSF) (240μg/m2 SC) - day 4-10
+
+Repeat every 2 weeks for 3–4 cycles
+
+Gemcitabine (1,000 mg/m2 IV) - day 1,8,15
+
+Cisplatin (70 mg/m2) - day 2
+
+Repeat every 4 weeks for 4 cycles
+
+every 3 weeks
+
+Gemcitabine (1,000 mg/m2 IV) - day 1,8
+
+Carboplatin (4.5 × [glomerular filtration rate + 25]) - day 1 and every 3 weeks
+
+Pembrolizumab 200 mg
+every 3 weeks
+
+Bladder cancer that is refractory or shows progression after platinum-based chemotherapy can be treated with second-line chemotherapy or immunotherapy.[citation needed]
+
+The most commonly used second-line chemotherapy is single-agent regimes of Taxanes (Paclitaxel, nab-paclitaxel and Docetaxel). Other single-agent regimes include Vinflunine, a third generation vinca alkaloid (approved in Europe), Gemcitabine, Pemetrexed, Oxaliplatin, and Ifosfamide.[65][66][67] Side effects of Vinflunine include neutropenia, constipation, fatigue and anemia and has limited its use as a second line agent. Response to second-line chemotherapy occurs in 5%–20% people. Median progression free survival with second-line chemotherapy is 3–4 months.[68]
+
+In people with fibroblast growth factor receptors (FGFR) mutations and fail standard platinum based chemotherapy erdafitinib can be used. Erdafitinib has shown a response rate of 40% in these patients.[69]
+
+Five immunotherapy agents have been approved in the US for use in metastatic bladder cancer. They act by inhibiting programmed cell-death protein 1 (PD-1) or programmed cell-death ligand 1 (PD-L1). Pembrolizumab and nivolumab, and are inhibitors of programmed cell-death ligand 1 (PD-1). Avelumab, atezolizumab and durvalumab are inhibitors of PD-L1.[70][71]
+
+Pembrolizumab probably improves overall survival a little and may slightly improve quality of life for people with urothelial cancer that has worsened after initial treatment when compared with continued chemotherapy.[72] However, pembrolizumab may have only minimal effects on the rate of death resulting from treatment or the rate at which the cancer advances.[72] Pembrolizumab may cause less serious side effects than chemotherapy.[72]
+
+every 3 weeks
+
+Nivolumab 3 mg/kg IV
+
+every 2 weeks
+
+Pembrolizumab 200 mg
+
+every 3 weeks
+
+Durvalumab 10 mg/kg
+
+every 2 weeks for 12 months
+
+Avelumab 10 mg/kg IV
+
+every 2 weeks
+
+Contrast enhanced CT is used to monitor lung, liver, and lymph node metastases. A bone scan is used to detect and monitor bone metastasis.[73] Treatment response is measured using the Response evaluation criteria in solid tumors (RECIST) into one of the following groups; response (complete or partial), stable disease and progressive disease.[74]
+
+Bladder cancer is caused by genetic damage to the DNA of bladder cells. These changes can be random, or can be induced by exposure of the bladder to toxic substances such as those from consuming tobacco. The accumulation of this genetic damage disrupts the normal functioning of bladder cells, causing them to grow uncontrollably and form a tumor.[75]
+
+Tobacco smoking is the main known contributor to urinary bladder cancer; in most populations, smoking is associated with over half of bladder cancer cases in men and one-third of cases among women,[76] however these proportions have reduced over recent years since there are fewer smokers in Europe and North America.[77] There is an almost linear relationship between smoking duration (in years), pack years and bladder cancer risk. A risk plateau at smoking about 15 cigarettes a day can be observed (meaning that those who smoke 15 cigarettes a day are approximately at the same risk as those smoking 30 cigarettes a day). Smoking in any form (cigar, cigarette, pipe, Egyptian waterpipe and smokeless tobacco) increases the risk for bladder cancer.[78] Quitting smoking reduces the risk. Risk of bladder cancer decreases by 30% within 1–4 years and continues to decrease by 60% at 25 years after smoking cessation.[79] However, former smokers will most likely always be at a higher risk of bladder cancer compared to people who have never smoked.[77] Passive smoking also appears to be a risk.[80][81]
+
+Opium consumption increases the risk of bladder cancer threefold, while concurrent use of opium and tobacco increases the risk of bladder cancer fivefold when compared to the general population.[82]
+
+Thirty percent of bladder tumors probably result from occupational exposure in the workplace to carcinogens. Occupational or circumstantial exposure to the following substances has been implicated as a cause of bladder cancer; benzidine (dyes manufacturing), 4-aminobiphenyl (rubber industry), 2-naphtylamine (azo dyes manufacturing, foundry fumes, rubber industry, cigarette smoke and cancer research), phenacetin (analgesic), arsenic and chlorinated aliphatic hydrocarbons in drinking water, auramine (dye manufacturing), magenta (dye manufacturing), ortho-toluidine (dye manufacturing), epoxy and polyurethane resin hardening agents (plastics industry), chlornaphazine, coal-tar pitch.[83][84][85][86][87] Occupations at risk are bus drivers, rubber workers, painters, motor mechanics, leather (including shoe) workers, blacksmiths, machine setters, and mechanics.[88][89] Hairdressers are thought to be at risk as well because of their frequent exposure to permanent hair dyes.[90]
+
+Infection with Schistosoma haematobium (bilharzia or schistosomiasis) may cause bladder cancer, particularly of the squamous cell type.[91] Schistosoma eggs induces a chronic inflammatory state in the bladder wall resulting in tissue fibrosis.[92] Higher levels of N-nitroso compounds has been detected in urine samples of people with schistosomiasis.[93] N-Nitroso compounds have been implicated in the pathogenesis of schistosomiasis related bladder cancer. They cause alkylation DNA damage, specially Guanine to Adenine transition mutations in the HRAS and p53 tumor suppressor gene.[94] Mutations of p53 are detected in 73% of the tumors, BCL-2 mutations accounting for 32% and the combination of the two accounting for 13%.[95] Other causes of squamous cell carcinoma of the bladder include chronic catheterizations in people with a spinal cord injury and history of treatment with cyclophosphamide.[96][97]
+
+The American Institute for Cancer Research have stated that there is strong evidence that drinking water containing arsenic increases the risk of bladder cancer.[98]
+
+High consumption of animal fat and dietary cholesterol increases bladder cancer risk in men.[99]
+
+Ingestion of aristolochic acid present in many Chinese herbal medications has been shown to cause urothelial carcinoma and kidney failure.[100] Aristolochic acid activates peroxidase in the urothelium and causes transversion mutation in the TP53 tumor suppressor gene.[citation needed]
+
+People who undergo external beam radiotherapy (EBRT) for prostate cancer have a higher risk of developing invasive bladder cancer.[101]
+
+In addition to these major risk factors there are also numerous other modifiable factors that are less strongly (i.e. 10–20% risk increase) associated with bladder cancer, for example, obesity.[102] Although these could be considered as minor effects, risk reduction in the general population could still be achieved by reducing the prevalence of a number of smaller risk factor together.[103]
+
+Mutations in FGFR3, TP53, PIK3CA, KDM6A, ARID1A, KMT2D, HRAS, TERT, KRAS, CREBBP, RB1 and TSC1 genes may be associated with some cases of bladder cancer.[104][105][106] Deletions of parts or whole of chromosome 9 is common in bladder cancer.[107] Low grade cancer are known to harbor mutations in RAS pathway and the fibroblast growth factor receptor 3 (FGFR3) gene, both of which play a role in the MAPK/ERK pathway. p53 and RB gene mutations are implicated in high-grade muscle invasive tumors.[108] Eighty nine percent of muscle invasive cancers have mutations in chromatin remodeling and histone modifying genes.[109]
+Deletion of both copies of the GSTM1 gene has a modest increase in risk of bladder cancer. GSTM1 gene product glutathione S-transferase M1 (GSTM1) participates in the detoxification process of carcinogens such as polycyclic aromatic hydrocarbons found in cigarette smoke.[110] Similarly, mutations in NAT2 (N-acetyltransferase) is associated with increased risk for bladder cancer. N-acetyltransferase helps in detoxification of carcinogens like aromatic amines (also present in cigarette smoke).[111] Various single-nucleotide polymorphisms in PSCA gene present on chromosome 8 have shown to increase the risk for bladder cancer. PSCA gene promoter region has an androgen response region. Loss of reactivity of this region to androgens is hypothesized as a cause of more aggressive tumors in women (unlike in men who have higher amount of androgen).[112]
+
+Muscle invasive bladder cancer are heterogeneous in nature. In general, they can be genetically classified into basal and luminal subtypes. Basal subtype show alterations involving RB and NFE2L2 and luminal type show changes in FGFR3 and KDM6A genes.[113] Basal subtype are subdivided into basal and claudin low-type group and are aggressive and show metastasis at presentation, however they respond to platinum based chemotherapy. Luminal subtype can be subdivided into p53-like and luminal. p53-like tumors of luminal subtype although not as aggressive as basal type, show resistance to chemotherapy[114]
+
+The most common sites for bladder cancer metastases are the lymph nodes, bones, lung, liver, and peritoneum.[115] The most common sentinel lymph nodes draining bladder cancer are obturator and internal iliac lymph nodes. The location of lymphatic spread depends on the location of the tumors. Tumors on the superolateral bladder wall spread to external iliac lymph nodes. Tumors on the neck, anterior wall and fundus spread commonly to the internal iliac lymph nodes.[116] From the regional lymph nodes (i.e. obturator, internal and external lymph nodes) the cancer spreads to distant sites like the common iliac lymph nodes and paraaortic lymph nodes.[117] Skipped lymph node lesions are not seen in bladder cancer.[116]
+
+As of 2019, there is limited high level evidence to suggest that eating vegetable and fruits decreases the risk of bladder cancer.[111] Fruit and yellow-orange vegetables, particularly carrots and those containing selenium, citrus fruits and cruciferous vegetables have been identified as having a possibly protective effect.
+
+While it is suggested that the polyphenol compounds in tea may have an inhibitory effect on bladder tumor formation and growth, there is limited evidence to suggesting drinking tea decreases bladder cancer risk.[111] A 2022 review found that a Mediterranean diet has a protective effect on bladder cancer risk.[118] Higher consumption of monounsaturated fat and plant-based oils decrease bladder cancer risk in women.[99] Higher consumption of total dietary fiber and whole grains is associated with a reduced risk of bladder cancer.[119]
+
+As of 2019 there is insufficient evidence to determine if screening for bladder cancer in people without symptoms is effective or not.[120]
+
+People with non-muscle invasive tumors have a favorable outcome (5-year survival is 95% vs. 69% of muscle invasive bladder cancer).[121][122] However, 70% of them will have a recurrence after initial treatment with 30% of them presenting with muscle invasive disease.[123] Recurrence and progression to a higher disease stage have a less favorable outcome.[124]
+
+Survival after radical cystectomy and pelvic lymph node dissection is dependent on the pathological stage. If the disease has not spread to the lymph node and is limited to the bladder (T1 or T2, N0) the 5-year survival is 78%. If it has spread locally around the region of the bladder with no lymph node involved (T3, N0) then the 5-year survival drops to 47%. In disease with lymph node spread (N+, irrespective of T stage) the 5-year survival is 31%. Locally advanced and metastatic disease drastically decreases survival, with a median survival of 3–6 months without chemotherapy. Cisplatin-based chemotherapy has increased the median survival to 15-months. However, the 5-year survival is still 15%.[125]
+
+There are several prognostic factors which determine cancer specific survival after radical cystectomy. Factor with detrimental effect of cancer specific survival are old age, higher tumor grade and pathological stage, lymph node metastasis, presence of lymphovascular invasion and positive soft tissue margin.[126] Lymph node density (positive lymph nodes/total lymph nodes observed in the specimen from surgery) is a predictor of survival in lymph node positive disease. Higher the density lower is the survival.[127]
+
+After radical cystectomy, urinary and sexual function remain inferior to the general population. People who have a neobladder have better emotional function and body image compared with ones with cutaneous diversion (who need to wear a bag to collect urine over their abdomen).[128] Social factors such as family, relationships, health and finances contribute significantly for determining good quality of life in people who have been diagnosed with bladder cancer.[129]
+
+A high percentage of people with bladder cancer have anxiety and depression.[130] People who are young, single and have advanced clinical disease have a high risk for getting diagnosed with a psychiatric illness post-treatment. People with psychiatric illness post treatment seem to have worse cancer specific and overall survival.[131][132]
+
+Around 500,000 people are diagnosed with bladder cancer each year, and 200,000 die of the disease.[136] This makes bladder cancer the tenth most commonly diagnosed cancer, and the thirteenth cause of cancer deaths.[137] Bladder cancer is most common in wealthier regions of the world, where exposure to certain carcinogens is highest. It is also common in places where schistosome infection is common, such as North Africa.[137]
+
+Bladder cancer is much more common in men than women; around 1.1% of men and 0.27% of women develop bladder cancer.[12] This makes bladder cancer the sixth most common cancer in men, and the seventeenth in women.[138] When women are diagnosed with bladder cancer, they tend to have more advanced disease and consequently a poorer prognosis.[138] This difference in outcomes is attributed to numerous factors such as, difference in carcinogen exposure, genetics, social and quality of care.[112] One of the common signs of bladder cancer is hematuria and is quite often misdiagnosed as urinary tract infection in women, leading to a delay in diagnosis.[112] Smoking can only partially explain this higher rates in men in western hemisphere.[139] In Africa, men are more prone to do field work and are exposed to infection with Schistosoma, this may explain to a certain extent the gap in incidence of squamous cell cancers in areas where bladder cancer is endemic.[139]
+
+As with most cancers, bladder cancer is more common in older people; the average person with bladder cancer is diagnosed at age 73.[140]

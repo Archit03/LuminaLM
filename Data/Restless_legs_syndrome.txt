@@ -1,0 +1,104 @@
+Title: Restless legs syndrome
+Restless legs syndrome, (also known as restless leg syndrome (RLS) and Willis–Ekbom disease (WED), is a neurological disorder, usually chronic, that causes an overwhelming urge to move one's legs.[2][10] There is often an unpleasant feeling in the legs that improves temporarily by moving them.[2] This feeling is often described as aching, tingling, or crawling in nature.[2] Occasionally, arms may also be affected.[2] The feelings generally happen when at rest and therefore can make it hard to sleep.[2] Sleep disruption may leave people with RLS sleepy during the day, with low energy, and irritable or depressed.[2] Additionally, many have limb twitching during sleep, a condition known as periodic limb movement disorder.[11] RLS is not the same as habitual foot-tapping or leg-rocking.[12]
+
+Diagnosis of RLS is generally based on a person's symptoms after ruling out other potential causes.[6] Risk factors include low iron levels, kidney failure, Parkinson's disease, diabetes mellitus, rheumatoid arthritis, pregnancy and celiac disease.[2][4][13] A number of medications may also trigger the disorder including antidepressants, antipsychotics, antihistamines, and calcium channel blockers.[5]
+
+RLS may either be of early onset, occurring before age 45, or of late onset, occurring after age 45. Early-onset cases tend to progress more slowly and involve fewer comorbidities, while cases in older patients may progress suddenly and alongside other conditions.[14]
+
+RLS may resolve if the underlying problem is addressed.[15] Otherwise treatment includes lifestyle changes and medication.[2] Lifestyle changes that may help include stopping alcohol and tobacco use, and sleep hygiene.[15] Medications used to treat RLS include dopamine agonists like pramipexole and gabapentinoids (α2δ ligands) like gabapentin.[4][7] RLS affects an estimated 2.5–15% of the American population.[4] Females are more commonly affected than males, and RLS becomes increasingly common with age.[3][1]
+
+Sir Thomas Willis provided a medical description in 1672.[16] Willis emphasized the sleep disruption and limb movements experienced by people with RLS.
+
+Subsequently, other descriptions of RLS were published, including by Theodor Wittmaack [de] (1861) (in relation to whom it is sometimes known as Wittmaack-Ekbom syndrome).[17]
+
+In 1945, Karl-Axel Ekbom (1907–1977) provided a detailed and comprehensive report of this condition in his doctoral thesis, restless legs: clinical study of hitherto overlooked disease.[18] Ekbom coined the term "restless legs". 
+
+Ekbom's work was largely ignored until it was rediscovered by Arthur S. Walters and Wayne A. Hening in the 1980s. Subsequent landmark publications include 1995 and 2003 papers, which revised and updated the diagnostic criteria.[19][20]
+
+RLS sensations range from pain or an aching in the muscles, to "an itch you can't scratch", a "buzzing sensation", an unpleasant "tickle that won't stop", a "crawling" feeling, or limbs jerking while awake. The sensations typically begin or intensify during quiet wakefulness, such as when relaxing, reading, studying, or trying to sleep.[19]
+
+It is a "spectrum disorder" with some people experiencing only a minor annoyance and others having major disruption of sleep and impairments in quality of life.[21]
+
+The sensations—and the need to move—may return immediately after ceasing movement or at a later time. RLS may start at any age, including childhood, and is a progressive disease for some, while the symptoms may remit in others.[22] In a survey among members of the Restless Legs Syndrome Foundation, it was found that up to 45% of patients had their first symptoms before the age of 20 years.[23]
+
+RLS may contribute to higher rates of depression and anxiety disorders in RLS patients.[25]
+
+RLS is categorized as either primary or secondary.
+
+While the cause is generally unknown, it is believed to be caused by changes in the neurotransmitter dopamine[27] resulting in an abnormal use of iron by the brain.[1] RLS is often due to iron deficiency (low total body iron status)[1] and could be a sign of anemia caused by internal bleeding or bone marrow issues.  Other associated conditions may include end-stage kidney disease and hemodialysis, folate deficiency, magnesium deficiency, sleep apnea, diabetes, peripheral neuropathy, Parkinson's disease, and certain autoimmune diseases, such as multiple sclerosis.[28] RLS can worsen in pregnancy, possibly due to elevated estrogen levels.[1][29] Use of alcohol, nicotine products, and caffeine may be associated with RLS.[1] A 2014 study from the American Academy of Neurology also found that reduced leg oxygen levels were strongly associated with restless legs syndrome symptom severity in untreated patients.[27]
+
+An association has been observed between attention deficit hyperactivity disorder (ADHD) and RLS or periodic limb movement disorder.[30] Both conditions appear to have links to dysfunctions related to the neurotransmitter dopamine, and common medications for both conditions among other systems, affect dopamine levels in the brain.[31] A 2005 study suggested that up to 44% of people with ADHD had comorbid (i.e. coexisting) RLS, and up to 26% of people with RLS had confirmed ADHD or symptoms of the condition.[32]
+
+Certain medications may cause or worsen RLS, or cause it secondarily, including:[1]
+
+Both primary and secondary RLS can be worsened by surgery of any kind; however, back surgery or injury can be associated with causing RLS.[36]
+
+The cause vs. effect of certain conditions and behaviors observed in some patients (ex. excess weight, lack of exercise, depression or other mental illnesses) is not well established. Loss of sleep due to RLS could cause the conditions, or medication used to treat a condition could cause RLS.[37][38]
+
+More than 60% of cases of RLS are familial and are inherited in an autosomal dominant fashion with variable penetrance.[39]
+
+Research and brain autopsies have implicated both dopaminergic system and iron insufficiency in the substantia nigra.[40] Iron is well understood to be an essential cofactor for the formation of L-dopa, the precursor of dopamine.
+
+Six genetic loci found by linkage are known and listed below. Other than the first one, all of the linkage loci were discovered using an autosomal dominant model of inheritance.
+
+Three genes, MEIS1, BTBD9 and MAP2K5, were found to be associated to RLS.[53]
+Their role in RLS pathogenesis is still unclear. More recently, a fourth gene, PTPRD was found to be associated with RLS.[54]
+
+There is also some evidence that periodic limb movements in sleep (PLMS) are associated with BTBD9 on chromosome 6p21.2,[55][56] MEIS1, MAP2K5/SKOR1, and PTPRD.[56] The presence of a positive family history suggests that there may be a genetic involvement in the etiology of RLS.
+
+Although it is only partly understood, pathophysiology of restless legs syndrome may involve dopamine and iron system anomalies.[57][58] There is also a commonly acknowledged circadian rhythm explanatory mechanism associated with it, clinically shown simply by biomarkers of circadian rhythm, such as body temperature.[59] The interactions between impaired neuronal iron uptake and the functions of the neuromelanin-containing and dopamine-producing cells have roles in RLS development, indicating that iron deficiency might affect the brain dopaminergic transmissions in different ways.[60]
+
+Medial thalamic nuclei may also have a role in RLS as part as the limbic system modulated by the dopaminergic system[61] which may affect pain perception.[62] Improvement of RLS symptoms occurs in people receiving low-dose dopamine agonists.[63]
+
+There are no specific tests for RLS, but non-specific laboratory tests are used to rule out other causes such as vitamin deficiencies. Five symptoms are used to confirm the diagnosis:[1]
+
+The symptoms below are not essential, like the ones above, but occur commonly in RLS patients:[1][64]
+
+According to the International Classification of Sleep Disorders (ICSD-3), the main symptoms have to be associated with a sleep disturbance or impairment in order to support RLS diagnosis.[65] As stated by this classification, RLS symptoms should begin or worsen when being inactive, be relieved when moving, should happen exclusively or mostly in the evening and at night, not be triggered by other medical or behavioral conditions, and should impair one's quality of life.[65][66] Generally, both legs are affected, but in some cases there is an asymmetry.
+
+The most common conditions that should be differentiated with RLS include leg cramps, positional discomfort, local leg injury, arthritis, leg edema, venous stasis, peripheral neuropathy, radiculopathy, habitual foot tapping/leg rocking, anxiety, myalgia, and drug-induced akathisia.[12]
+
+Peripheral artery disease and arthritis can also cause leg pain but this usually gets worse with movement.[11]
+
+There are less common differential diagnostic conditions included myelopathy, myopathy, vascular or neurogenic claudication, hypotensive akathisia, orthostatic tremor, painful legs, and moving toes.[12]
+
+If RLS is not linked to an underlying cause, its frequency may be reduced by lifestyle modifications such as adopting improving sleep hygiene, regular exercise, and stopping smoking.[67] Medications used may include dopamine agonists and gabapentinoids in those with daily restless legs syndrome.[1][35][7][8] In severe or refractory cases, opioids have been used.[68]
+
+Treatment of RLS should not be considered until possible medical causes are ruled out. Secondary RLS may be cured if precipitating medical conditions (anemia) are managed effectively.[1]
+
+Stretching the leg muscles can bring temporary relief.[19][69] Walking and moving the legs, as the name "restless legs" implies, brings temporary relief. In fact, those with RLS often have an almost uncontrollable need to walk and therefore relieve the symptoms while they are moving. Unfortunately, the symptoms usually return immediately after the moving and walking ceases.
+
+Counter-stimulation from massage, a hot or cold compress, or a vibratory counter-stimulation device has been found to help some people with primary RLS to improve their sleep.[70][71]
+
+There is some evidence that intravenous iron supplementation moderately improves restlessness for people with RLS.[72]
+
+For those whose RLS disrupts or prevents sleep or regular daily activities, medication may be useful. Evidence supports the use of dopamine agonists including pramipexole, ropinirole, rotigotine, cabergoline, and pergolide.[7][73][74] They reduce symptoms, improve sleep quality and quality of life.[75] Levodopa is also effective.[76] However, pergolide and cabergoline are less recommended due to their association with increased risk of valvular heart disease.[77] Ropinirole has a faster onset with shorter duration.[78] Rotigotine is commonly used as a transdermal patch which continuously provides stable plasma drug concentrations, resulting in its particular therapeutic effect on patients with symptoms throughout the day.[78] A 2008 meta-analysis[needs update] found pramipexole to be better than ropinirole.[79]
+
+There are, however, issues with the use of dopamine agonists including augmentation. This is a medical condition where the drug itself causes symptoms to increase in severity and/or occur earlier in the day. Dopamine agonists may also cause rebound when symptoms increase as the drug wears off. In many cases, the longer dopamine agonists have been used, the higher the risk of augmentation and rebound as well as the severity of the symptoms. Patients may also develop dopamine dysregulation syndrome, meaning that they can experience an addictive pattern of dopamine replacement therapy. A 2007 study indicated that dopamine agonists used in restless legs syndrome can lead to an increase in compulsive gambling.[80] Patients may also exhibit other impulse-control disorders such as compulsive shopping and compulsive eating.[81] There are some indications that stopping the dopamine agonist treatment has an impact on the resolution or at least improvement of the impulse-control disorder, even though some people can be particularly exposed to dopamine agonist withdrawal syndrome.[81]
+
+Gabapentinoids (α2δ ligands), including gabapentin, pregabalin, and gabapentin enacarbil, are also widely used in the treatment of RLS.[7][82] They are used as first-line treatments similarly to dopamine agonists, and as of 2019, guidelines have started to recommend gabapentinoids over dopamine agonists as initial therapy for RLS due to higher known risks of symptom augmentation with long-term dopamine agonist therapy.[83] Gabapentin enacarbil is approved by regulatory authorities for the treatment of RLS, whereas gabapentin and pregabalin are used off-label.[7] Data on gabapentinoids in the treatment of RLS are more limited compared to dopamine agonists.[84] However, based on available evidence, gabapentinoids are similarly effective to dopamine agonists in the treatment of RLS.[83][85][82]
+
+Low doses of opioids are used in the treatment of severe and treatment-resistant cases and are recommended by multiple reputable medical guidelines.[7][8][86] The most commonly used agents are prolonged-release oxycodone and methadone, but other opioids, including tramadol, codeine, morphine, and hydrocodone, may also be considered.[7][87][8] Opioids are only indicated in severe cases that do not respond to other measures due to their very high abuse liability and high rate of side effects, which may include constipation, fatigue, and headache.[88][35] However, opioids are said to be highly effective for severe and refractory RLS, and can be helpful in well-selected individuals.[7][8][87]
+
+Benzodiazepines, such as diazepam or clonazepam, are not generally recommended,[89] and their effectiveness is unknown or contradictory.[90][84] They, however, are sometimes still used as a second-line treatment,[91] as add-on agents.[90] Other treatments have also been explored, such as valproate, carbamazepine, perampanel, and dipyridamole, but are either not effective or have insufficient data to support their use.[84]
+
+Placebos provide a large benefit in terms of reduction of RLS symptoms.[92] This is thought to be due to positive expectancy effects and conditioning, which activate dopamine and opioid pathways in the brain.[92] Both dopamine agonists and opioids are used in and effective for the treatment of RLS, which is thought to be related to the effectiveness of placebos for the condition.[92] More than half of the benefit of RLS medications such as pramipexole and gabapentin enacarbil appears to be due to the placebo component based on clinical trial data.[93][94]
+
+RLS symptoms may gradually worsen with age, although more slowly for those with the idiopathic form of RLS than for people who also have an associated medical condition.[95] Current therapies can control the disorder, minimizing symptoms and increasing periods of restful sleep. In addition, some people have remissions, periods in which symptoms decrease or disappear for days, weeks, or months, although symptoms usually eventually reappear.[95] Being diagnosed with RLS does not indicate or foreshadow another neurological disease, such as Parkinson's disease.[95] RLS symptoms can worsen over time when dopamine-related drugs are used for therapy, an effect called augmentation which may represent symptoms occurring throughout the day and affect movements of all limbs.[95] There is no cure for RLS.[95]
+
+RLS affects an estimated 2.5–15% of the American population.[4][96] A minority (around 2.7% of the population) experience daily or severe symptoms.[97] RLS is twice as common in women as in men,[98] and Caucasians are more prone to RLS than people of African descent.[96] RLS occurs in 3% of individuals from the Mediterranean or Middle Eastern regions, and in 1–5% of those from East Asia, indicating that different genetic or environmental factors, including diet, may play a role in the prevalence of this syndrome.[96][99] RLS diagnosed at an older age runs a more severe course.[69] RLS is even more common in individuals with iron deficiency, pregnancy, or end-stage kidney disease.[100][101] The National Sleep Foundation's 1998 Sleep in America poll showed that up to 25 percent of pregnant women developed RLS during the third trimester.[102] Poor general health is also linked.[103]
+
+There are several risk factors for RLS, including old age, family history, and uremia. The prevalence of RLS tends to increase with age, as well as its severity and longer duration of symptoms. People with uremia receiving renal dialysis have a prevalence from 20% to 57%, while those having kidney transplant improve compared to those treated with dialysis.[104]
+
+RLS can occur at all ages, although it typically begins in the third or fourth decade.[66]
+Genome‐wide association studies have now identified 19 risk loci associated with RLS.[105] Neurological conditions linked to RLS include Parkinson's disease, spinal cerebellar atrophy, spinal stenosis,[specify] lumbosacral radiculopathy and Charcot–Marie–Tooth disease type 2.[96]
+
+In 2013, the Restless Legs Syndrome Foundation renamed itself the Willis–Ekbom Disease Foundation; however, it reverted to its original name in 2015 “to better support its mission”.[106]
+
+A point of confusion is that RLS and delusional parasitosis are entirely different conditions that have both been called "Ekbom syndrome", as both syndromes were described by the same person, Karl-Axel Ekbom.[107] Today, calling WED/RLS "Ekbom syndrome" is outdated usage, as the unambiguous names (WED or RLS) are preferred for clarity.
+
+Some doctors express the view that the incidence of restless legs syndrome is exaggerated by manufacturers of drugs used to treat it.[108] Others believe it is an underrecognized and undertreated disorder.[96] Further, GlaxoSmithKline (GSK) ran advertisements that, while not promoting off-licence use of their drug (ropinirole) for treatment of RLS, did link to the Ekbom Support Group website. That website contained statements advocating the use of ropinirole to treat RLS. The Association of the British Pharmaceutical Industry (ABPI) ruled against GSK in this case.[109]
+
+Different measurements have been used to evaluate treatments in RLS. Most of them are based on subjective rating scores, such as IRLS rating scale (IRLS), Clinical Global Impression (CGI), Patient Global Impression (PGI), and Quality of life (QoL).[110] These questionnaires provide information about the severity and progress of the disease, as well as the person's quality of life and sleep.[110] Polysomnography (PSG) and actigraphy (both related to sleep parameters) are more objective resources that provide evidences of sleep disturbances associated with RLS symptoms.[110]
+
+Creutzfeldt–Jakob disease
