@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics.pairwise import cosine_similarity
 import seaborn as sns
 from tqdm import tqdm
+import os
 
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -30,14 +31,18 @@ transformer_model = model.build_transformer(src_vocab_size, tgt_vocab_size, src_
 # Set model to evaluation mode (no gradient tracking needed for inference)
 transformer_model.eval()
 
-# Read input text from files and concatenate them
-file_list = ["ACS_CA3_Book.txt", "Genomes_3 - T.A. Brown_.txt", "input.txt", "data.txt", "train.txt", "test.txt"]
+# Specify the directory containing the text files
+directory_path = "Sentient-Sculptor-LLM\\Data"  # Replace with the path to your directory containing text files
+
+# Read input text from all files in the directory and concatenate them
 text = ""
 
 # Initialize progress bar for reading files
+file_list = [os.path.join(directory_path, file) for file in os.listdir(directory_path) if file.endswith(".txt")]
+
 with tqdm(total=len(file_list), desc="Reading Files") as pbar_files:
     for file_name in file_list:
-        with open(file_name, "r", encoding="utf-8") as f:
+        with open(file_name, "r", encoding="utf-8", errors="ignore") as f:
             text += f.read()  # Concatenate the content of each file
         pbar_files.update(1)  # Update progress after reading each file
 
