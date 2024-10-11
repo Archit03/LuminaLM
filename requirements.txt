@@ -1,11 +1,11 @@
-torch==2.0.1
-transformers==4.30.2
-tokenizers==0.13.3
-scikit-learn==1.2.2
-umap-learn==0.5.3
-matplotlib==3.7.1
+torch
+transformers
+tokenizers
+scikit-learn
+umap-learn
+matplotlib
 numpy<2
-pandas==2.0.1
-seaborn==0.12.2
-tbb>=2021.6.0
-torch-xla==2.0
+pandas
+seaborn
+tbb == 2021.13.1
+torch-xla
