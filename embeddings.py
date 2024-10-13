@@ -32,6 +32,11 @@ transformer_model.eval()
 # Specify the directory containing the text files
 directory_path = "/content/Sentient-Sculptor-LLM/Data"  # Path to your directory
 
+# Create a directory to save the plots
+output_directory = "/content/Sentient-Sculptor-LLM/Plots"
+if not os.path.exists(output_directory):
+    os.makedirs(output_directory)
+
 # Process files one by one to reduce memory load
 def read_files_in_chunks(directory, chunk_size=10000):
     file_list = [os.path.join(directory, file) for file in os.listdir(directory) if file.endswith(".txt")]
@@ -88,11 +93,12 @@ with tqdm(desc="Calculating Cosine Similarities (Sampled)", total=1) as pbar_cos
     cos_sim_matrix_sampled = cosine_similarity(embedding_np_sampled)
     pbar_cosine.update(1)
 
-# Plot the cosine similarity matrix (Sampled)
+# Save the cosine similarity matrix (Sampled)
 plt.figure(figsize=(10, 8))
 sns.heatmap(cos_sim_matrix_sampled, cmap='viridis', xticklabels=False, yticklabels=False)
 plt.title('Cosine Similarity Matrix (Sampled)')
-plt.show()
+plt.savefig(os.path.join(output_directory, "cosine_similarity_sampled.png"))
+plt.close()  # Close the plot to free memory
 
 ### OPTION 2: Block-Wise Cosine Similarity Calculation ###
 def compute_cosine_similarity_blockwise(embeddings, block_size=1000):
@@ -110,11 +116,12 @@ def compute_cosine_similarity_blockwise(embeddings, block_size=1000):
 block_size = 500  # Adjust block size based on available memory
 cos_sim_matrix_blockwise = compute_cosine_similarity_blockwise(embedding_np_sampled, block_size=block_size)
 
-# Plot the block-wise cosine similarity matrix
+# Save the block-wise cosine similarity matrix
 plt.figure(figsize=(10, 8))
 sns.heatmap(cos_sim_matrix_blockwise, cmap='viridis', xticklabels=False, yticklabels=False)
 plt.title('Cosine Similarity Matrix (Block-wise)')
-plt.show()
+plt.savefig(os.path.join(output_directory, "cosine_similarity_blockwise.png"))
+plt.close()
 
 ### OPTION 3: Dimensionality Reduction ###
 # Perform PCA reduction with progress bar
@@ -123,8 +130,9 @@ with tqdm(desc="PCA Reduction", total=1) as pbar_pca:
     reduced_embeddings_pca = pca.fit_transform(embedding_np_sampled)
     pbar_pca.update(1)
 
-# Plotting PCA projection
+# Save the PCA projection plot
 fig, ax = plt.subplots()
 ax.scatter(reduced_embeddings_pca[:, 0], reduced_embeddings_pca[:, 1], alpha=0.5)
 ax.set_title('PCA Projection of the Embeddings')
-plt.show()
+plt.savefig(os.path.join(output_directory, "pca_projection.png"))
+plt.close()
