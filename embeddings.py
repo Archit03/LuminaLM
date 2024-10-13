@@ -12,7 +12,7 @@ from tqdm import tqdm
 import os
 
 # Check if CUDA is available; otherwise use CPU
-device = torch.device("cuda" if torch.device.cuda.is_avilable() else 'cpu')
+device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
 # Load the BPE tokenizer
@@ -24,7 +24,7 @@ src_leq_len = 512  # Reduced sequence length for memory management
 src_vocab_size = len(tokenizer.get_vocab())  # Vocabulary size from the BPE tokenizer
 tgt_vocab_size = src_vocab_size  # Assuming the same vocab size for target
 
-# Build transformer model with smaller embedding size and sequence length, and move it to the device (CPU)
+# Build transformer model with smaller embedding size and sequence length, and move it to the device (GPU/CPU)
 transformer_model = model.build_transformer(
     src_vocab_size, tgt_vocab_size, src_leq_len=src_leq_len, tgt_seq_len=src_leq_len, d_model=d_model
 ).to(device)
@@ -60,7 +60,7 @@ all_embeddings = []
 # Process each batch independently with a progress bar
 with tqdm(total=len(input_ids_batches), desc="Processing Batches") as pbar_batches:
     for batch in input_ids_batches:
-        input_ids = torch.tensor([batch], dtype=torch.long).to(device)
+        input_ids = torch.tensor([batch], dtype=torch.long).to(device)  # Ensure tensors are moved to GPU if available
 
         # Forward pass through the transformer model
         with torch.no_grad():
