@@ -3,12 +3,14 @@ import torch.nn as nn
 from tokenizers import Tokenizer
 from Transformer import model  # Ensure this is the correct module and function
 from sklearn.decomposition import PCA
+import umap
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics.pairwise import cosine_similarity
 import seaborn as sns
 from tqdm import tqdm
 import os
+from mpl_toolkits.mplot3d import Axes3D  # For 3D plotting
 
 # Check if CUDA is available; otherwise use CPU
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
@@ -32,13 +34,9 @@ transformer_model.eval()
 # Specify the directory containing the text files
 directory_path = "/content/Sentient-Sculptor-LLM/Data"  # Path to your directory
 
-# Create a directory to save the plots
-output_directory = "/content/Sentient-Sculptor-LLM/Plots"
-if not os.path.exists(output_directory):
-    os.makedirs(output_directory)
-
 # Process files one by one to reduce memory load
 def read_files_in_chunks(directory, chunk_size=10000):
+    text = ""
     file_list = [os.path.join(directory, file) for file in os.listdir(directory) if file.endswith(".txt")]
     for file_name in file_list:
         with open(file_name, "r", encoding="utf-8", errors="ignore") as f:
@@ -80,8 +78,36 @@ all_embeddings_tensor = torch.cat(all_embeddings, dim=0)
 # Convert the embeddings tensor to numpy for further processing
 embedding_np = all_embeddings_tensor.numpy()
 
-### OPTION 1: Sampling Subset for Cosine Similarity ###
-max_samples = 5000  # Reduce sample size for cosine similarity calculation
+### PCA for 3D projection ###
+with tqdm(desc="PCA Reduction", total=1) as pbar_pca:
+    pca = PCA(n_components=3)  # 3 components for 3D
+    reduced_embeddings_pca = pca.fit_transform(embedding_np)
+    pbar_pca.update(1)
+
+# 3D Plotting PCA projection
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.scatter(reduced_embeddings_pca[:, 0], reduced_embeddings_pca[:, 1], reduced_embeddings_pca[:, 2], alpha=0.5)
+ax.set_title('3D PCA Projection of the Embeddings')
+plt.savefig('3d_pca_projection.png')
+plt.show()
+
+### UMAP for 3D projection ###
+with tqdm(desc="UMAP Reduction", total=1) as pbar_umap:
+    umap_reducer = umap.UMAP(n_components=3, n_neighbors=5, min_dist=0.3)  # 3 components for 3D
+    reduced_embeddings_umap = umap_reducer.fit_transform(embedding_np)
+    pbar_umap.update(1)
+
+# 3D Plotting UMAP projection
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.scatter(reduced_embeddings_umap[:, 0], reduced_embeddings_umap[:, 1], reduced_embeddings_umap[:, 2], alpha=0.5)
+ax.set_title('3D UMAP Projection of the Embeddings')
+plt.savefig('3d_umap_projection.png')
+plt.show()
+
+### Cosine Similarity (Sampled) ###
+max_samples = 5000  # Limit the number of samples for cosine similarity calculation
 if embedding_np.shape[0] > max_samples:
     indices = np.random.choice(embedding_np.shape[0], max_samples, replace=False)
     embedding_np_sampled = embedding_np[indices]
@@ -97,10 +123,10 @@ with tqdm(desc="Calculating Cosine Similarities (Sampled)", total=1) as pbar_cos
 plt.figure(figsize=(10, 8))
 sns.heatmap(cos_sim_matrix_sampled, cmap='viridis', xticklabels=False, yticklabels=False)
 plt.title('Cosine Similarity Matrix (Sampled)')
-plt.savefig(os.path.join(output_directory, "cosine_similarity_sampled.png"))
-plt.close()  # Close the plot to free memory
+plt.savefig('cosine_similarity_sampled.png')
+plt.show()
 
-### OPTION 2: Block-Wise Cosine Similarity Calculation ###
+### Block-Wise Cosine Similarity Calculation ###
 def compute_cosine_similarity_blockwise(embeddings, block_size=1000):
     n = embeddings.shape[0]
     cos_sim_matrix = np.zeros((n, n))
@@ -114,25 +140,11 @@ def compute_cosine_similarity_blockwise(embeddings, block_size=1000):
 
 # Use block-wise cosine similarity calculation
 block_size = 500  # Adjust block size based on available memory
-cos_sim_matrix_blockwise = compute_cosine_similarity_blockwise(embedding_np_sampled, block_size=block_size)
+cos_sim_matrix_blockwise = compute_cosine_similarity_blockwise(embedding_np, block_size=block_size)
 
 # Save the block-wise cosine similarity matrix
 plt.figure(figsize=(10, 8))
 sns.heatmap(cos_sim_matrix_blockwise, cmap='viridis', xticklabels=False, yticklabels=False)
 plt.title('Cosine Similarity Matrix (Block-wise)')
-plt.savefig(os.path.join(output_directory, "cosine_similarity_blockwise.png"))
-plt.close()
-
-### OPTION 3: Dimensionality Reduction ###
-# Perform PCA reduction with progress bar
-with tqdm(desc="PCA Reduction", total=1) as pbar_pca:
-    pca = PCA(n_components=2)  # Reduced to 2 components for visualization
-    reduced_embeddings_pca = pca.fit_transform(embedding_np_sampled)
-    pbar_pca.update(1)
-
-# Save the PCA projection plot
-fig, ax = plt.subplots()
-ax.scatter(reduced_embeddings_pca[:, 0], reduced_embeddings_pca[:, 1], alpha=0.5)
-ax.set_title('PCA Projection of the Embeddings')
-plt.savefig(os.path.join(output_directory, "pca_projection.png"))
-plt.close()
+plt.savefig('cosine_similarity_blockwise.png')
+plt.show()
