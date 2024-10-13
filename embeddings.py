@@ -3,7 +3,7 @@ import torch.nn as nn
 from tokenizers import Tokenizer
 from Transformer import model  # Ensure this is the correct module and function
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE  # For t-SNE projection
+from sklearn.manifold import TSNE  # Import t-SNE
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics.pairwise import cosine_similarity
@@ -92,28 +92,29 @@ ax.set_title('3D PCA Projection of the Embeddings')
 plt.savefig('3d_pca_projection.png')
 plt.show()
 
-### t-SNE for 3D projection ###
-with tqdm(desc="t-SNE Reduction", total=1) as pbar_tsne:
-    tsne = TSNE(n_components=3, random_state=42, perplexity=30, n_iter=300)  # t-SNE parameters
-    reduced_embeddings_tsne = tsne.fit_transform(embedding_np)
-    pbar_tsne.update(1)
-
-# 3D Plotting t-SNE projection
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.scatter(reduced_embeddings_tsne[:, 0], reduced_embeddings_tsne[:, 1], reduced_embeddings_tsne[:, 2], alpha=0.5)
-ax.set_title('3D t-SNE Projection of the Embeddings')
-plt.savefig('3d_tsne_projection.png')
-plt.show()
-
-### Cosine Similarity (Sampled) ###
-max_samples = 5000  # Limit the number of samples for cosine similarity calculation
+### t-SNE for 3D projection (Sampled) ###
+max_samples = 5000  # Limit the number of samples for t-SNE
 if embedding_np.shape[0] > max_samples:
     indices = np.random.choice(embedding_np.shape[0], max_samples, replace=False)
     embedding_np_sampled = embedding_np[indices]
 else:
     embedding_np_sampled = embedding_np
 
+# Perform t-SNE reduction on the sampled embeddings
+with tqdm(desc="t-SNE Reduction", total=1) as pbar_tsne:
+    tsne = TSNE(n_components=3, random_state=42)  # 3 components for 3D
+    reduced_embeddings_tsne = tsne.fit_transform(embedding_np_sampled)
+    pbar_tsne.update(1)
+
+# 3D Plotting t-SNE projection
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.scatter(reduced_embeddings_tsne[:, 0], reduced_embeddings_tsne[:, 1], reduced_embeddings_tsne[:, 2], alpha=0.5)
+ax.set_title('3D t-SNE Projection of the Embeddings (Sampled)')
+plt.savefig('3d_tsne_projection.png')
+plt.show()
+
+### Cosine Similarity (Sampled) ###
 # Calculate cosine similarity for the sampled embeddings
 with tqdm(desc="Calculating Cosine Similarities (Sampled)", total=1) as pbar_cosine:
     cos_sim_matrix_sampled = cosine_similarity(embedding_np_sampled)
