@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import tokenizer
+from tokenizer import Tokenizer
 from Transformer import model  # Ensure this is the correct module and function
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
@@ -18,7 +18,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
 # Load the BPE tokenizer (Ensure tokenizer is domain-specific if possible)
-tokenizer = tokenizer.from_file("bpe_token.json")
+tokenizer = Tokenizer.from_file("bpe_token.json")
 
 # Initialize the transformer model (fine-tune this on domain-specific data)
 d_model = 512  # Increased embedding dimension to capture richer features
