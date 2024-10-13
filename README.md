@@ -16,8 +16,9 @@ Visit the live project at: [Sentient Sculptor](https://www.ellanorai.org)
 - **User-Friendly Interface**: Provides an easy-to-use interface for inputting prompts and receiving AI-generated responses.
 - **API Integration**: Developers can leverage the Sentient Sculptor API for text generation in their own applications.
 - **Custom Built Embeddings Generators**: This model leverages the Transformers architecture, to genereate embeddings. 
-![Cosine Similarity Heatmap](cosine_similarity_heatmap-1.png)
-![Umap 3d Embeddings](umap_3d_embeddings-1.png)
+![Cosine Similarity Heatmap](cosine_similarity_sampled.png)
+![3d t_SNE projections](3d_tsne_projection.png)
+![3d PCA Projection](3d_pca_projection.png)
 
 
 ## Requirements
@@ -33,4 +34,12 @@ You can install the required packages using:
 
 ```bash
 pip install -r requirements.txt
+```
+
+```bash
+python tokenizer.py
+```
+
+```bash
+python embeddings.py
 ```
