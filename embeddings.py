@@ -3,7 +3,7 @@ import torch.nn as nn
 from tokenizers import Tokenizer
 from Transformer import model  # Ensure this is the correct module and function
 from sklearn.decomposition import PCA
-import umap
+from sklearn.manifold import TSNE  # For t-SNE projection
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics.pairwise import cosine_similarity
@@ -92,18 +92,18 @@ ax.set_title('3D PCA Projection of the Embeddings')
 plt.savefig('3d_pca_projection.png')
 plt.show()
 
-### UMAP for 3D projection ###
-with tqdm(desc="UMAP Reduction", total=1) as pbar_umap:
-    umap_reducer = umap.UMAP(n_components=3, n_neighbors=5, min_dist=0.3)  # 3 components for 3D
-    reduced_embeddings_umap = umap_reducer.fit_transform(embedding_np)
-    pbar_umap.update(1)
+### t-SNE for 3D projection ###
+with tqdm(desc="t-SNE Reduction", total=1) as pbar_tsne:
+    tsne = TSNE(n_components=3, random_state=42, perplexity=30, n_iter=300)  # t-SNE parameters
+    reduced_embeddings_tsne = tsne.fit_transform(embedding_np)
+    pbar_tsne.update(1)
 
-# 3D Plotting UMAP projection
+# 3D Plotting t-SNE projection
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
-ax.scatter(reduced_embeddings_umap[:, 0], reduced_embeddings_umap[:, 1], reduced_embeddings_umap[:, 2], alpha=0.5)
-ax.set_title('3D UMAP Projection of the Embeddings')
-plt.savefig('3d_umap_projection.png')
+ax.scatter(reduced_embeddings_tsne[:, 0], reduced_embeddings_tsne[:, 1], reduced_embeddings_tsne[:, 2], alpha=0.5)
+ax.set_title('3D t-SNE Projection of the Embeddings')
+plt.savefig('3d_tsne_projection.png')
 plt.show()
 
 ### Cosine Similarity (Sampled) ###
