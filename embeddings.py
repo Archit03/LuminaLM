@@ -3,7 +3,6 @@ import torch.nn as nn
 from tokenizers import Tokenizer
 from Transformer import model  # Ensure this is the correct module and function
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE  # Import t-SNE
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics.pairwise import cosine_similarity
@@ -92,60 +91,53 @@ ax.set_title('3D PCA Projection of the Embeddings')
 plt.savefig('3d_pca_projection.png')
 plt.show()
 
-### t-SNE for 3D projection (Sampled) ###
-max_samples = 5000  # Limit the number of samples for t-SNE
-if embedding_np.shape[0] > max_samples:
-    indices = np.random.choice(embedding_np.shape[0], max_samples, replace=False)
-    embedding_np_sampled = embedding_np[indices]
-else:
-    embedding_np_sampled = embedding_np
+### Cosine Similarity Block-wise Calculation with Memory Mapping ###
+def compute_cosine_similarity_blockwise_to_disk(embeddings, block_size=1000, output_file="cosine_similarity_blockwise.npy"):
+    n = embeddings.shape[0]
+    
+    # Memory map the file to store blocks incrementally without holding the full matrix in memory
+    cos_sim_matrix_file = np.memmap(output_file, dtype='float32', mode='w+', shape=(n, n))
 
-# Perform t-SNE reduction on the sampled embeddings
+    for i in tqdm(range(0, n, block_size), desc="Calculating Cosine Similarity in Blocks"):
+        for j in range(0, n, block_size):
+            # Compute the cosine similarity for the current block
+            block_sim = cosine_similarity(embeddings[i:i+block_size], embeddings[j:j+block_size])
+            # Save the block to the memory-mapped file
+            cos_sim_matrix_file[i:i+block_size, j:j+block_size] = block_sim
+    
+    # Flush the memory-mapped file to ensure data is written to disk
+    cos_sim_matrix_file.flush()
+    return output_file
+
+# Use block-wise cosine similarity calculation and store results to disk
+block_size = 500  # Adjust block size based on available memory
+output_file = "cosine_similarity_blockwise.npy"
+cos_sim_matrix_blockwise_file = compute_cosine_similarity_blockwise_to_disk(embedding_np, block_size=block_size, output_file=output_file)
+
+# Once saved to disk, you can load parts of the matrix when needed without requiring full memory:
+cos_sim_matrix_blockwise = np.memmap(output_file, dtype='float32', mode='r', shape=(len(embedding_np), len(embedding_np)))
+
+# Optionally, plot a sample of the matrix
+sample_size = 1000  # For visualization, sample a subset
+plt.figure(figsize=(10, 8))
+sns.heatmap(cos_sim_matrix_blockwise[:sample_size, :sample_size], cmap='viridis', xticklabels=False, yticklabels=False)
+plt.title('Cosine Similarity Matrix (Block-wise, Sampled)')
+plt.savefig('cosine_similarity_blockwise_sampled.png')
+plt.show()
+
+### t-SNE for 3D projection ###
+from sklearn.manifold import TSNE
+
+# Perform t-SNE with 3 components for 3D visualization
 with tqdm(desc="t-SNE Reduction", total=1) as pbar_tsne:
-    tsne = TSNE(n_components=3, random_state=42)  # 3 components for 3D
-    reduced_embeddings_tsne = tsne.fit_transform(embedding_np_sampled)
+    tsne = TSNE(n_components=3, random_state=42, perplexity=30, n_iter=300)
+    reduced_embeddings_tsne = tsne.fit_transform(embedding_np)
     pbar_tsne.update(1)
 
 # 3D Plotting t-SNE projection
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 ax.scatter(reduced_embeddings_tsne[:, 0], reduced_embeddings_tsne[:, 1], reduced_embeddings_tsne[:, 2], alpha=0.5)
-ax.set_title('3D t-SNE Projection of the Embeddings (Sampled)')
+ax.set_title('3D t-SNE Projection of the Embeddings')
 plt.savefig('3d_tsne_projection.png')
-plt.show()
-
-### Cosine Similarity (Sampled) ###
-# Calculate cosine similarity for the sampled embeddings
-with tqdm(desc="Calculating Cosine Similarities (Sampled)", total=1) as pbar_cosine:
-    cos_sim_matrix_sampled = cosine_similarity(embedding_np_sampled)
-    pbar_cosine.update(1)
-
-# Save the cosine similarity matrix (Sampled)
-plt.figure(figsize=(10, 8))
-sns.heatmap(cos_sim_matrix_sampled, cmap='viridis', xticklabels=False, yticklabels=False)
-plt.title('Cosine Similarity Matrix (Sampled)')
-plt.savefig('cosine_similarity_sampled.png')
-plt.show()
-
-### Block-Wise Cosine Similarity Calculation ###
-def compute_cosine_similarity_blockwise(embeddings, block_size=1000):
-    n = embeddings.shape[0]
-    cos_sim_matrix = np.zeros((n, n))
-
-    for i in tqdm(range(0, n, block_size), desc="Calculating Cosine Similarity in Blocks"):
-        for j in range(0, n, block_size):
-            cos_sim_matrix[i:i+block_size, j:j+block_size] = cosine_similarity(
-                embeddings[i:i+block_size], embeddings[j:j+block_size]
-            )
-    return cos_sim_matrix
-
-# Use block-wise cosine similarity calculation
-block_size = 500  # Adjust block size based on available memory
-cos_sim_matrix_blockwise = compute_cosine_similarity_blockwise(embedding_np, block_size=block_size)
-
-# Save the block-wise cosine similarity matrix
-plt.figure(figsize=(10, 8))
-sns.heatmap(cos_sim_matrix_blockwise, cmap='viridis', xticklabels=False, yticklabels=False)
-plt.title('Cosine Similarity Matrix (Block-wise)')
-plt.savefig('cosine_similarity_blockwise.png')
 plt.show()
