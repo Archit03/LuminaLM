@@ -76,46 +76,23 @@ all_embeddings_tensor = torch.cat(all_embeddings, dim=0)
 # Convert the embeddings tensor to numpy for further processing
 embedding_np = all_embeddings_tensor.numpy()
 
-### OPTION 1: Sampling Subset for Cosine Similarity ###
-max_samples = 1000  # Reduced sample size for cosine similarity calculation
-if embedding_np.shape[0] > max_samples:
-    indices = np.random.choice(embedding_np.shape[0], max_samples, replace=False)
-    embedding_np_sampled = embedding_np[indices]
-else:
-    embedding_np_sampled = embedding_np
-
-# Calculate cosine similarity for the sampled embeddings
-with tqdm(desc="Calculating Cosine Similarities (Sampled)", total=1) as pbar_cosine:
-    cos_sim_matrix_sampled = cosine_similarity(embedding_np_sampled)
-    pbar_cosine.update(1)
-
-# Plot the cosine similarity matrix (Sampled)
-plt.figure(figsize=(10, 8))
-sns.heatmap(cos_sim_matrix_sampled, cmap='viridis', xticklabels=False, yticklabels=False)
-plt.title('Cosine Similarity Matrix (Sampled)')
-plt.show()
-
-### OPTION 2: Block-Wise Cosine Similarity Calculation ###
-def compute_cosine_similarity_blockwise(embeddings, block_size=250):
+### Block-Wise Cosine Similarity Calculation with File Writing ###
+def compute_cosine_similarity_blockwise_to_disk(embeddings, block_size=250, output_file="cosine_similarity_blocks.npz"):
     n = embeddings.shape[0]
-    cos_sim_matrix = np.zeros((n, n))
+    
+    # Open a file to store the results in a sparse format
+    with open(output_file, 'wb') as f:
+        for i in tqdm(range(0, n, block_size), desc="Calculating Cosine Similarity in Blocks"):
+            for j in range(0, n, block_size):
+                # Compute the block of cosine similarities
+                block = cosine_similarity(embeddings[i:i+block_size], embeddings[j:j+block_size])
+                
+                # Save each block to file
+                np.savez_compressed(f, block=block, i=i, j=j)
 
-    for i in tqdm(range(0, n, block_size), desc="Calculating Cosine Similarity in Blocks"):
-        for j in range(0, n, block_size):
-            cos_sim_matrix[i:i+block_size, j:j+block_size] = cosine_similarity(
-                embeddings[i:i+block_size], embeddings[j:j+block_size]
-            )
-    return cos_sim_matrix
-
-# Use block-wise cosine similarity calculation
-block_size = 250  # Further reduced block size based on available memory
-cos_sim_matrix_blockwise = compute_cosine_similarity_blockwise(embedding_np, block_size=block_size)
-
-# Plot the block-wise cosine similarity matrix
-plt.figure(figsize=(10, 8))
-sns.heatmap(cos_sim_matrix_blockwise, cmap='viridis', xticklabels=False, yticklabels=False)
-plt.title('Cosine Similarity Matrix (Block-wise)')
-plt.show()
+# Use block-wise cosine similarity calculation with file output
+block_size = 250  # Adjust block size based on available memory
+compute_cosine_similarity_blockwise_to_disk(embedding_np, block_size=block_size, output_file="cosine_similarity_blocks.npz")
 
 ### OPTION 3: Dimensionality Reduction ###
 # Perform PCA reduction with progress bar
