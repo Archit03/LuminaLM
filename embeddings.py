@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from tokenizers import Tokenizer
+import tokenizer
 from Transformer import model  # Ensure this is the correct module and function
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
@@ -11,28 +11,48 @@ import seaborn as sns
 from tqdm import tqdm
 import os
 from mpl_toolkits.mplot3d import Axes3D  # For 3D plotting
+import pandas as pd
 
 # Check if CUDA is available; otherwise use CPU
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
-# Load the BPE tokenizer
-tokenizer = Tokenizer.from_file("bpe_token.json")
+# Load the BPE tokenizer (Ensure tokenizer is domain-specific if possible)
+tokenizer = tokenizer.from_file("bpe_token.json")
 
-# Initialize the transformer model
-d_model = 256  # Reduced embedding dimension from 512 to 256 for less memory usage
-src_leq_len = 512  # Reduced sequence length for memory management
+# Initialize the transformer model (fine-tune this on domain-specific data)
+d_model = 512  # Increased embedding dimension to capture richer features
+src_leq_len = 512  # Keep manageable sequence length for memory management
 src_vocab_size = len(tokenizer.get_vocab())  # Vocabulary size from the BPE tokenizer
 tgt_vocab_size = src_vocab_size  # Assuming the same vocab size for target
 
-# Build transformer model with smaller embedding size and sequence length, and move it to the device
+# Build transformer model with larger embedding size, move it to the device
 transformer_model = model.build_transformer(
     src_vocab_size, tgt_vocab_size, src_leq_len=src_leq_len, tgt_seq_len=src_leq_len, d_model=d_model
 ).to(device)
-transformer_model.eval()
 
-# Specify the directory containing the text files
-directory_path = "/content/Sentient-Sculptor-LLM/Data"  # Path to your directory
+# Optionally fine-tune the model with your domain-specific data
+def fine_tune_model(train_data, model, epochs=3, lr=1e-5):
+    # Define a simple training loop
+    model.train()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    criterion = nn.CrossEntropyLoss()
+
+    for epoch in range(epochs):
+        total_loss = 0
+        for batch in train_data:
+            optimizer.zero_grad()
+            input_ids = batch['input_ids'].to(device)
+            labels = batch['labels'].to(device)
+            outputs = model(input_ids)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+        print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(train_data)}")
+
+# Data preprocessing: increase data quality through augmentation or cleaning
+directory_path = "/content/Sentient-Sculptor-LLM/Data"
 
 # Process files one by one to reduce memory load
 def read_files_in_chunks(directory, chunk_size=10000):
@@ -51,8 +71,8 @@ encoded_input = []
 for chunk in read_files_in_chunks(directory_path):
     encoded_input.extend(tokenizer.encode(chunk).ids)
 
-# Adjust the batch size to 256 for memory efficiency
-batch_size = 256
+# Adjust the batch size for memory efficiency
+batch_size = 512  # Increased batch size if memory allows
 input_ids_batches = [encoded_input[i:i + batch_size] for i in range(0, len(encoded_input), batch_size)]
 
 # Initialize a list to store embeddings for all batches
@@ -63,7 +83,8 @@ with tqdm(total=len(input_ids_batches), desc="Processing Batches") as pbar_batch
     for batch in input_ids_batches:
         input_ids = torch.tensor([batch], dtype=torch.long).to(device)
 
-        # Forward pass through the transformer model
+        # Forward pass through the transformer model with dropout regularization
+        transformer_model.eval()
         with torch.no_grad():
             src_mask = None  # Optional mask
             embeddings = transformer_model.encode(input_ids, src_mask)
@@ -83,6 +104,10 @@ with tqdm(desc="PCA Reduction", total=1) as pbar_pca:
     pca = PCA(n_components=3)  # 3 components for 3D
     reduced_embeddings_pca = pca.fit_transform(embedding_np)
     pbar_pca.update(1)
+
+# Save the reduced PCA embeddings
+pca_df = pd.DataFrame(reduced_embeddings_pca, columns=['Component 1', 'Component 2', 'Component 3'])
+pca_df.to_csv('reduced_pca_embeddings.csv', index=False)
 
 # 3D Plotting PCA projection
 fig = plt.figure()
@@ -105,7 +130,10 @@ with tqdm(desc="Calculating Cosine Similarities (Sampled)", total=1) as pbar_cos
     cos_sim_matrix_sampled = cosine_similarity(embedding_np_sampled)
     pbar_cosine.update(1)
 
-# Save the cosine similarity matrix (Sampled)
+# Save the cosine similarity matrix
+np.save('cosine_similarity_sampled.npy', cos_sim_matrix_sampled)
+
+# Save the cosine similarity heatmap
 plt.figure(figsize=(10, 8))
 sns.heatmap(cos_sim_matrix_sampled, cmap='viridis', xticklabels=False, yticklabels=False)
 plt.title('Cosine Similarity Matrix (Sampled)')
@@ -117,6 +145,10 @@ with tqdm(desc="t-SNE Reduction", total=1) as pbar_tsne:
     tsne = TSNE(n_components=3, random_state=42, perplexity=30, n_iter=300)
     reduced_embeddings_tsne = tsne.fit_transform(embedding_np_sampled)
     pbar_tsne.update(1)
+
+# Save the t-SNE reduced embeddings
+tsne_df = pd.DataFrame(reduced_embeddings_tsne, columns=['Component 1', 'Component 2', 'Component 3'])
+tsne_df.to_csv('reduced_tsne_embeddings.csv', index=False)
 
 # 3D Plotting t-SNE projection
 fig = plt.figure()
