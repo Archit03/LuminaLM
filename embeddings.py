@@ -11,43 +11,48 @@ import seaborn as sns
 from tqdm import tqdm
 import os
 
-# Check if CUDA is available
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Check if CUDA is available; otherwise use CPU
+device = torch.device("cpu")
 print(f"Using device: {device}")
 
 # Load the BPE tokenizer
 tokenizer = Tokenizer.from_file("bpe_token.json")
 
 # Initialize the transformer model
-d_model = 512  # Embedding dimension
-src_leq_len = 1064  # Maximum sequence length per batch
+d_model = 256  # Reduced embedding dimension from 512 to 256 for less memory usage
+src_leq_len = 512  # Reduced sequence length for memory management
 src_vocab_size = len(tokenizer.get_vocab())  # Vocabulary size from the BPE tokenizer
 tgt_vocab_size = src_vocab_size  # Assuming the same vocab size for target
 
-# Build transformer model with manageable sequence length and move it to the GPU
-transformer_model = model.build_transformer(src_vocab_size, tgt_vocab_size, src_leq_len=src_leq_len, tgt_seq_len=src_leq_len, d_model=d_model).to(device)
+# Build transformer model with smaller embedding size and sequence length, and move it to the device (CPU)
+transformer_model = model.build_transformer(
+    src_vocab_size, tgt_vocab_size, src_leq_len=src_leq_len, tgt_seq_len=src_leq_len, d_model=d_model
+).to(device)
 transformer_model.eval()
 
 # Specify the directory containing the text files
-directory_path = "/content/Sentient-Sculptor-LLM/Data"  # Path to your directory
+directory_path = "C:\\Users\\LENOVO\\Desktop\\Sentient-Sculptor-LLM\\Data"  # Path to your directory
 
-# Read input text from all files in the directory and concatenate them
-text = ""
-file_list = [os.path.join(directory_path, file) for file in os.listdir(directory_path) if file.endswith(".txt")]
-
-# Initialize progress bar for reading files
-with tqdm(total=len(file_list), desc="Reading Files") as pbar_files:
+# Process files one by one to reduce memory load
+def read_files_in_chunks(directory, chunk_size=10000):
+    text = ""
+    file_list = [os.path.join(directory, file) for file in os.listdir(directory) if file.endswith(".txt")]
     for file_name in file_list:
         with open(file_name, "r", encoding="utf-8", errors="ignore") as f:
-            text += f.read()  # Concatenate the content of each file
-        pbar_files.update(1)
+            while True:
+                chunk = f.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
 
-# Tokenize the concatenated text using the BPE tokenizer
-encoded_input = tokenizer.encode(text)
+# Tokenize the concatenated text in chunks using the BPE tokenizer
+encoded_input = []
+for chunk in read_files_in_chunks(directory_path):
+    encoded_input.extend(tokenizer.encode(chunk).ids)
 
-# Adjust the batch size to 512
-batch_size = 512
-input_ids_batches = [encoded_input.ids[i:i + batch_size] for i in range(0, len(encoded_input.ids), batch_size)]
+# Adjust the batch size to 256 for memory efficiency
+batch_size = 256
+input_ids_batches = [encoded_input[i:i + batch_size] for i in range(0, len(encoded_input), batch_size)]
 
 # Initialize a list to store embeddings for all batches
 all_embeddings = []
@@ -74,13 +79,13 @@ embedding_np = all_embeddings_tensor.numpy()
 
 # Perform PCA reduction with progress bar
 with tqdm(desc="PCA Reduction", total=1) as pbar_pca:
-    pca = PCA(n_components=3)
+    pca = PCA(n_components=2)  # Reduced to 2 components for visualization
     reduced_embeddings_pca = pca.fit_transform(embedding_np)
     pbar_pca.update(1)
 
-# Perform UMAP reduction with progress bar
+# Optionally, perform UMAP reduction if memory permits (use smaller `n_neighbors` and `min_dist`)
 with tqdm(desc="UMAP Reduction", total=1) as pbar_umap:
-    umap_reducer = umap.UMAP(n_components=3)
+    umap_reducer = umap.UMAP(n_components=2, n_neighbors=5, min_dist=0.3)  # Optimized UMAP parameters
     reduced_embeddings_umap = umap_reducer.fit_transform(embedding_np)
     pbar_umap.update(1)
 
