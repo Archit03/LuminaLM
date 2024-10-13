@@ -12,23 +12,30 @@ from tqdm import tqdm
 import os
 
 # Check if CUDA is available; otherwise use CPU
-device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 # Load the BPE tokenizer
 tokenizer = Tokenizer.from_file("bpe_token.json")
 
-# Initialize the transformer model
-d_model = 256  # Reduced embedding dimension from 512 to 256 for less memory usage
+# Initialize two transformer models with smaller embedding size
+d_model = 256  # Each model will have a 256-dimensional embedding
 src_leq_len = 512  # Reduced sequence length for memory management
 src_vocab_size = len(tokenizer.get_vocab())  # Vocabulary size from the BPE tokenizer
 tgt_vocab_size = src_vocab_size  # Assuming the same vocab size for target
 
-# Build transformer model with smaller embedding size and sequence length, and move it to the device (GPU/CPU)
-transformer_model = model.build_transformer(
+# Build two transformer models
+transformer_model_1 = model.build_transformer(
     src_vocab_size, tgt_vocab_size, src_leq_len=src_leq_len, tgt_seq_len=src_leq_len, d_model=d_model
 ).to(device)
-transformer_model.eval()
+
+transformer_model_2 = model.build_transformer(
+    src_vocab_size, tgt_vocab_size, src_leq_len=src_leq_len, tgt_seq_len=src_leq_len, d_model=d_model
+).to(device)
+
+# Set models to evaluation mode (no gradient tracking needed for inference)
+transformer_model_1.eval()
+transformer_model_2.eval()
 
 # Specify the directory containing the text files
 directory_path = "C:\\Users\\LENOVO\\Desktop\\Sentient-Sculptor-LLM\\Data"  # Path to your directory
@@ -60,15 +67,22 @@ all_embeddings = []
 # Process each batch independently with a progress bar
 with tqdm(total=len(input_ids_batches), desc="Processing Batches") as pbar_batches:
     for batch in input_ids_batches:
-        input_ids = torch.tensor([batch], dtype=torch.long).to(device)  # Ensure tensors are moved to GPU if available
+        input_ids = torch.tensor([batch], dtype=torch.long).to(device)
 
-        # Forward pass through the transformer model
+        # Forward pass through the first transformer model
         with torch.no_grad():
             src_mask = None  # Optional mask
-            embeddings = transformer_model.encode(input_ids, src_mask)
+            embeddings_1 = transformer_model_1.encode(input_ids, src_mask)
+        
+        # Forward pass through the second transformer model
+        with torch.no_grad():
+            embeddings_2 = transformer_model_2.encode(input_ids, src_mask)
+        
+        # Concatenate the embeddings from both models to create a 512-dimensional embedding
+        combined_embeddings = torch.cat((embeddings_1, embeddings_2), dim=-1)
         
         # Collect embeddings for this batch
-        all_embeddings.append(embeddings.squeeze(0).detach().cpu())  # Move the embeddings to CPU for further processing
+        all_embeddings.append(combined_embeddings.squeeze(0).detach().cpu())  # Move to CPU for further processing
         pbar_batches.update(1)
 
 # Concatenate all batch embeddings into a single tensor
@@ -105,3 +119,4 @@ plt.figure(figsize=(10, 8))
 sns.heatmap(cos_sim_matrix, cmap='viridis', xticklabels=False, yticklabels=False)
 plt.title('Cosine Similarity Matrix')
 plt.show()
+
