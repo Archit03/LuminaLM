@@ -12,7 +12,7 @@ from tqdm import tqdm
 import os
 
 # Check if CUDA is available; otherwise use CPU
-device = torch.device("cpu")
+device = torch.device("cuda" if torch.device.cuda.is_avilable() else 'cpu')
 print(f"Using device: {device}")
 
 # Load the BPE tokenizer
