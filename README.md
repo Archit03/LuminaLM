@@ -20,6 +20,14 @@ Visit the live project at: [Sentient Sculptor](https://www.ellanorai.org)
 ![3d t_SNE projections](3d_tsne_projection.png)
 ![3d PCA Projection](3d_pca_projection.png)
 
+### Analysis of New Embeddings
+
+The new embeddings show improved clustering and separation compared to the previous ones:
+
+- **Cosine Similarity Matrix**: The values range between 0.92 to 1.0, showing some diversity in how the embeddings relate to each other.
+- **3D t-SNE Projection**: The embeddings are more compact but less clearly separated, suggesting limited non-linear differentiation.
+- **3D PCA Projection**: The embeddings form distinct clusters, showing better linear separability and a more structured representation.
+
 
 ## Requirements
 
