@@ -186,7 +186,6 @@ class ProjectionLayer(nn.Module):
     def forward(self, x):
         return torch.log_softmax(self.proj(x), dim=-1)
 
-
 class Transformer(nn.Module):
     def __init__(self, encoder: Encoder, decoder: Decoder, src_embed: InputEmbeddings, tgt_embed: InputEmbeddings,
                  src_pos: PositionalEncoding, tgt_pos: PositionalEncoding, projection_layer: ProjectionLayer):
@@ -212,41 +211,26 @@ class Transformer(nn.Module):
     def project(self, x):
         return self.projection_layer(x)
 
-
-def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_leq_len: int, tgt_seq_len: int, d_model: int = 512,
-                      N: int = 6, h: int = 8, dropout: float = 0.1, d_ff: int = 2048) -> Transformer:
-    src_embed = InputEmbeddings(d_model, src_vocab_size)
-    tgt_embed = InputEmbeddings(d_model, tgt_vocab_size)
-
-    src_pos = PositionalEncoding(d_model, src_leq_len, dropout)
-    tgt_pos = PositionalEncoding(d_model, tgt_seq_len, dropout)
-
-    encoder_blocks = []
-    for i in range(N):
-        encoder_self_attention_block = MultiHeadAttentionBlock(d_model, h, dropout)
-        feed_forward_block = FeedForwardBlock(d_model, d_ff, dropout)
-        encoder_block = EncoderBlock(encoder_self_attention_block, feed_forward_block, dropout)
-        encoder_blocks.append(encoder_block)
-
-    decoder_blocks = []
-    for _ in range(N):
-        decoder_self_attention_block = MultiHeadAttentionBlock(d_model, h, dropout)
-        decoder_cross_attention_block = MultiHeadAttentionBlock(d_model, h, dropout)
-        feed_forward_block = FeedForwardBlock(d_model, d_ff, dropout)
-        decoder_block = DecoderBlock(decoder_self_attention_block, decoder_cross_attention_block, feed_forward_block, dropout)
-        decoder_blocks.append(decoder_block)
-
-    # create the encoder and the decoder
-    encoder = Encoder(nn.ModuleList(encoder_blocks))
-    decoder = Decoder(nn.ModuleList(decoder_blocks))
-
-    # create the projection layer
-    projection_layer = ProjectionLayer(d_model, tgt_vocab_size)
-
-    transformer = Transformer(encoder, decoder, src_embed, tgt_embed, src_pos, tgt_pos, projection_layer)
-
-    # Initialize the parameters
-    for p in transformer.parameters():
-        if p.dim() > 1:
-            nn.init.xavier_uniform_(p)
-    return transformer
+    def forward(self, src, tgt, src_mask=None, tgt_mask=None):
+        """
+        Forward pass combining encoding, decoding, and projection.
+        
+        Args:
+        - src: The input sequence (source).
+        - tgt: The target sequence.
+        - src_mask: Optional mask for source sequence.
+        - tgt_mask: Optional mask for target sequence.
+        
+        Returns:
+        - Output logits from the projection layer.
+        """
+        # Encode the source sequence
+        encoder_output = self.encode(src, src_mask)
+        
+        # Decode the target sequence using the encoder output
+        decoder_output = self.decode(encoder_output, src_mask, tgt, tgt_mask)
+        
+        # Project the output to the vocabulary size
+        output = self.project(decoder_output)
+        
+        return output
