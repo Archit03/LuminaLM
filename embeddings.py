@@ -12,15 +12,57 @@ from tqdm import tqdm
 import os
 from mpl_toolkits.mplot3d import Axes3D  # For 3D plotting
 import pandas as pd
+from torch.utils.data import DataLoader, Dataset
+
+# Check if CUDA is available; otherwise use CPU
+class CustomDataset(Dataset):
+    def __init__(self, tokenized_inputs, labels=None):
+        self.inputs = tokenized_inputs
+        self.labels = labels
+
+    def __len__(self):
+        return len(self.inputs)
+
+    def __getitem__(self, idx):
+        input_ids = self.inputs[idx]
+        if self.labels is not None:
+            return {"input_ids": torch.tensor(input_ids, dtype=torch.long), 
+                    "labels": torch.tensor(self.labels[idx], dtype=torch.long)}
+        return {"input_ids": torch.tensor(input_ids, dtype=torch.long)}
+
+# Define the fine-tuning function
+def fine_tune_model(model, train_loader, epochs=3, lr=5e-5):
+    model.train()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    criterion = nn.CrossEntropyLoss()
+
+    for epoch in range(epochs):
+        total_loss = 0
+        for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}"):
+            optimizer.zero_grad()
+            input_ids = batch['input_ids'].to(device)
+            labels = batch['labels'].to(device) if 'labels' in batch else None
+
+            # Forward pass
+            outputs = model(input_ids)
+
+            # Calculate loss if labels are available
+            if labels is not None:
+                loss = criterion(outputs.view(-1, outputs.size(-1)), labels.view(-1))
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item()
+
+        print(f"Epoch {epoch+1} completed. Average Loss: {total_loss / len(train_loader)}")
 
 # Check if CUDA is available; otherwise use CPU
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
-# Load the BPE tokenizer (Ensure tokenizer is domain-specific if possible)
+# Load the BPE tokenizer
 tokenizer = Tokenizer.from_file("bpe_token.json")
 
-# Initialize the transformer model (fine-tune this on domain-specific data)
+# Initialize the transformer model
 d_model = 512  # Increased embedding dimension to capture richer features
 src_leq_len = 512  # Keep manageable sequence length for memory management
 src_vocab_size = len(tokenizer.get_vocab())  # Vocabulary size from the BPE tokenizer
@@ -32,24 +74,53 @@ transformer_model = model.build_transformer(
 ).to(device)
 
 # Optionally fine-tune the model with your domain-specific data
-def fine_tune_model(train_data, model, epochs=3, lr=1e-5):
-    # Define a simple training loop
-    model.train()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-    criterion = nn.CrossEntropyLoss()
 
-    for epoch in range(epochs):
-        total_loss = 0
-        for batch in train_data:
-            optimizer.zero_grad()
-            input_ids = batch['input_ids'].to(device)
-            labels = batch['labels'].to(device)
-            outputs = model(input_ids)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item()
-        print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(train_data)}")
+# Tokenize the data
+directory_path = "/content/Sentient-Sculptor-LLM/Data"  # Path to your directory
+
+def read_files_in_chunks(directory, chunk_size=10000):
+    file_list = [os.path.join(directory, file) for file in os.listdir(directory) if file.endswith(".txt")]
+    for file_name in file_list:
+        with open(file_name, "r", encoding="utf-8", errors="ignore") as f:
+            while True:
+                chunk = f.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+
+encoded_input = []
+for chunk in read_files_in_chunks(directory_path):
+    encoded_input.extend(tokenizer.encode(chunk).ids)
+
+# Create a dataset and dataloader for training
+batch_size = 512
+input_ids_batches = [encoded_input[i:i + batch_size] for i in range(0, len(encoded_input), batch_size)]
+
+# Dummy labels for supervised fine-tuning (replace with actual labels for your task)
+labels = np.random.randint(0, tgt_vocab_size, (len(input_ids_batches),))
+
+# Custom dataset and dataloader
+train_dataset = CustomDataset(tokenized_inputs=input_ids_batches, labels=labels)
+train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+
+# Fine-tune the model
+fine_tune_model(transformer_model, train_loader, epochs=3, lr=5e-5)
+
+### Optional: Post-training evaluation ###
+# Once fine-tuning is done, you can use the model to generate embeddings
+transformer_model.eval()
+all_embeddings = []
+with tqdm(total=len(input_ids_batches), desc="Generating Embeddings") as pbar_batches:
+    for batch in input_ids_batches:
+        input_ids = torch.tensor([batch], dtype=torch.long).to(device)
+        with torch.no_grad():
+            embeddings = transformer_model.encode(input_ids)
+        all_embeddings.append(embeddings.squeeze(0).detach().cpu())  # Move to CPU for processing
+        pbar_batches.update(1)
+
+# Save the fine-tuned embeddings or proceed with further analysis
+all_embeddings_tensor = torch.cat(all_embeddings, dim=0)
+np.save('fine_tuned_embeddings.npy', all_embeddings_tensor.numpy())
 
 # Data preprocessing: increase data quality through augmentation or cleaning
 directory_path = "/content/Sentient-Sculptor-LLM/Data"
