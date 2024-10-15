@@ -46,7 +46,7 @@ def save_tokenizer(tokenizer, path="bpe_token.json"):
     tokenizer.save(path)
 
 # Load the tokenizer from a saved file
-def load_tokenizer(path="C:\Users\LENOVO\Desktop\Sentient-Sculptor-LLM\bpe_token.json"):
+def load_tokenizer(path="bpe_token.json"):
     return Tokenizer.from_file(path)
 
 # Example Usage
