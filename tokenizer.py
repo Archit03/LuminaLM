@@ -46,11 +46,11 @@ def save_tokenizer(tokenizer, path="bpe_token.json"):
     tokenizer.save(path)
 
 # Load the tokenizer from a saved file
-def load_tokenizer(path="bpe_token.json"):
+def load_tokenizer(path="C:\Users\LENOVO\Desktop\Sentient-Sculptor-LLM\bpe_token.json"):
     return Tokenizer.from_file(path)
 
 # Example Usage
-directory = "/content/Sentient-Sculptor-LLM/Data"  # Replace with the directory path containing your .txt and .csv files
+directory = r'C:\Users\LENOVO\Desktop\Sentient-Sculptor-LLM\Data'  # Replace with the directory path containing your .txt and .csv files
 tokenizer, trainer = create_tokens(vocab_size=199997)
 train_tokenizer(tokenizer, trainer, directory)
 save_tokenizer(tokenizer)
