@@ -1,10 +1,12 @@
-torch
-transformers
-tokenizers
-scikit-learn
-umap-learn
-matplotlib
-numpy<2
-pandas
-seaborn
-tbb == 2021.13.1
+torch==2.0.1                   # PyTorch for deep learning
+transformers==4.24.0           # Hugging Face Transformers library
+tokenizers==0.13.3             # Tokenizers for handling custom tokenization
+scikit-learn==1.2.2            # For PCA, t-SNE, and cosine similarity
+umap-learn==0.5.4              # For UMAP dimensionality reduction
+matplotlib==3.7.1              # For plotting graphs
+numpy<2                        # For numerical operations
+pandas==2.0.1                  # For data handling and CSV I/O
+seaborn==0.12.2                # For heatmap visualizations
+tbb==2021.13.1                 # Threading Building Blocks (Intel TBB)
+psutil==5.9.5  
+streamlit==1.23.0
