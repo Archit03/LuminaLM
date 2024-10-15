@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 
 # Main UI code
 def main():
-    st.title("Real-Time Training Dashboard")
+    st.title("LuminaLM Training Dashboard")
     
     # Load data directory path
     data_dir = st.text_input("Enter data directory path", "")
