@@ -51,3 +51,7 @@ python tokenizer.py
 ```bash
 python embeddings.py
 ```
+
+```bash
+python dashboard.py
+```
