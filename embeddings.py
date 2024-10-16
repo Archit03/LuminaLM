@@ -86,9 +86,15 @@ def fine_tune_model(model, train_loader, epochs=3, lr=5e-5):
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss()
-    
+
+    loss_values = []
+    accuracy_values = []
+
     for epoch in range(epochs):
         total_loss = 0
+        correct_predictions = 0
+        total_predictions = 0
+        
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}"):
             optimizer.zero_grad()
             input_ids = batch['input_ids'].to(device)
@@ -98,16 +104,23 @@ def fine_tune_model(model, train_loader, epochs=3, lr=5e-5):
             loss = criterion(outputs.view(-1, outputs.size(-1)), target_ids.view(-1))
             loss.backward()
             optimizer.step()
+            
             total_loss += loss.item()
 
-        print(f"Epoch {epoch+1} completed. Average Loss: {total_loss / len(train_loader)}")
+            # Calculate accuracy
+            _, predicted = torch.max(outputs, -1)
+            correct_predictions += (predicted == target_ids).sum().item()
+            total_predictions += target_ids.numel()
 
-def save_model(model, path="fine_tuned_transformer_model.pth"):
-    if isinstance(model, nn.Module):
-        torch.save(model.state_dict(), path)
-        print(f"Model saved to {path}")
-    else:
-        raise ValueError("The provided object is not a PyTorch model.")
+        avg_loss = total_loss / len(train_loader)
+        accuracy = correct_predictions / total_predictions
+
+        loss_values.append(avg_loss)
+        accuracy_values.append(accuracy)
+
+        print(f"Epoch {epoch+1} completed. Average Loss: {avg_loss}, Accuracy: {accuracy}")
+
+    return loss_values, accuracy_values
 
 # Generate embeddings post-training
 def generate_embeddings(model, input_ids_batches):
@@ -125,10 +138,13 @@ def generate_embeddings(model, input_ids_batches):
     all_embeddings_tensor = torch.cat(all_embeddings, dim=0)
     return all_embeddings_tensor
 
-transformer_model, tokenizer = initialize_model()
-
-# After fine-tuning or training
-save_model(transformer_model, "fine_tuned_transformer_model.pth")
+# After fine-tuning or training, save the model at the end
+def save_model(model, path="fine_tuned_transformer_model.pth"):
+    if isinstance(model, nn.Module):
+        torch.save(model.state_dict(), path)
+        print(f"Model saved to {path}")
+    else:
+        raise ValueError("The provided object is not a PyTorch model.")
 
 # PCA and t-SNE plotting
 def plot_embeddings(embeddings_np, method="PCA"):
