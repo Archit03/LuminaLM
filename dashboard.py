@@ -24,8 +24,9 @@ def main():
         st.error("Please provide a valid data directory")
         return
     
-    # Initialize the model and tokenizer
-    transformer_model, tokenizer = initialize_model(tokenizer_path="bpe_token.json")
+    # Initialize the model and tokenizer with d_model=256
+    transformer_model, tokenizer = initialize_model(tokenizer_path="bpe_token.json", d_model=256)
+
     
     # Tokenize the data
     st.write("Tokenizing data...")

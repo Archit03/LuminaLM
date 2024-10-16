@@ -13,24 +13,27 @@ import os
 import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D
 from torch.utils.data import DataLoader, Dataset
+from torch.nn.utils.rnn import pad_sequence  # To pad sequences
 
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
-def initialize_model(tokenizer_path="bpe_token.json", d_model=512, src_leq_len=512):
-    # Load the tokenizer
+# Initialize transformer model with d_model=256
+def initialize_model(tokenizer_path="bpe_token.json", d_model=256, src_len=512):
     tokenizer = Tokenizer.from_file(tokenizer_path)
+    vocab_size = len(tokenizer.get_vocab())
     
-    # Initialize transformer model
-    src_vocab_size = len(tokenizer.get_vocab())
-    tgt_vocab_size = src_vocab_size
     transformer_model = model.build_transformer(
-        src_vocab_size, tgt_vocab_size, src_leq_len=src_leq_len, tgt_seq_len=src_leq_len, d_model=d_model
+        src_vocab_size=vocab_size,
+        tgt_vocab_size=vocab_size,
+        src_leq_len=src_len,
+        tgt_seq_len=src_len,
+        d_model=d_model
     ).to(device)
     
     return transformer_model, tokenizer
 
-# Define custom dataset
+# Custom dataset class
 class CustomDataset(Dataset):
     def __init__(self, tokenized_inputs, tokenized_targets=None):
         self.inputs = tokenized_inputs
@@ -47,8 +50,19 @@ class CustomDataset(Dataset):
                     "target_ids": torch.tensor(target_ids, dtype=torch.long)}
         return {"input_ids": torch.tensor(input_ids, dtype=torch.long)}
 
+# Function to pad sequences to the same length
+def collate_fn(batch):
+    input_ids = [item['input_ids'] for item in batch]
+    target_ids = [item['target_ids'] for item in batch]
+
+    # Pad sequences to the length of the longest sequence in the batch
+    padded_inputs = pad_sequence(input_ids, batch_first=True, padding_value=0)
+    padded_targets = pad_sequence(target_ids, batch_first=True, padding_value=0)
+
+    return {"input_ids": padded_inputs, "target_ids": padded_targets}
+
 # Tokenize data
-def tokenize_data(tokenizer, directory, batch_size=512):
+def tokenize_data(tokenizer, directory, batch_size=128):
     encoded_input = []
     encoded_target = []
 
@@ -71,7 +85,7 @@ def tokenize_data(tokenizer, directory, batch_size=512):
 
     return input_ids_batches, target_ids_batches
 
-# Fine-tune model
+# Fine-tune the model
 def fine_tune_model(model, train_loader, epochs=3, lr=5e-5):
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
@@ -81,12 +95,17 @@ def fine_tune_model(model, train_loader, epochs=3, lr=5e-5):
         total_loss = 0
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}"):
             optimizer.zero_grad()
+
             input_ids = batch['input_ids'].to(device)
             target_ids = batch['target_ids'].to(device)
 
+            # Forward pass through the model
             outputs = model(input_ids, target_ids)
+
+            # Calculate the loss
             loss = criterion(outputs.view(-1, outputs.size(-1)), target_ids.view(-1))
             loss.backward()
+
             optimizer.step()
             total_loss += loss.item()
 
@@ -101,6 +120,7 @@ def generate_embeddings(model, input_ids_batches):
             input_ids = torch.tensor([batch], dtype=torch.long).to(device)
             with torch.no_grad():
                 embeddings = model.encode(input_ids)
+            
             all_embeddings.append(embeddings.squeeze(0).detach().cpu())
             pbar_batches.update(1)
     
