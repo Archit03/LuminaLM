@@ -7,6 +7,8 @@ from embeddings import (
     calculate_cosine_similarity,  # Calculate and plot cosine similarity
     tokenize_data,       # Tokenize data
     CustomDataset, 
+    collate_fn
+
 )
 import matplotlib.pyplot as plt
 import psutil  # For system monitoring
@@ -34,7 +36,8 @@ def main():
     
     # Create DataLoader
     dataset = CustomDataset(tokenized_inputs=input_ids_batches, tokenized_targets=target_ids_batches)
-    data_loader = DataLoader(dataset, batch_size=16, shuffle=True)
+    data_loader = DataLoader(dataset, batch_size=16, shuffle=True, collate_fn=collate_fn)
+
     
     # Fine-tune the model
     st.write("Fine-tuning the model...")

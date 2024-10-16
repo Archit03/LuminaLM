@@ -10,30 +10,26 @@ from sklearn.metrics.pairwise import cosine_similarity
 import seaborn as sns
 from tqdm import tqdm
 import os
-import pandas as pd
-from mpl_toolkits.mplot3d import Axes3D
-from torch.utils.data import DataLoader, Dataset
-from torch.nn.utils.rnn import pad_sequence  # To pad sequences
+from torch.utils.data import DataLoader, Dataset, default_collate
+import torch.nn.utils.rnn as rnn_utils
 
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
-# Initialize transformer model with d_model=256
-def initialize_model(tokenizer_path="bpe_token.json", d_model=256, src_len=512):
+# Initialize the transformer model with d_model=256
+def initialize_model(tokenizer_path="bpe_token.json", d_model=256, src_leq_len=512):
     tokenizer = Tokenizer.from_file(tokenizer_path)
-    vocab_size = len(tokenizer.get_vocab())
+    src_vocab_size = len(tokenizer.get_vocab())
+    tgt_vocab_size = src_vocab_size
     
+    # Initialize the transformer model with d_model=256
     transformer_model = model.build_transformer(
-        src_vocab_size=vocab_size,
-        tgt_vocab_size=vocab_size,
-        src_leq_len=src_len,
-        tgt_seq_len=src_len,
-        d_model=d_model
+        src_vocab_size, tgt_vocab_size, src_leq_len=src_leq_len, tgt_seq_len=src_leq_len, d_model=d_model
     ).to(device)
     
     return transformer_model, tokenizer
 
-# Custom dataset class
+# Custom dataset
 class CustomDataset(Dataset):
     def __init__(self, tokenized_inputs, tokenized_targets=None):
         self.inputs = tokenized_inputs
@@ -50,16 +46,16 @@ class CustomDataset(Dataset):
                     "target_ids": torch.tensor(target_ids, dtype=torch.long)}
         return {"input_ids": torch.tensor(input_ids, dtype=torch.long)}
 
-# Function to pad sequences to the same length
+# Define a collate function to pad sequences
 def collate_fn(batch):
     input_ids = [item['input_ids'] for item in batch]
     target_ids = [item['target_ids'] for item in batch]
 
-    # Pad sequences to the length of the longest sequence in the batch
-    padded_inputs = pad_sequence(input_ids, batch_first=True, padding_value=0)
-    padded_targets = pad_sequence(target_ids, batch_first=True, padding_value=0)
+    # Pad input and target sequences to the maximum length in the batch
+    input_ids_padded = rnn_utils.pad_sequence(input_ids, batch_first=True, padding_value=0)
+    target_ids_padded = rnn_utils.pad_sequence(target_ids, batch_first=True, padding_value=0)
 
-    return {"input_ids": padded_inputs, "target_ids": padded_targets}
+    return {"input_ids": input_ids_padded, "target_ids": target_ids_padded}
 
 # Tokenize data
 def tokenize_data(tokenizer, directory, batch_size=128):
@@ -85,7 +81,7 @@ def tokenize_data(tokenizer, directory, batch_size=128):
 
     return input_ids_batches, target_ids_batches
 
-# Fine-tune the model
+# Fine-tune model
 def fine_tune_model(model, train_loader, epochs=3, lr=5e-5):
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
@@ -95,17 +91,12 @@ def fine_tune_model(model, train_loader, epochs=3, lr=5e-5):
         total_loss = 0
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}"):
             optimizer.zero_grad()
-
             input_ids = batch['input_ids'].to(device)
             target_ids = batch['target_ids'].to(device)
 
-            # Forward pass through the model
             outputs = model(input_ids, target_ids)
-
-            # Calculate the loss
             loss = criterion(outputs.view(-1, outputs.size(-1)), target_ids.view(-1))
             loss.backward()
-
             optimizer.step()
             total_loss += loss.item()
 
@@ -120,7 +111,6 @@ def generate_embeddings(model, input_ids_batches):
             input_ids = torch.tensor([batch], dtype=torch.long).to(device)
             with torch.no_grad():
                 embeddings = model.encode(input_ids)
-            
             all_embeddings.append(embeddings.squeeze(0).detach().cpu())
             pbar_batches.update(1)
     
