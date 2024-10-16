@@ -19,6 +19,8 @@ Visit the live project at [Lumina LM ](https://www.ellanorai.org)
 ![Cosine Similarity Heatmap](cosine_similarity_sampled.png)
 ![3d t_SNE projections](3d_tsne_projection.png)
 ![3d PCA Projection](3d_pca_projection.png)
+![Training Loss and accuracy](Train_loss_and_accuracy.png)
+
 
 ### Analysis of New Embeddings
 
