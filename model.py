@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
@@ -65,17 +64,17 @@ class Block(nn.Module):
         x = x + self.mlp(self.ln_2(x))
         return x
 
-# Configuration for the Sentient Sculptor Model
+# Configuration for the LuminaLM Model
 @dataclass
-class SentientSculptorConfig:
+class LuminaLMConfig:
     block_size: int = 1024  # Number of tokens in a sequence
     vocab_size: int = 199997  # Number of tokens in the vocabulary
-    n_layer: int = 48  # 12 layers (adjust as needed)
+    n_layer: int = 48  # Number of layers
     n_head: int = 48  # Number of attention heads
     n_embd: int = 6144  # Embedding dimension
 
-# Sentient Sculptor Model Class
-class SentientSculptor(nn.Module):
+# LuminaLM Model Class
+class LuminaLM(nn.Module):
     def __init__(self, config):
         super().__init__()
         # Load custom embeddings from embeddings.py
@@ -144,13 +143,10 @@ class TextDataset(Dataset):
         target_ids = input_ids[1:]  # Next token prediction task
         return torch.tensor(input_ids[:-1], dtype=torch.long), torch.tensor(target_ids, dtype=torch.long)
 
-
-
-# Example usage with Sentient Sculptor model
+# Example usage with LuminaLM model
 if __name__ == "__main__":
-    model_config = SentientSculptorConfig()  # Initialize custom GPT configuration
-    model = SentientSculptor(model_config)  # Initialize Sentient Sculptor model
-
+    model_config = LuminaLMConfig()  # Initialize custom GPT configuration
+    model = LuminaLM(model_config)  # Initialize LuminaLM model
 
     # Set device (CPU or GPU)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -182,8 +178,8 @@ if __name__ == "__main__":
             outputs = model(input_ids)
 
             # Shift logits for next-token prediction
-            logits = outputs[..., :-1, :].contiguous()
-            shift_labels = target_ids[..., 1:].contiguous()
+            logits = outputs[..., :-1, :].contiguous()  # Keep logits unchanged
+            shift_labels = target_ids[..., :-1].contiguous()  # Shift labels
 
             # Calculate loss
             loss = loss_fn(logits.view(-1, logits.size(-1)), shift_labels.view(-1))
@@ -195,11 +191,8 @@ if __name__ == "__main__":
             loop.set_description(f"Epoch {epoch}")
             loop.set_postfix(loss=loss.item())
 
-    # Save the trained model
-    model.load_state_dict(torch.load("sentient_sculptor_trained_model.pth"))
-
-    # Generate text
-    print(model.eval())  # Set model to eval mode for generation
+    # Generate text after training
+    model.eval()  # Set model to eval mode for generation
     prompt = "The patient exhibits"
     generated_text = model.generate_text(prompt, max_length=50)
     print("Generated Text:", generated_text)
