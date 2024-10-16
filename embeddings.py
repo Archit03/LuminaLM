@@ -19,7 +19,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 # Initialize the transformer model with d_model=256
 def initialize_model(tokenizer_path="bpe_token.json", d_model=256, src_leq_len=512):
     tokenizer = Tokenizer.from_file(tokenizer_path)
-    src_vocab_size = len(tokenizer.get_vocab())
+    src_vocab_size = tokenizer.get_vocab_size()
     tgt_vocab_size = src_vocab_size
     
     # Initialize the transformer model with d_model=256
@@ -102,6 +102,13 @@ def fine_tune_model(model, train_loader, epochs=3, lr=5e-5):
 
         print(f"Epoch {epoch+1} completed. Average Loss: {total_loss / len(train_loader)}")
 
+def save_model(model, path="fine_tuned_transformer_model.pth"):
+    if isinstance(model, nn.Module):
+        torch.save(model.state_dict(), path)
+        print(f"Model saved to {path}")
+    else:
+        raise ValueError("The provided object is not a PyTorch model.")
+
 # Generate embeddings post-training
 def generate_embeddings(model, input_ids_batches):
     model.eval()
@@ -109,13 +116,19 @@ def generate_embeddings(model, input_ids_batches):
     with tqdm(total=len(input_ids_batches), desc="Generating Embeddings") as pbar_batches:
         for batch in input_ids_batches:
             input_ids = torch.tensor([batch], dtype=torch.long).to(device)
+            src_mask = torch.ones(input_ids.shape).to(device)  # Create a mask if necessary, or pass None
             with torch.no_grad():
-                embeddings = model.encode(input_ids)
+                embeddings = model.encode(input_ids, src_mask)  # Ensure the mask is passed
             all_embeddings.append(embeddings.squeeze(0).detach().cpu())
             pbar_batches.update(1)
-    
+
     all_embeddings_tensor = torch.cat(all_embeddings, dim=0)
     return all_embeddings_tensor
+
+transformer_model, tokenizer = initialize_model()
+
+# After fine-tuning or training
+save_model(transformer_model, "fine_tuned_transformer_model.pth")
 
 # PCA and t-SNE plotting
 def plot_embeddings(embeddings_np, method="PCA"):
