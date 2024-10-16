@@ -51,7 +51,7 @@ def load_tokenizer(path="bpe_token.json"):
 
 # Example Usage
 if __name__ == "__main__":
-    directory = r'C:/Users/LENOVO/Desktop/Sentient-Sculptor-LLM/Data'  # Adjust to your actual directory path
+    directory = r'/home/ubuntu/LuminaLM/Data'  # Adjust to your actual directory path
     tokenizer, trainer = create_tokens(vocab_size=199997)
     train_tokenizer(tokenizer, trainer, directory)
     save_tokenizer(tokenizer)
