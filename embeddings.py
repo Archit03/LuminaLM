@@ -9,8 +9,6 @@ from tqdm import tqdm
 import os
 from torch.utils.data import DataLoader, Dataset
 import torch.nn.utils.rnn as rnn_utils
-import matplotlib as plt
-import seaborn as sns
 
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
@@ -85,7 +83,7 @@ def fine_tune_model(model, train_loader, epochs=3, lr=5e-5):
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss()
-    scaler = torch.cuda.amp.GradScaler('cuda')  # Mixed precision scaler
+    scaler = torch.amp.GradScaler()  # Updated for mixed precision training
 
     loss_values = []
     accuracy_values = []
@@ -102,7 +100,7 @@ def fine_tune_model(model, train_loader, epochs=3, lr=5e-5):
             input_ids = batch['input_ids'].to(device)
             target_ids = batch['target_ids'].to(device)
 
-            with torch.cuda.amp.autocast():  # Mixed precision
+            with torch.amp.autocast(device_type="cuda"):  # Updated for mixed precision training
                 outputs = model(input_ids, target_ids)
                 loss = criterion(outputs.view(-1, outputs.size(-1)), target_ids.view(-1))
                 perplexity = torch.exp(loss)
@@ -185,7 +183,7 @@ def calculate_cosine_similarity(embeddings_np):
     else:
         embedding_np_sampled = embeddings_np
 
-    cos_sim_matrix_sampled = calculate_cosine_similarity(embedding_np_sampled)
+    cos_sim_matrix_sampled = cosine_similarity(embedding_np_sampled)
     sns.heatmap(cos_sim_matrix_sampled, cmap='viridis', xticklabels=False, yticklabels=False)
     plt.title('Cosine Similarity Matrix (Sampled)')
     plt.savefig('cosine_similarity_sampled.png')
