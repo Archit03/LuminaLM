@@ -1,13 +1,16 @@
 import torch
 import torch.nn as nn
-import numpy as np
 from tokenizers import Tokenizer
 from Transformer import model
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+import numpy as np
 from tqdm import tqdm
+import os
 from torch.utils.data import DataLoader, Dataset
 import torch.nn.utils.rnn as rnn_utils
-import collections
-import os
+import matplotlib as plt
+import seaborn as sns
 
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
@@ -53,11 +56,10 @@ def collate_fn(batch):
 
     return {"input_ids": input_ids_padded, "target_ids": target_ids_padded}
 
-# Tokenize data and return top tokens
-def tokenize_data(tokenizer, directory, batch_size=128):
+# Tokenize data
+def tokenize_data(tokenizer, directory, batch_size=64):
     encoded_input = []
     encoded_target = []
-    token_counts = collections.Counter()
 
     def read_files_in_chunks(directory, chunk_size=10000):
         file_list = [os.path.join(directory, file) for file in os.listdir(directory) if file.endswith(".txt")]
@@ -70,43 +72,46 @@ def tokenize_data(tokenizer, directory, batch_size=128):
                     yield chunk
 
     for chunk in read_files_in_chunks(directory):
-        encoded = tokenizer.encode(chunk)
-        encoded_input.extend(encoded.ids)
-        encoded_target.extend(encoded.ids)  # Assuming source=target setup
-        token_counts.update(encoded.tokens)
+        encoded_input.extend(tokenizer.encode(chunk).ids)
+        encoded_target.extend(tokenizer.encode(chunk).ids)  # Assuming source=target setup
 
     input_ids_batches = [encoded_input[i:i + batch_size] for i in range(0, len(encoded_input), batch_size)]
     target_ids_batches = [encoded_target[i:i + batch_size] for i in range(0, len(encoded_target), batch_size)]
 
-    top_tokens = token_counts.most_common(10)  # Top 10 tokens
-    return input_ids_batches, target_ids_batches, top_tokens
+    return input_ids_batches, target_ids_batches
 
-# Fine-tune model with validation and perplexity
-def fine_tune_model(model, train_loader, val_loader, epochs=3, lr=5e-5):
+# Fine-tune model with mixed precision training to save memory
+def fine_tune_model(model, train_loader, epochs=3, lr=5e-5):
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss()
+    scaler = torch.cuda.amp.GradScaler('cuda')  # Mixed precision scaler
 
     loss_values = []
     accuracy_values = []
     perplexity_values = []
-    val_loss_values = []
 
     for epoch in range(epochs):
         total_loss = 0
         correct_predictions = 0
         total_predictions = 0
-        
+        total_perplexity = 0
+
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}"):
             optimizer.zero_grad()
             input_ids = batch['input_ids'].to(device)
             target_ids = batch['target_ids'].to(device)
 
-            outputs = model(input_ids, target_ids)
-            loss = criterion(outputs.view(-1, outputs.size(-1)), target_ids.view(-1))
-            loss.backward()
-            optimizer.step()
-            
+            with torch.cuda.amp.autocast():  # Mixed precision
+                outputs = model(input_ids, target_ids)
+                loss = criterion(outputs.view(-1, outputs.size(-1)), target_ids.view(-1))
+                perplexity = torch.exp(loss)
+                total_perplexity += perplexity.item()
+
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
             total_loss += loss.item()
 
             # Calculate accuracy
@@ -116,37 +121,15 @@ def fine_tune_model(model, train_loader, val_loader, epochs=3, lr=5e-5):
 
         avg_loss = total_loss / len(train_loader)
         accuracy = correct_predictions / total_predictions
+        avg_perplexity = total_perplexity / len(train_loader)
 
         loss_values.append(avg_loss)
         accuracy_values.append(accuracy)
+        perplexity_values.append(avg_perplexity)
 
-        # Validation step to calculate perplexity
-        val_loss, perplexity = validate_model(model, val_loader)
-        val_loss_values.append(val_loss)
-        perplexity_values.append(perplexity)
+        print(f"Epoch {epoch+1} completed. Average Loss: {avg_loss}, Accuracy: {accuracy}, Perplexity: {avg_perplexity}")
 
-        print(f"Epoch {epoch+1} completed. Avg Loss: {avg_loss}, Accuracy: {accuracy}, Perplexity: {perplexity}")
-
-    return loss_values, accuracy_values, perplexity_values, val_loss_values
-
-# Validation step to calculate perplexity
-def validate_model(model, val_loader):
-    model.eval()
-    criterion = nn.CrossEntropyLoss()
-    total_val_loss = 0
-    with torch.no_grad():
-        for batch in val_loader:
-            input_ids = batch['input_ids'].to(device)
-            target_ids = batch['target_ids'].to(device)
-
-            outputs = model(input_ids, target_ids)
-            loss = criterion(outputs.view(-1, outputs.size(-1)), target_ids.view(-1))
-            total_val_loss += loss.item()
-
-    avg_val_loss = total_val_loss / len(val_loader)
-    perplexity = torch.exp(torch.tensor(avg_val_loss))
-    model.train()
-    return avg_val_loss, perplexity.item()
+    return loss_values, accuracy_values, perplexity_values
 
 # Generate embeddings post-training
 def generate_embeddings(model, input_ids_batches):
@@ -155,19 +138,63 @@ def generate_embeddings(model, input_ids_batches):
     with tqdm(total=len(input_ids_batches), desc="Generating Embeddings") as pbar_batches:
         for batch in input_ids_batches:
             input_ids = torch.tensor([batch], dtype=torch.long).to(device)
-            src_mask = torch.ones(input_ids.shape).to(device)  # Create a mask if necessary, or pass None
+            src_mask = torch.ones(input_ids.shape).to(device)
             with torch.no_grad():
-                embeddings = model.encode(input_ids, src_mask)  # Ensure the mask is passed
+                embeddings = model.encode(input_ids, src_mask)
             all_embeddings.append(embeddings.squeeze(0).detach().cpu())
             pbar_batches.update(1)
 
     all_embeddings_tensor = torch.cat(all_embeddings, dim=0)
     return all_embeddings_tensor
 
-# Save the model
+# After fine-tuning or training, save the model at the end
 def save_model(model, path="fine_tuned_transformer_model.pth"):
     if isinstance(model, nn.Module):
         torch.save(model.state_dict(), path)
         print(f"Model saved to {path}")
     else:
         raise ValueError("The provided object is not a PyTorch model.")
+
+# PCA and t-SNE plotting
+def plot_embeddings(embeddings_np, method="PCA"):
+    if method == "PCA":
+        pca = PCA(n_components=3)
+        reduced_embeddings = pca.fit_transform(embeddings_np)
+        title = "3D PCA Projection"
+        filename = "3d_pca_projection.png"
+    elif method == "t-SNE":
+        tsne = TSNE(n_components=3, random_state=42, perplexity=30, n_iter=300)
+        reduced_embeddings = tsne.fit_transform(embeddings_np)
+        title = "3D t-SNE Projection"
+        filename = "3d_tsne_projection.png"
+    
+    # 3D Plotting
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(reduced_embeddings[:, 0], reduced_embeddings[:, 1], reduced_embeddings[:, 2], alpha=0.5)
+    ax.set_title(title)
+    plt.savefig(filename)
+    plt.show()
+
+# Calculate cosine similarity
+def calculate_cosine_similarity(embeddings_np):
+    max_samples = 5000
+    if embeddings_np.shape[0] > max_samples:
+        indices = np.random.choice(embeddings_np.shape[0], max_samples, replace=False)
+        embedding_np_sampled = embeddings_np[indices]
+    else:
+        embedding_np_sampled = embeddings_np
+
+    cos_sim_matrix_sampled = calculate_cosine_similarity(embedding_np_sampled)
+    sns.heatmap(cos_sim_matrix_sampled, cmap='viridis', xticklabels=False, yticklabels=False)
+    plt.title('Cosine Similarity Matrix (Sampled)')
+    plt.savefig('cosine_similarity_sampled.png')
+    plt.show()
+
+# Token frequency for top tokens
+def get_top_tokens(tokenizer, tokenized_data, top_n=10):
+    from collections import Counter
+    tokens = [token for batch in tokenized_data for token in batch]
+    token_counts = Counter(tokens)
+    sorted_tokens = token_counts.most_common(top_n)
+    return sorted_tokens
