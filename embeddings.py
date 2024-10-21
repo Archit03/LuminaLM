@@ -9,6 +9,8 @@ from tqdm import tqdm
 import os
 from torch.utils.data import DataLoader, Dataset
 import torch.nn.utils.rnn as rnn_utils
+import matplotlib as plt
+import seaborn as sns
 
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
@@ -183,7 +185,7 @@ def calculate_cosine_similarity(embeddings_np):
     else:
         embedding_np_sampled = embeddings_np
 
-    cos_sim_matrix_sampled = cosine_similarity(embedding_np_sampled)
+    cos_sim_matrix_sampled = calculate_cosine_similarity(embedding_np_sampled)
     sns.heatmap(cos_sim_matrix_sampled, cmap='viridis', xticklabels=False, yticklabels=False)
     plt.title('Cosine Similarity Matrix (Sampled)')
     plt.savefig('cosine_similarity_sampled.png')
