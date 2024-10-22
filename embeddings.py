@@ -156,6 +156,7 @@ def save_model(model, path="fine_tuned_transformer_model.pth"):
         raise ValueError("The provided object is not a PyTorch model.")
 
 # PCA and t-SNE plotting
+# PCA and t-SNE plotting
 def plot_embeddings(embeddings_np, method="PCA"):
     if method == "PCA":
         pca = PCA(n_components=3)
@@ -169,12 +170,13 @@ def plot_embeddings(embeddings_np, method="PCA"):
         filename = "3d_tsne_projection.png"
     
     # 3D Plotting
-    fig = plt.figure()
+    fig = plt.figure()  # This now correctly refers to matplotlib.pyplot's figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.scatter(reduced_embeddings[:, 0], reduced_embeddings[:, 1], reduced_embeddings[:, 2], alpha=0.5)
     ax.set_title(title)
     plt.savefig(filename)
     plt.show()
+
 
 # Calculate cosine similarity
 def calculate_cosine_similarity(embeddings_np):
