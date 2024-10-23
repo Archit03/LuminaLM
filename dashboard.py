@@ -2,19 +2,18 @@ import streamlit as st
 import matplotlib.pyplot as plt  # Dashboard will use these libraries
 from embeddings import (
     initialize_model,
-    fine_tune_model,
+    fine_tune_model_with_early_stopping,
     generate_embeddings,
     plot_embeddings,
     calculate_sampled_cosine_similarity,
     get_top_tokens,
     tokenize_data,
     CustomDataset,
-    collate_fn,
-    save_model,
-    load_model
+    collate_fn
 )
 import torch
 from torch.utils.data import DataLoader
+import numpy as np
 
 # Main UI code
 def main():
@@ -26,16 +25,10 @@ def main():
     if not data_dir:
         st.error("Please provide a valid data directory")
         return
-
-    # Load pre-trained model if the option is checked
-    load_model_option = st.checkbox("Load Pre-trained Model")
+    
+    # Initialize the model and tokenizer with d_model=256
     transformer_model, tokenizer = initialize_model(tokenizer_path="bpe_token.json", d_model=256)
 
-    if load_model_option:
-        model_path = st.text_input("Enter model path to load", "fine_tuned_transformer_model.pth")
-        if model_path:
-            load_model(transformer_model, model_path)
-    
     # Tokenize the data
     st.write("Tokenizing data...")
     input_ids_batches, target_ids_batches = tokenize_data(tokenizer, data_dir)
@@ -45,12 +38,13 @@ def main():
     train_loader = DataLoader(dataset, batch_size=16, shuffle=True, collate_fn=collate_fn)
     val_loader = DataLoader(dataset, batch_size=16, shuffle=False, collate_fn=collate_fn)  # Assuming you have a val set
     
-    # Fine-tune the model
+    # Fine-tune the model with early stopping and model saving logic
     st.write("Fine-tuning the model...")
-    loss_values, accuracy_values, perplexity_values, val_loss_values, val_accuracy_values = fine_tune_model(
-        transformer_model, train_loader, val_loader, epochs=3, lr=5e-5
+    loss_values, accuracy_values, perplexity_values, val_loss_values, val_accuracy_values = fine_tune_model_with_early_stopping(
+        transformer_model, train_loader, val_loader, epochs=5, lr=5e-5, patience=3
     )
-        # Plot Training Loss
+
+    # Plot Training Loss
     st.write("Training Loss")
     fig_loss, ax_loss = plt.subplots()
     ax_loss.plot(loss_values, label='Training Loss', color='blue')
@@ -83,9 +77,6 @@ def main():
     st.write("Generating embeddings...")
     embeddings = generate_embeddings(transformer_model, input_ids_batches)
     st.write(f"Total Embeddings: {embeddings.shape[0]}")  # Display total number of embeddings generated
-
-    st.write("Saving the model...")
-    save_model(transformer_model, "LuminaLM.pth")
     
     # Visualizations: Sample for PCA, t-SNE, and Cosine Similarity
     sample_size = st.slider("Select Sample Size for Visualization", min_value=1000, max_value=500000, value=1000)
