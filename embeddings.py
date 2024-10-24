@@ -17,7 +17,7 @@ import torch.nn.utils.rnn as rnn_utils
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
 # Initialize the transformer model
-def initialize_model(tokenizer_path="bpe_token.json", d_model=256, src_leq_len=512):
+def initialize_model(tokenizer_path="bpe_token.json", d_model=512, src_leq_len=512):
     tokenizer = Tokenizer.from_file(tokenizer_path)
     src_vocab_size = tokenizer.get_vocab_size()
     tgt_vocab_size = src_vocab_size
@@ -90,8 +90,9 @@ def save_model(model, path="LuminaLM_01.pth"):
     print(f"Model saved to {path}")
 
 # Fine-tune model with early stopping and model saving logic
+# Fine-tune model with early stopping and model saving logic
 def fine_tune_model_with_early_stopping(
-    model, train_loader, val_loader, epochs=5, lr=5e-5, patience=3
+    model, train_loader, val_loader, input_ids_batches, epochs=5, lr=5e-5, patience=3
 ):
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
@@ -153,13 +154,22 @@ def fine_tune_model_with_early_stopping(
 
         # Save the model after the 4th epoch
         if epoch == 3:
-            save_model(model, "best_model_after_4th_epoch.pth")
+            save_model(model, "LuminaLM_01.pth")
             print(f"Model saved after the 4th epoch with validation loss: {val_loss:.4f}")
         
-        # Update model after 5th epoch, unless early stopping
-        elif epoch > 3 and patience_counter < patience:
-            save_model(model, f"best_model_epoch_{epoch+1}.pth")
-            print(f"Model updated after epoch {epoch+1} with validation loss: {val_loss:.4f}")
+        # Save the model after the 5th epoch, unless early stopping
+        if epoch == 4 and patience_counter < patience:
+            save_model(model, "LuminaLM_02.pth")
+            print(f"Model saved after the 5th epoch with validation loss: {val_loss:.4f}")
+
+            # Generate embeddings post-training
+            print("Generating embeddings after the 5th epoch...")
+            embeddings = generate_embeddings(model, input_ids_batches)
+            print(f"Total embeddings generated: {embeddings.shape[0]}")
+
+            # Optional: Save embeddings to a file (if required)
+            torch.save(embeddings, "embeddings_after_epoch_5.pt")
+            print("Embeddings saved successfully.")
 
         # Early stopping
         if patience_counter >= patience:
@@ -167,6 +177,7 @@ def fine_tune_model_with_early_stopping(
             break
 
     return loss_values, accuracy_values, perplexity_values, val_loss_values, val_accuracy_values
+
 
 # Validation function (unchanged)
 def validate_model(model, val_loader, criterion):

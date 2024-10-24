@@ -65,7 +65,6 @@ class Block(nn.Module):
         return x
 
 # Configuration for the LuminaLM Model
-@dataclass
 class LuminaLMConfig:
     block_size: int = 1024  # Number of tokens in a sequence
     vocab_size: int = 199997  # Number of tokens in the vocabulary

@@ -27,7 +27,7 @@ def main():
         return
     
     # Initialize the model and tokenizer with d_model=256
-    transformer_model, tokenizer = initialize_model(tokenizer_path="bpe_token.json", d_model=256)
+    transformer_model, tokenizer = initialize_model(tokenizer_path="bpe_token.json", d_model=512)
 
     # Tokenize the data
     st.write("Tokenizing data...")
