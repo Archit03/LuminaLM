@@ -23,7 +23,7 @@ def save_model(model, path="LuminaLM_01.pth"):
     logging.info(f"Model saved to {path}")
 
 # Initialize the transformer model
-def initialize_model(tokenizer_path="bpe_token.json", d_model=512, src_leq_len=512):
+def initialize_model(tokenizer_path="LuminaLM_text_token.json", d_model=512, src_leq_len=512):
     tokenizer = Tokenizer.from_file(tokenizer_path)
     src_vocab_size = tokenizer.get_vocab_size()
     tgt_vocab_size = src_vocab_size

@@ -14,6 +14,7 @@ from embeddings import (
 import torch
 from torch.utils.data import DataLoader
 import numpy as np
+import os
 
 # Main UI code
 def main():
@@ -27,7 +28,7 @@ def main():
         return
     
     # Initialize the model and tokenizer with d_model=256
-    transformer_model, tokenizer = initialize_model(tokenizer_path="bpe_token.json", d_model=512)
+    transformer_model, tokenizer = initialize_model(tokenizer_path="LuminaLM_text_token.json", d_model=512)
 
     # Tokenize the data
     st.write("Tokenizing data...")
