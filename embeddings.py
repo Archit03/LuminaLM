@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from tokenizers import Tokenizer
-from Transformer import model
+from Transformer import model  # Assuming your model code is in a file named 'model.py' in 'Transformer' directory
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import numpy as np
@@ -14,11 +14,14 @@ from torch.utils.data import DataLoader, Dataset
 import torch.nn.utils.rnn as rnn_utils
 import logging
 
+# Set up logging
+logging.basicConfig(level=logging.INFO, filename='/opt/dlami/nvme/training_log.log', filemode='a', format='%(asctime)s - %(message)s')
+
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
 # Save the model
-def save_model(model, path="LuminaLM_01.pth"):
+def save_model(model, path="LuminaLM.pth"):
     torch.save(model.state_dict(), path)
     logging.info(f"Model saved to {path}")
 
@@ -87,7 +90,7 @@ def tokenize_data(tokenizer, directory, batch_size=128):
 
 # Fine-tune model with early stopping and model saving logic
 def fine_tune_model_with_early_stopping(
-    model, train_loader, val_loader, epochs=5, lr=5e-5, patience=3
+    model, train_loader, val_loader, input_ids_batches, epochs=5, lr=5e-5, patience=3
 ):
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
@@ -134,6 +137,7 @@ def fine_tune_model_with_early_stopping(
         accuracy_values.append(accuracy)
         perplexity_values.append(avg_perplexity)
 
+        # Validation step
         val_loss, val_accuracy = validate_model(model, val_loader, criterion)
         val_loss_values.append(val_loss)
         val_accuracy_values.append(val_accuracy)
@@ -145,15 +149,21 @@ def fine_tune_model_with_early_stopping(
         else:
             patience_counter += 1
 
+        # Save the model after the 4th epoch
         if epoch == 3:
-            save_model(model, "LuminaLM_embeddings_01.pth")
-        
-        elif epoch > 3 and patience_counter < patience:
-            save_model(model, f"LuminaLM_embeddings_epoch_{epoch+1}.pth")
+            save_model(model, "LuminaLM_after_4th_epoch.pth")
+            logging.info("Model saved after the 4th epoch")
 
+        # Check for early stopping
         if patience_counter >= patience:
             logging.info("Early stopping triggered. No improvement in validation loss.")
             break
+
+    # After completing all epochs, generate embeddings and save the model
+    logging.info("Generating embeddings after 5th epoch...")
+    embeddings = generate_embeddings(model, input_ids_batches)
+    save_model(model, "LuminaLM_final_with_embeddings.pth")
+    logging.info("Model and embeddings saved after 5th epoch")
 
     return loss_values, accuracy_values, perplexity_values, val_loss_values, val_accuracy_values
 
