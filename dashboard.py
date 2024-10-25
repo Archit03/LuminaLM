@@ -54,6 +54,7 @@ def main():
     ax_loss.set_ylabel('Loss')
     ax_loss.legend()
     st.pyplot(fig_loss)
+    plt.savefig('TrainingLoss.png')
 
     # Plot Training Accuracy
     st.write("Training Accuracy")
@@ -64,6 +65,7 @@ def main():
     ax_acc.set_ylabel('Accuracy')
     ax_acc.legend()
     st.pyplot(fig_acc)
+    plt.savefig('trainingAccuracy.png')
 
     # Plot Perplexity
     st.write("Training Perplexity")
@@ -73,6 +75,7 @@ def main():
     ax_perp.set_ylabel('Perplexity')
     ax_perp.legend()
     st.pyplot(fig_perp)
+    plt.savefig('TrainingPerplexity.png')
 
     # Generate embeddings
     st.write("Generating embeddings...")

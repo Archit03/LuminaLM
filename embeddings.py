@@ -146,10 +146,10 @@ def fine_tune_model_with_early_stopping(
             patience_counter += 1
 
         if epoch == 3:
-            save_model(model, "LuminaLM_01.pth")
+            save_model(model, "LuminaLM_embeddings_01.pth")
         
         elif epoch > 3 and patience_counter < patience:
-            save_model(model, f"LuminaLM_epoch_{epoch+1}.pth")
+            save_model(model, f"LuminaLM_embeddings_epoch_{epoch+1}.pth")
 
         if patience_counter >= patience:
             logging.info("Early stopping triggered. No improvement in validation loss.")
