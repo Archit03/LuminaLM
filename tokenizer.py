@@ -7,7 +7,21 @@ import os
 # Create a function to handle tokenization
 def create_tokens(vocab_size=20000, special_tokens=None):
     if special_tokens is None:
-        special_tokens = ["<pad>", "<unk>", "<s>", "</s>", "<cls>", "<sep>", "<mask>", "<eot>", "<bos>", "<eos>"]
+        special_tokens = [
+    "<pad>", "<unk>", "<s>", "</s>", "<cls>", "<sep>", "<mask>", "<eot>", "<bos>", "<eos>",
+    "<SYM>", "<DIAG>", "<PROC>", "<TREAT>", "<MED>", "<DOSAGE>", "<FREQ>", "<ROUTE>", "<LAB>", "<VAL>",
+    "<IMAGING>", "<BLOOD>", "<VITALS>", "<DISEASE>", "<CONDITION>", "<ALLERGY>", "<FAMILY_HISTORY>",
+    "<SOCIAL_HISTORY>", "<ORG>", "<BODY_PART>", "<TISSUE>", "<SYSTEM>", "<MUSCLE>", "<NORMAL>", "<ABNORMAL>",
+    "<SEVERE>", "<MODERATE>", "<MILD>", "<STABLE>", "<IMPROVING>", "<WORSENING>", "<SURGERY>", "<NONINVASIVE>",
+    "<INVASIVE>", "<THERAPY>", "<TRANSPLANT>", "<BIOPSY>", "<MRI>", "<CT>", "<XRAY>", "<ULTRASOUND>", "<RESULT>",
+    "<POSITIVE>", "<NEGATIVE>", "<DATE>", "<DURATION>", "<TIMESTAMP>", "<AGE>", "<GENDER>", "<WEIGHT>", "<HEIGHT>",
+    "<PATIENT_ID>", "<CONSENT>", "<HIPAA>", "<ICD_CODE>", "<CPT_CODE>", "<GLUCOSE>", "<BP>", "<HR>", "<O2_SAT>", 
+    "<TEMP>", "<RBC>", "<WBC>", "<PLATELET>", "<COVID19>", "<HYPERTENSION>", "<DIABETES>", "<CANCER>", "<STROKE>",
+    "<CARDIAC>", "<PRESCRIPTION>", "<GENERIC_DRUG>", "<BRAND_DRUG>", "<DOSAGE_FORM>", "<GENE>", "<MUTATION>", "<DNA>",
+    "<RNA>", "<PROTEIN>", "<GENOTYPE>", "<SNP>", "<SEQ>", "<MG>", "<ML>", "<L>", "<MOL>", "<IU>", "<STUDY>", "<TRIAL>",
+    "<EVIDENCE>", "<CONCLUSION>", "<REFERENCE>", "<UNKNOWN>", "<MISSING>", "<ANONYMOUS>"
+]
+    
     tokenizer = Tokenizer(BPE())
     tokenizer.pre_tokenizer = ByteLevel()  # Better subword and punctuation handling
     trainer = BpeTrainer(vocab_size=vocab_size, special_tokens=special_tokens)
@@ -42,11 +56,11 @@ def train_tokenizer(tokenizer, trainer, directory):
     tokenizer.train_from_iterator([text_data], trainer)
 
 # Save the tokenizer to a file
-def save_tokenizer(tokenizer, path="bpe_token.json"):
+def save_tokenizer(tokenizer, path="LuminaLM_text_token.json"):
     tokenizer.save(path)
 
 # Load the tokenizer from a saved file
-def load_tokenizer(path="bpe_token.json"):
+def load_tokenizer(path="LuminaLM_text_token.json"):
     return Tokenizer.from_file(path)
 
 # Example Usage
