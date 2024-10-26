@@ -12,19 +12,20 @@ class InputEmbeddings(nn.Module):
         return self.embedding(x) * math.sqrt(self.d_model)
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model: int, seq_len: int, dropout: float) -> None:
+    def __init__(self, d_model: int, max_len: int, dropout: float):
         super().__init__()
         self.dropout = nn.Dropout(dropout)
-        pe = torch.zeros(seq_len, d_model)
-        position = torch.arange(0, seq_len, dtype=torch.float).unsqueeze(1)
-        div_terms = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_terms)
-        pe[:, 1::2] = torch.cos(position * div_terms)
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0)
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        x = x + self.pe[:, :x.size(1), :].requires_grad_(False)
+        seq_len = x.size(1)
+        x = x + self.pe[:, :seq_len]
         return self.dropout(x)
 
 class LayerNormalization(nn.Module):
@@ -174,11 +175,11 @@ class Transformer(nn.Module):
         output = self.project(decoder_output)
         return output
 
-def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_leq_len: int, tgt_seq_len: int, d_model: int = 512, 
+def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int, tgt_seq_len: int, d_model: int = 512, 
                       N: int = 6, h: int = 8, dropout: float = 0.1, d_ff: int = 2048) -> Transformer:
     src_embed = InputEmbeddings(d_model, src_vocab_size)
     tgt_embed = InputEmbeddings(d_model, tgt_vocab_size)
-    src_pos = PositionalEncoding(d_model, src_leq_len, dropout)
+    src_pos = PositionalEncoding(d_model, src_seq_len, dropout)
     tgt_pos = PositionalEncoding(d_model, tgt_seq_len, dropout)
 
     encoder_blocks = nn.ModuleList([
