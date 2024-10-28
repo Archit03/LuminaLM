@@ -55,5 +55,5 @@ python embeddings.py
 ```
 
 ```bash
-python dashboard.py
+streamlit run dashboard.py
 ```
