@@ -16,6 +16,7 @@ Visit the live project at [Lumina LM ](https://www.ellanorai.org)
 - **User-Friendly Interface**: Provides an easy-to-use interface for inputting prompts and receiving AI-generated responses.
 - **API Integration**: Developers can leverage the Lumina LM  API for text generation in their applications.
 - **Custom Built Embeddings Generators**: This model leverages the Transformers architecture, to generate embeddings. 
+- **Total Embeddings count**: 8474275
 ![Cosine Similarity Heatmap](cosine_similarity_sampled.png)
 ![3d t_SNE projections](3d_tsne_projection.png)
 ![3d PCA Projection](3D_PCA_Projection.png)
@@ -48,10 +49,6 @@ pip install -r requirements.txt
 
 ```bash
 python tokenizer.py
-```
-
-```bash
-python embeddings.py
 ```
 
 ```bash
