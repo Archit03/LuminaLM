@@ -85,7 +85,7 @@ def main():
     st.write("Model saved after generating embeddings.")
 
     # Visualizations: Sample for PCA, t-SNE, and Cosine Similarity
-    sample_size = st.slider("Select Sample Size for Visualization", min_value=1000, max_value=500000, value=1000)
+    sample_size = 500000
 
     # Sample embeddings for visualization
     sample_indices = np.random.choice(embeddings.shape[0], sample_size, replace=False)

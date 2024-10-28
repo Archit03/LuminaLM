@@ -18,7 +18,7 @@ Visit the live project at [Lumina LM ](https://www.ellanorai.org)
 - **Custom Built Embeddings Generators**: This model leverages the Transformers architecture, to generate embeddings. 
 ![Cosine Similarity Heatmap](cosine_similarity_sampled.png)
 ![3d t_SNE projections](3d_tsne_projection.png)
-![3d PCA Projection](3d_pca_projection.png)
+![3d PCA Projection](3D_PCA_Projection.png)
 ![Training Loss and accuracy](Train_loss_and_accuracy.png)
 
 

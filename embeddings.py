@@ -92,7 +92,7 @@ def fine_tune_model_with_early_stopping(
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss()
-    scaler = torch.cuda.amp.GradScaler()
+    scaler = torch.amp.GradScaler()
 
     loss_values, accuracy_values, perplexity_values, val_loss_values, val_accuracy_values = [], [], [], [], []
 
@@ -111,7 +111,7 @@ def fine_tune_model_with_early_stopping(
             input_ids = batch['input_ids'].to(device)
             target_ids = batch['target_ids'].to(device)
 
-            with torch.cuda.amp.autocast():
+            with torch.amp.autocast(device_type='cuda'):
                 outputs = model(input_ids, target_ids)
                 loss = criterion(outputs.view(-1, outputs.size(-1)), target_ids.view(-1))
                 perplexity = torch.exp(loss)
