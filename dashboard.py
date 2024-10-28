@@ -1,5 +1,5 @@
 import streamlit as st
-import matplotlib.pyplot as plt  # Dashboard will use these libraries
+import matplotlib.pyplot as plt
 from embeddings import (
     initialize_model,
     fine_tune_model_with_early_stopping,
@@ -10,7 +10,6 @@ from embeddings import (
     tokenize_data,
     CustomDataset,
     collate_fn,
-    save_model  # Assuming this is the function to save your model
 )
 import torch
 from torch.utils.data import DataLoader
@@ -42,8 +41,8 @@ def main():
     
     # Fine-tune the model with early stopping and model saving logic
     st.write("Fine-tuning the model...")
-    loss_values, accuracy_values, perplexity_values, val_loss_values, val_accuracy_values = fine_tune_model_with_early_stopping(
-        transformer_model, train_loader,input_ids_batches, val_loader, epochs=5, lr=5e-5, patience=3
+    loss_values, accuracy_values, perplexity_values, val_loss_values, val_accuracy_values, embeddings = fine_tune_model_with_early_stopping(
+        transformer_model, train_loader, input_ids_batches, val_loader, epochs=5, lr=5e-5, patience=3
     )
 
     # Plot Training Loss
@@ -80,11 +79,9 @@ def main():
 
     # Generate embeddings after fine-tuning
     st.write("Generating embeddings after fine-tuning...")
-    embeddings = generate_embeddings(transformer_model, input_ids_batches)
     st.write(f"Total Embeddings Generated: {embeddings.shape[0]}")
 
     # Save the model after generating embeddings (i.e., after 5th epoch)
-    save_model(transformer_model, "LuminaLM_final_with_embeddings.pth")
     st.write("Model saved after generating embeddings.")
 
     # Visualizations: Sample for PCA, t-SNE, and Cosine Similarity
