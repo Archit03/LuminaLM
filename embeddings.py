@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from tokenizers import Tokenizer
-from Transformer import model  # Assuming your model code is in a file named 'model.py' in 'Transformer' directory
+from Transformer import model
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import numpy as np
@@ -14,25 +14,22 @@ from torch.utils.data import DataLoader, Dataset
 import torch.nn.utils.rnn as rnn_utils
 import logging
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, filename='/opt/dlami/nvme/training_log.log', filemode='a', format='%(asctime)s - %(message)s')
-
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
 # Save the model
-def save_model(model, path="LuminaLM.pth"):
+def save_model(model, path="LuminaLM_01.pth"):
     torch.save(model.state_dict(), path)
     logging.info(f"Model saved to {path}")
 
 # Initialize the transformer model
-def initialize_model(tokenizer_path="LuminaLM_text_token.json", d_model=512, src_leq_len=512):
+def initialize_model(tokenizer_path="LuminaLM_text_token.json", d_model=512, src_seq_len=512):
     tokenizer = Tokenizer.from_file(tokenizer_path)
     src_vocab_size = tokenizer.get_vocab_size()
     tgt_vocab_size = src_vocab_size
     
     transformer_model = model.build_transformer(
-        src_vocab_size, tgt_vocab_size, src_leq_len=src_leq_len, tgt_seq_len=src_leq_len, d_model=d_model
+        src_vocab_size, tgt_vocab_size, src_seq_len=src_seq_len, tgt_seq_len=src_seq_len, d_model=d_model
     ).to(device)
     
     return transformer_model, tokenizer
@@ -90,12 +87,12 @@ def tokenize_data(tokenizer, directory, batch_size=128):
 
 # Fine-tune model with early stopping and model saving logic
 def fine_tune_model_with_early_stopping(
-    model, train_loader, val_loader, input_ids_batches, epochs=5, lr=5e-5, patience=3
+    model, train_loader, input_ids_batches, val_loader, epochs=5, lr=5e-5, patience=3
 ):
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss()
-    scaler = torch.amp.GradScaler()
+    scaler = torch.cuda.amp.GradScaler()
 
     loss_values, accuracy_values, perplexity_values, val_loss_values, val_accuracy_values = [], [], [], [], []
 
@@ -114,7 +111,7 @@ def fine_tune_model_with_early_stopping(
             input_ids = batch['input_ids'].to(device)
             target_ids = batch['target_ids'].to(device)
 
-            with torch.amp.autocast(device_type='cuda'):
+            with torch.cuda.amp.autocast():
                 outputs = model(input_ids, target_ids)
                 loss = criterion(outputs.view(-1, outputs.size(-1)), target_ids.view(-1))
                 perplexity = torch.exp(loss)
@@ -137,7 +134,6 @@ def fine_tune_model_with_early_stopping(
         accuracy_values.append(accuracy)
         perplexity_values.append(avg_perplexity)
 
-        # Validation step
         val_loss, val_accuracy = validate_model(model, val_loader, criterion)
         val_loss_values.append(val_loss)
         val_accuracy_values.append(val_accuracy)
@@ -149,23 +145,16 @@ def fine_tune_model_with_early_stopping(
         else:
             patience_counter += 1
 
-        # Save the model after the 4th epoch
-        if epoch == 3:
-            save_model(model, "LuminaLM_after_4th_epoch.pth")
-            logging.info("Model saved after the 4th epoch")
-
-        # Check for early stopping
+        # Early stopping
         if patience_counter >= patience:
             logging.info("Early stopping triggered. No improvement in validation loss.")
             break
 
-    # After completing all epochs, generate embeddings and save the model
-    logging.info("Generating embeddings after 5th epoch...")
+    # Generate embeddings and save the model after final epoch or early stopping
     embeddings = generate_embeddings(model, input_ids_batches)
     save_model(model, "LuminaLM_final_with_embeddings.pth")
-    logging.info("Model and embeddings saved after 5th epoch")
 
-    return loss_values, accuracy_values, perplexity_values, val_loss_values, val_accuracy_values
+    return loss_values, accuracy_values, perplexity_values, val_loss_values, val_accuracy_values, embeddings
 
 # Validation function
 def validate_model(model, val_loader, criterion):
@@ -255,3 +244,4 @@ def load_model(model, path="LuminaLM.pth"):
     model.load_state_dict(torch.load(path))
     model.eval()
     logging.info(f"Model loaded from {path}")
+
