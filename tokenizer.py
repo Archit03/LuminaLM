@@ -5,7 +5,11 @@ from tokenizers.pre_tokenizers import ByteLevel
 import os
 
 # Create a function to handle tokenization
+<<<<<<< HEAD
 def create_tokens(vocab_size=20000, special_tokens=None):
+=======
+def create_tokens(vocab_size=50000, special_tokens=None):
+>>>>>>> 462031e4bf56ff98ac912176fdfcea6606899f22
     if special_tokens is None:
         special_tokens = [
     "<pad>", "<unk>", "<s>", "</s>", "<cls>", "<sep>", "<mask>", "<eot>", "<bos>", "<eos>",
@@ -66,6 +70,10 @@ def load_tokenizer(path="LuminaLM_text_token.json"):
 # Example Usage
 if __name__ == "__main__":
     directory = r'/home/ubuntu/LuminaLM/Data'  # Adjust to your actual directory path
+<<<<<<< HEAD
     tokenizer, trainer = create_tokens(vocab_size=199997)
+=======
+    tokenizer, trainer = create_tokens(vocab_size=50000)
+>>>>>>> 462031e4bf56ff98ac912176fdfcea6606899f22
     train_tokenizer(tokenizer, trainer, directory)
     save_tokenizer(tokenizer)

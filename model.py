@@ -2,8 +2,13 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from transformers import AdamW
+<<<<<<< HEAD
 import embeddings  # Custom embeddings logic in embeddings.py
 from tqdm import tqdm
+=======
+from tqdm import tqdm
+import embeddings  # Custom embeddings logic in embeddings.py
+>>>>>>> 462031e4bf56ff98ac912176fdfcea6606899f22
 import tokenizer  # Custom tokenizer from tokenizer.py
 
 # Custom Causal Self-Attention Layer
@@ -40,7 +45,7 @@ class MLP(nn.Module):
         super().__init__()
         self.fc1 = nn.Linear(config.n_embd, 4 * config.n_embd)
         self.fc2 = nn.Linear(4 * config.n_embd, config.n_embd)
-        self.act = nn.GELU()  # Activation function
+        self.act = nn.GELU()
         self.dropout = nn.Dropout(0.1)
 
     def forward(self, x):
@@ -65,6 +70,7 @@ class Block(nn.Module):
         return x
 
 # Configuration for the LuminaLM Model
+<<<<<<< HEAD
 @dataclass
 class LuminaLMConfig:
     block_size: int = 1024  # Number of tokens in a sequence
@@ -72,6 +78,14 @@ class LuminaLMConfig:
     n_layer: int = 48  # Number of layers
     n_head: int = 48  # Number of attention heads
     n_embd: int = 6144  # Embedding dimension
+=======
+class LuminaLMConfig:
+    block_size: int = 1024
+    vocab_size: int = 50_000
+    n_layer: int = 120
+    n_head: int = 64
+    n_embd: int = 512  
+>>>>>>> 462031e4bf56ff98ac912176fdfcea6606899f22
 
 # LuminaLM Model Class
 class LuminaLM(nn.Module):
@@ -80,36 +94,45 @@ class LuminaLM(nn.Module):
         # Load custom embeddings from embeddings.py
         self.config = config
         self.transformer = nn.ModuleDict({
+<<<<<<< HEAD
             'wte': embeddings.load_pretrained_embeddings(),  # Load custom embeddings
             'wpe': nn.Embedding(config.block_size, config.n_embd),  # Positional encodings
+=======
+            'wte': embeddings.load_pretrained_embeddings(),
+            'wpe': nn.Embedding(config.block_size, config.n_embd),
+>>>>>>> 462031e4bf56ff98ac912176fdfcea6606899f22
             'h': nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
             'ln_f': nn.LayerNorm(config.n_embd),
         })
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+<<<<<<< HEAD
         self.tokenizer = tokenizer.load_tokenizer()  # Load custom tokenizer
+=======
+        self.tokenizer = tokenizer.load_tokenizer()
+>>>>>>> 462031e4bf56ff98ac912176fdfcea6606899f22
 
     def forward(self, input_ids):
         device = input_ids.device
         position_ids = torch.arange(0, input_ids.size(1), dtype=torch.long, device=device)
         position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
 
+<<<<<<< HEAD
         # Get word embeddings from embeddings.py
+=======
+>>>>>>> 462031e4bf56ff98ac912176fdfcea6606899f22
         inputs_embeds = self.transformer.wte(input_ids)
         position_embeds = self.transformer.wpe(position_ids)
         hidden_states = inputs_embeds + position_embeds
 
-        # Forward pass through transformer blocks
         for block in self.transformer['h']:
             hidden_states = block(hidden_states)
 
-        # Final layer norm
         hidden_states = self.transformer['ln_f'](hidden_states)
-
-        # Language modeling head
         logits = self.lm_head(hidden_states)
         return logits
 
     def generate_text(self, prompt, max_length=50):
+<<<<<<< HEAD
         # Tokenize the prompt using the custom tokenizer from tokenizer.py
         input_ids = self.tokenizer.encode(prompt)
 
@@ -118,6 +141,12 @@ class LuminaLM(nn.Module):
         input_ids = torch.tensor([input_ids], dtype=torch.long).to(device)
 
         # Pass the tokenized input into the model and generate output tokens
+=======
+        input_ids = self.tokenizer.encode(prompt)
+        device = next(self.parameters()).device
+        input_ids = torch.tensor([input_ids], dtype=torch.long).to(device)
+
+>>>>>>> 462031e4bf56ff98ac912176fdfcea6606899f22
         self.eval()
         with torch.no_grad():
             for _ in range(max_length):
@@ -125,11 +154,17 @@ class LuminaLM(nn.Module):
                 next_token_id = torch.argmax(logits[:, -1, :], dim=-1)
                 input_ids = torch.cat([input_ids, next_token_id.unsqueeze(-1)], dim=1)
 
+<<<<<<< HEAD
         # Decode using your custom tokenizer
         output_text = self.tokenizer.decode(input_ids[0].tolist())
         return output_text
 
 # Custom Dataset Class
+=======
+        output_text = self.tokenizer.decode(input_ids[0].tolist())
+        return output_text
+
+>>>>>>> 462031e4bf56ff98ac912176fdfcea6606899f22
 class TextDataset(Dataset):
     def __init__(self, texts, tokenizer):
         self.texts = texts
@@ -140,6 +175,7 @@ class TextDataset(Dataset):
 
     def __getitem__(self, idx):
         input_ids = self.tokenizer.encode(self.texts[idx])
+<<<<<<< HEAD
         target_ids = input_ids[1:]  # Next token prediction task
         return torch.tensor(input_ids[:-1], dtype=torch.long), torch.tensor(target_ids, dtype=torch.long)
 
@@ -194,5 +230,41 @@ if __name__ == "__main__":
     # Generate text after training
     model.eval()  # Set model to eval mode for generation
     prompt = "The patient exhibits"
+=======
+        target_ids = input_ids[1:]
+        return torch.tensor(input_ids[:-1], dtype=torch.long), torch.tensor(target_ids, dtype=torch.long)
+
+if __name__ == "__main__":
+    config = LuminaLMConfig()
+    model = LuminaLM(config)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+
+    texts = ["Sample sentence for dataset.", "Another sample for the model."]
+    dataset = TextDataset(texts, model.tokenizer)
+    dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
+
+    loss_fn = nn.CrossEntropyLoss()
+    optimizer = AdamW(model.parameters(), lr=1e-4)
+    epochs = 3
+
+    for epoch in range(epochs):
+        model.train()
+        loop = tqdm(dataloader, leave=True)
+        for input_ids, target_ids in loop:
+            optimizer.zero_grad()
+            input_ids, target_ids = input_ids.to(device), target_ids.to(device)
+            outputs = model(input_ids)
+            logits = outputs[..., :-1, :].contiguous()
+            shift_labels = target_ids[..., :-1].contiguous()
+            loss = loss_fn(logits.view(-1, logits.size(-1)), shift_labels.view(-1))
+            loss.backward()
+            optimizer.step()
+            loop.set_description(f"Epoch {epoch}")
+            loop.set_postfix(loss=loss.item())
+
+    model.eval()
+    prompt = input("Please input the prompt.")
+>>>>>>> 462031e4bf56ff98ac912176fdfcea6606899f22
     generated_text = model.generate_text(prompt, max_length=50)
     print("Generated Text:", generated_text)

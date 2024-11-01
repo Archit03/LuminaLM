@@ -1,4 +1,8 @@
 LLM
 __pycache__
 llm
+<<<<<<< HEAD
 .vs
+=======
+LuminaLm_final_with_embeddings.pth
+>>>>>>> 462031e4bf56ff98ac912176fdfcea6606899f22
