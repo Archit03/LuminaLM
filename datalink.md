@@ -59,3 +59,22 @@
 - **Data**: Medical terms, concepts, and relationships between concepts.
 - **Size**: ~35 GB
 - **Access**: Requires registration and approval.
+
+## 11 [HuggingFace](https://huggingface.co/datasets/MedRAG/textbooks)
+```python
+from datasets import load_dataset
+ds = load_dataset("MedRAG/textbooks")
+print(ds)
+```
+## 12 [HuggingFace PubMed-1](https://huggingface.co/datasets/MedRAG/pubmed)
+```python
+from datasets import load_dataset
+ds = load_dataset("MedRAG/pubmed")
+print(ds)
+```
+
+## 13 [SQUAD Dataset](https://huggingface.co/datasets/rajpurkar/squad?sql=--+The+SQL+console+is+powered+by+DuckDB+WASM+and+runs+entirely+in+the+browser.%0A--+Get+started+by+typing+a+query+or+selecting+a+view+from+the+options+below.%0ASELECT+*+FROM+train+LIMIT+10%3B)
+```python 
+from datasets import load_dataset
+ds = load_dataset("rajpurkar/squad")
+```
