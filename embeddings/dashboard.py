@@ -94,14 +94,17 @@ def main():
     # PCA Visualization
     st.write("PCA Visualization")
     plot_embeddings(sample_embeddings.numpy(), method="PCA", sample_size=sample_size)
+    plt.show()
 
     # t-SNE Visualization
     st.write("t-SNE Visualization")
     plot_embeddings(sample_embeddings.numpy(), method="t-SNE", sample_size=sample_size)
+    plt.show()
 
     # Cosine Similarity Visualization
     st.write("Cosine Similarity Visualization")
     calculate_sampled_cosine_similarity(embeddings.numpy(), sample_size=sample_size)
+    plt.show()
 
     # Display Top Tokens
     st.write("Top Tokens from Tokenized Data")
