@@ -11,3 +11,5 @@ tbb==2021.13.1                 # Threading Building Blocks (Intel TBB)
 psutil  
 streamlit
 datasets
+pinecone-client
+python-dotenv

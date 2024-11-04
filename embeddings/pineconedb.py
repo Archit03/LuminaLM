@@ -13,18 +13,6 @@ pc = Pinecone(api_key=api_key, environment="us-east-1")
 # Define index details
 index_name = "luminalm-embeddings"
 
-# Create the Pinecone index (only do this once)
-if index_name not in pc.list_indexes():
-    pc.create_index(
-        name=index_name,
-        dimension=512,  # Replace with your model's embedding dimension
-        metric="cosine",  # Common metric for similarity search
-        spec=ServerlessSpec(
-            cloud="aws",
-            region="us-east-1"
-        )
-    )
-
 # Define function to save embeddings to Pinecone
 def save_embeddings_to_pinecone(embeddings, batch_ids, index_name=index_name):
     # Connect to the existing Pinecone index
