@@ -17,6 +17,7 @@ from pineconedb import save_embeddings_to_pinecone
 from datasets import load_dataset
 
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
+print(device)
 
 def load_openwebtext():
     dataset = load_dataset("openwebtext",  split="train[:10%]", trust_remote_code=True)
@@ -76,7 +77,7 @@ def tokenize_combined_data(tokenizer, openwebtext_data, local_data, batch_size=1
     target_ids_batches = [encoded_target[i:i + batch_size] for i in range(0, len(encoded_target), batch_size)]
     return input_ids_batches, target_ids_batches
 
-def fine_tune_model_with_early_stopping(model, train_loader, input_ids_batches, val_loader, epochs=5, lr=5e-5, patience=3):
+def fine_tune_model_with_early_stopping(model, train_loader, input_ids_batches, val_loader, epochs=3, lr=5e-5, patience=3):
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss()
