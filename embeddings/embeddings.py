@@ -19,7 +19,7 @@ from datasets import load_dataset
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
 def load_openwebtext():
-    dataset = load_dataset("openwebtext", split="train", trust_remote_code=True)
+    dataset = load_dataset("openwebtext",  split="train[:10%]", trust_remote_code=True)
     texts = [item['text'] for item in dataset]
     return texts
 
