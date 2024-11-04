@@ -7,21 +7,24 @@ from embeddings.embeddings import (
     plot_embeddings,
     calculate_sampled_cosine_similarity,
     get_top_tokens,
-    tokenize_data,
+    tokenize_combined_data,
     CustomDataset,
     collate_fn,
+    load_local_data, 
+    load_openwebtext
 )
 import torch
 from torch.utils.data import DataLoader
 import numpy as np
 import os
+from datasets import load_dataset
 
 # Main UI code
 def main():
     st.title("LuminaLM Training Dashboard")
     
     # Load data directory path
-    data_dir = st.text_input("Enter data directory path", "")
+    data_dir = st.text_input("Enter data directory path for additional data:", "")
     
     if not data_dir:
         st.error("Please provide a valid data directory")
@@ -30,9 +33,13 @@ def main():
     # Initialize the model and tokenizer with d_model=512
     transformer_model, tokenizer = initialize_model(tokenizer_path="LuminaLM_text_token.json", d_model=512)
 
-    # Tokenize the data
-    st.write("Tokenizing data... This may take some time.")
-    input_ids_batches, target_ids_batches = tokenize_data(tokenizer, data_dir)
+    # Load OpenWebText and local data
+    openwebtext_data = load_openwebtext()
+    local_data = load_local_data(data_dir)
+    
+    # Tokenize the combined data
+    st.write("Tokenizing combined dataset... This may take some time.")
+    input_ids_batches, target_ids_batches = tokenize_combined_data(tokenizer, openwebtext_data, local_data)
     
     # Create DataLoader for training and validation
     dataset = CustomDataset(tokenized_inputs=input_ids_batches, tokenized_targets=target_ids_batches)
@@ -46,7 +53,7 @@ def main():
     )
 
     # Plot Training Loss
-    st.write("Training and Validation Loss Over Epochs")
+    st.subheader("Training and Validation Loss Over Epochs")
     fig_loss, ax_loss = plt.subplots()
     ax_loss.plot(loss_values, label='Training Loss', color='blue')
     ax_loss.plot(val_loss_values, label='Validation Loss', color='orange')
@@ -57,7 +64,7 @@ def main():
     plt.savefig('TrainingLoss.png')  # Save the training loss plot locally
 
     # Plot Training Accuracy
-    st.write("Training and Validation Accuracy Over Epochs")
+    st.subheader("Training and Validation Accuracy Over Epochs")
     fig_acc, ax_acc = plt.subplots()
     ax_acc.plot(accuracy_values, label='Training Accuracy', color='blue')
     ax_acc.plot(val_accuracy_values, label='Validation Accuracy', color='orange')
@@ -68,7 +75,7 @@ def main():
     plt.savefig('TrainingAccuracy.png')  # Save the accuracy plot locally
 
     # Plot Perplexity
-    st.write("Training Perplexity Over Epochs")
+    st.subheader("Training Perplexity Over Epochs")
     fig_perp, ax_perp = plt.subplots()
     ax_perp.plot(perplexity_values, label='Perplexity')
     ax_perp.set_xlabel('Epochs')
@@ -81,24 +88,21 @@ def main():
     st.write("Generating embeddings after fine-tuning...")
     st.write(f"Total Embeddings Generated: {embeddings.shape[0]}")
 
-    # Save the model after generating embeddings (i.e., after 5th epoch)
+    # Save the model after generating embeddings
     st.write("Model saved after generating embeddings.")
 
-    # Visualizations: Sample for PCA, t-SNE, and Cosine Similarity
-    sample_size = 500000
-
-    # Sample embeddings for visualization
-    sample_indices = np.random.choice(embeddings.shape[0], sample_size, replace=False)
-    sample_embeddings = embeddings[sample_indices]
+    # Embeddings Visualizations
+    st.subheader("Embeddings Visualizations")
+    sample_size = 500000  # Set sample size for visualization
 
     # PCA Visualization
     st.write("PCA Visualization")
-    plot_embeddings(sample_embeddings.numpy(), method="PCA", sample_size=sample_size)
+    plot_embeddings(embeddings.numpy(), method="PCA", sample_size=sample_size)
     plt.show()
 
     # t-SNE Visualization
     st.write("t-SNE Visualization")
-    plot_embeddings(sample_embeddings.numpy(), method="t-SNE", sample_size=sample_size)
+    plot_embeddings(embeddings.numpy(), method="t-SNE", sample_size=sample_size)
     plt.show()
 
     # Cosine Similarity Visualization
@@ -107,7 +111,7 @@ def main():
     plt.show()
 
     # Display Top Tokens
-    st.write("Top Tokens from Tokenized Data")
+    st.subheader("Top Tokens from Tokenized Data")
     top_tokens = get_top_tokens(tokenizer, input_ids_batches)
     for token, freq in top_tokens:
         st.write(f"Token: {token}, Frequency: {freq}")

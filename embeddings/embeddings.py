@@ -14,10 +14,25 @@ from torch.utils.data import DataLoader, Dataset
 import torch.nn.utils.rnn as rnn_utils
 import logging
 from embeddings.pineconedb import save_embeddings_to_pinecone
+from datasets import load_dataset  # Import for OpenWebText
 
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
+# Load OpenWebText dataset and preprocess
+def load_openwebtext():
+    dataset = load_dataset("openwebtext", split="train")  # Load OpenWebText dataset
+    texts = [item['text'] for item in dataset]  # Extract text field
+    return texts
+
+# Load additional local dataset
+def load_local_data(directory):
+    texts = []
+    file_list = [os.path.join(directory, file) for file in os.listdir(directory) if file.endswith(".txt")]
+    for file_name in file_list:
+        with open(file_name, "r", encoding="utf-8", errors="ignore") as f:
+            texts.extend(f.readlines())  # Add each line as a separate text entry
+    return texts
 
 # Initialize the transformer model
 def initialize_model(tokenizer_path="LuminaLM_text_token.json", d_model=512, src_seq_len=512):
@@ -58,24 +73,15 @@ def collate_fn(batch):
 
     return {"input_ids": input_ids_padded, "target_ids": target_ids_padded}
 
-# Tokenize data
-def tokenize_data(tokenizer, directory, batch_size=128):
+# Tokenize combined data from OpenWebText and local files
+def tokenize_combined_data(tokenizer, openwebtext_data, local_data, batch_size=128):
+    texts = openwebtext_data + local_data  # Combine both datasets
     encoded_input = []
     encoded_target = []
-
-    def read_files_in_chunks(directory, chunk_size=10000):
-        file_list = [os.path.join(directory, file) for file in os.listdir(directory) if file.endswith(".txt")]
-        for file_name in file_list:
-            with open(file_name, "r", encoding="utf-8", errors="ignore") as f:
-                while True:
-                    chunk = f.read(chunk_size)
-                    if not chunk:
-                        break
-                    yield chunk
-
-    for chunk in read_files_in_chunks(directory):
-        encoded_input.extend(tokenizer.encode(chunk).ids)
-        encoded_target.extend(tokenizer.encode(chunk).ids)
+    
+    for text in tqdm(texts, desc="Tokenizing Combined Dataset"):
+        encoded_input.extend(tokenizer.encode(text).ids)
+        encoded_target.extend(tokenizer.encode(text).ids)
 
     input_ids_batches = [encoded_input[i:i + batch_size] for i in range(0, len(encoded_input), batch_size)]
     target_ids_batches = [encoded_target[i:i + batch_size] for i in range(0, len(encoded_target), batch_size)]
@@ -199,45 +205,20 @@ def generate_embeddings(model, input_ids_batches, index_name="luminalm-embedding
 
     return torch.cat(all_embeddings, dim=0)  # for local use if needed
 
+# Usage
+if __name__ == "__main__":
+    # Load datasets
+    openwebtext_data = load_openwebtext()
+    local_data = load_local_data("path/to/your/local/data")  # Update with your local data directory path
 
-# PCA and t-SNE plotting (with sample size)
-def plot_embeddings(embeddings_np, method="PCA", sample_size=500000):
-    sample_indices = np.random.choice(embeddings_np.shape[0], sample_size, replace=False)
-    sampled_embeddings = embeddings_np[sample_indices]
+    transformer_model, tokenizer = initialize_model()
 
-    if method == "PCA":
-        pca = PCA(n_components=3)
-        reduced_embeddings = pca.fit_transform(sampled_embeddings)
-        title = "3D PCA Projection"
-    elif method == "t-SNE":
-        tsne = TSNE(n_components=3, random_state=42, perplexity=30, n_iter=300)
-        reduced_embeddings = tsne.fit_transform(sampled_embeddings)
-        title = "3D t-SNE Projection"
-    
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(reduced_embeddings[:, 0], reduced_embeddings[:, 1], reduced_embeddings[:, 2], alpha=0.5)
-    ax.set_title(title)
-    plt.savefig(f'{title}.png')
-    plt.show()
+    # Tokenize and combine both datasets
+    input_ids_batches, target_ids_batches = tokenize_combined_data(tokenizer, openwebtext_data, local_data)
 
-# Cosine Similarity Matrix (Sampled) - 2D Heatmap
-def calculate_sampled_cosine_similarity(embeddings_np, sample_size=500000):
-    sample_indices = np.random.choice(embeddings_np.shape[0], sample_size, replace=False)
-    sampled_embeddings = embeddings_np[sample_indices]
-    cos_sim_matrix = cosine_similarity(sampled_embeddings)
+    # Prepare Dataloaders
+    train_dataset = CustomDataset(input_ids_batches, target_ids_batches)
+    train_loader = DataLoader(train_dataset, batch_size=2, collate_fn=collate_fn)
 
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(cos_sim_matrix, cmap='viridis', xticklabels=False, yticklabels=False)
-    plt.title('Cosine Similarity Matrix (Sampled)')
-    plt.savefig('Cosine_Similarity_Matrix_(Sampled).png')
-    plt.show()
-
-# Token frequency for top tokens
-def get_top_tokens(tokenizer, tokenized_data, top_n=10):
-    from collections import Counter
-    tokens = [token for batch in tokenized_data for token in batch]
-    token_counts = Counter(tokens)
-    sorted_tokens = token_counts.most_common(top_n)
-    return sorted_tokens
-
+    # Fine-tune model
+    fine_tune_model_with_early_stopping(transformer_model, train_loader, input_ids_batches, train_loader)
