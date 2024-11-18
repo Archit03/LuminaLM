@@ -6,7 +6,7 @@ from tqdm import tqdm
 from transformers import AdamW
 import embeddings.embeddings as embeddings  # Custom embeddings logic in embeddings.py
 import embeddings.tokenizer as tokenizer  # Custom tokenizer logic in tokenizer.py
-from LuminaLM.model import SentientSculptor, SentientSculptorConfig, TextDataset  # Assuming model is in sentient_sculptor.py
+from LuminaLM.model import LuminaLM, LuminaLMConfig, TextDataset  # Assuming model is in sentient_sculptor.py
 
 
 # Function to measure memory usage
@@ -104,8 +104,8 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Initialize model and load it to device
-    model_config = SentientSculptorConfig()
-    model = SentientSculptor(model_config)
+    model_config = LuminaLMConfig()
+    model = LuminaLM(model_config)
     model.to(device)
 
     # Prepare dataset and dataloader
