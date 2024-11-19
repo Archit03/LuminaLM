@@ -1,4 +1,3 @@
-
 import torch
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
@@ -54,13 +53,16 @@ class MedicalTokenizer:
         )
         
         # Add post-processor for handling special tokens
+        self.tokenizer.train_from_iterator(["dummy text for training"], self.trainer)  # Dummy training to register special tokens
+        special_tokens = [
+            ("<s>", self.tokenizer.token_to_id("<s>")),
+            ("</s>", self.tokenizer.token_to_id("</s>"))
+        ]
+        
         self.tokenizer.post_processor = TemplateProcessing(
             single="<s> $A </s>",
             pair="<s> $A </s> $B:1 </s>:1",
-            special_tokens=[
-                ("<s>", self.tokenizer.token_to_id("<s>")),
-                ("</s>", self.tokenizer.token_to_id("</s>"))
-            ]
+            special_tokens=special_tokens
         )
     
     def preprocess_dataset(self, dataset_name: str) -> List[str]:
