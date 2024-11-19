@@ -53,6 +53,7 @@ python embeddings.py
 
 ```bash
 python dashboard.py
+```
 
 ```bash
 streamlit run dashboard.py
