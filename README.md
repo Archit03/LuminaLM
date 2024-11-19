@@ -7,6 +7,7 @@
 Lumina LM  generates human-like text from a given prompt and can be fine-tuned for specific domains, such as **medical text generation**. This flexibility makes the model useful for various applications, from creative writing to clinical report generation, medical diagnostics, and more.
 
 Visit the live project at [Lumina LM ](https://www.ellanorai.org)
+![EllanorAI](EllanorAI.jpg)
 
 ## Features
 
@@ -16,18 +17,6 @@ Visit the live project at [Lumina LM ](https://www.ellanorai.org)
 - **User-Friendly Interface**: Provides an easy-to-use interface for inputting prompts and receiving AI-generated responses.
 - **API Integration**: Developers can leverage the Lumina LM  API for text generation in their applications.
 - **Custom Built Embeddings Generators**: This model leverages the Transformers architecture, to generate embeddings. 
-<<<<<<< HEAD
-![Cosine Similarity Heatmap](cosine_similarity_sampled.png)
-![3d t_SNE projections](3d_tsne_projection.png)
-![3d PCA Projection](3d_pca_projection.png)
-=======
-- **Total Embeddings count**: 8474275
-![Cosine Similarity Heatmap](cosine_similarity_sampled.png)
-![3d t_SNE projections](3d_tsne_projection.png)
-![3d PCA Projection](3D_PCA_Projection.png)
->>>>>>> 462031e4bf56ff98ac912176fdfcea6606899f22
-![Training Loss and accuracy](Train_loss_and_accuracy.png)
-
 
 ### Analysis of New Embeddings
 
@@ -58,13 +47,13 @@ python tokenizer.py
 ```
 
 ```bash
-<<<<<<< HEAD
+
 python embeddings.py
 ```
 
 ```bash
 python dashboard.py
-=======
+
+```bash
 streamlit run dashboard.py
->>>>>>> 462031e4bf56ff98ac912176fdfcea6606899f22
 ```

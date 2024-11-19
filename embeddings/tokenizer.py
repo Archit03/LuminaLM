@@ -1,27 +1,34 @@
+
 import torch
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
 from tokenizers.pre_tokenizers import ByteLevel
+from tokenizers.processors import TemplateProcessing
 from datasets import load_dataset
 import os
 import pandas as pd
+from typing import List, Optional
+import logging
+from pathlib import Path
 
-# Create and configure a tokenizer
-def create_tokenizer(vocab_size=50000, special_tokens=None):
-    """
-    Initializes the tokenizer with Byte Pair Encoding (BPE) and special tokens.
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-    Parameters:
-        vocab_size (int): Size of the vocabulary.
-        special_tokens (list): List of special tokens to include.
-
-    Returns:
-        tokenizer (Tokenizer): Configured tokenizer object.
-        trainer (BpeTrainer): Trainer object for the tokenizer.
-    """
-    if special_tokens is None:
-        special_tokens = [
+class MedicalTokenizer:
+    """A specialized tokenizer for medical text processing."""
+    
+    def __init__(self, vocab_size: int = 50000, special_tokens: Optional[List[str]] = None):
+        self.vocab_size = vocab_size
+        self.special_tokens = special_tokens or self._get_default_special_tokens()
+        self.tokenizer = None
+        self.trainer = None
+        
+    @staticmethod
+    def _get_default_special_tokens() -> List[str]:
+        """Returns the default set of special tokens for medical text processing."""
+        return [
             "<pad>", "<unk>", "<s>", "</s>", "<cls>", "<sep>", "<mask>", "<eot>", "<bos>", "<eos>",
             "<SYM>", "<DIAG>", "<PROC>", "<TREAT>", "<MED>", "<DOSAGE>", "<FREQ>", "<ROUTE>", "<LAB>", "<VAL>",
             "<IMAGING>", "<BLOOD>", "<VITALS>", "<DISEASE>", "<CONDITION>", "<ALLERGY>", "<FAMILY_HISTORY>",
@@ -35,113 +42,125 @@ def create_tokenizer(vocab_size=50000, special_tokens=None):
             "<RNA>", "<PROTEIN>", "<GENOTYPE>", "<SNP>", "<SEQ>", "<MG>", "<ML>", "<L>", "<MOL>", "<IU>", "<STUDY>", "<TRIAL>",
             "<EVIDENCE>", "<CONCLUSION>", "<REFERENCE>", "<UNKNOWN>", "<MISSING>", "<ANONYMOUS>"
         ]
+    
+    def create_tokenizer(self) -> None:
+        """Initializes the tokenizer with BPE and special tokens."""
+        self.tokenizer = Tokenizer(BPE())
+        self.tokenizer.pre_tokenizer = ByteLevel()
+        self.trainer = BpeTrainer(
+            vocab_size=self.vocab_size,
+            special_tokens=self.special_tokens,
+            min_frequency=2  # Minimum frequency for a token to be included
+        )
+        
+        # Add post-processor for handling special tokens
+        self.tokenizer.post_processor = TemplateProcessing(
+            single="<s> $A </s>",
+            pair="<s> $A </s> $B:1 </s>:1",
+            special_tokens=[
+                ("<s>", self.tokenizer.token_to_id("<s>")),
+                ("</s>", self.tokenizer.token_to_id("</s>"))
+            ]
+        )
+    
+    def preprocess_dataset(self, dataset_name: str) -> List[str]:
+        """Loads and preprocesses a dataset with error handling."""
+        try:
+            dataset = load_dataset(dataset_name, split="train", trust_remote_code=True)
+            texts = []
+            
+            if "text" in dataset.column_names:
+                texts.extend(dataset["text"])
+            elif all(col in dataset.column_names for col in ["question", "context"]):
+                texts.extend([f"{q.strip()} {c.strip()}" 
+                            for q, c in zip(dataset["question"], dataset["context"])])
+            elif "sentence" in dataset.column_names:
+                texts.extend(dataset["sentence"])
+                
+            logger.info(f"Processed {len(texts)} examples from {dataset_name}")
+            return texts
+            
+        except Exception as e:
+            logger.error(f"Error processing dataset {dataset_name}: {str(e)}")
+            return []
+    
+    def preprocess_files(self, directory: str) -> List[str]:
+        """Processes files from a directory with enhanced error handling."""
+        texts = []
+        directory_path = Path(directory)
+        
+        if not directory_path.exists():
+            logger.error(f"Directory {directory} does not exist")
+            return texts
+            
+        for file_path in directory_path.rglob("*"):
+            try:
+                if file_path.suffix == ".csv":
+                    df = pd.read_csv(file_path)
+                    text = " ".join(df.astype(str).values.flatten())
+                    texts.append(text)
+                elif file_path.suffix == ".txt":
+                    text = file_path.read_text(encoding='utf-8')
+                    texts.append(text)
+                    
+                logger.info(f"Processed {file_path.name}")
+                
+            except Exception as e:
+                logger.error(f"Error processing {file_path}: {str(e)}")
+                continue
+                
+        return texts
+    
+    def train(self, additional_directory: Optional[str] = None) -> None:
+        """Trains the tokenizer with progress tracking."""
+        if not self.tokenizer:
+            self.create_tokenizer()
+            
+        datasets = {
+            "openwebtext": self.preprocess_dataset("openwebtext"),
+            "medical": []
+        }
+        
+        # Process medical datasets
+        medical_datasets = ["pubmed_qa", "mednli", "i2b2_2010", "mimic_notes", "scicite"]
+        for dataset_name in medical_datasets:
+            datasets["medical"].extend(self.preprocess_dataset(dataset_name))
+            
+        # Process additional files if provided
+        if additional_directory:
+            datasets["additional"] = self.preprocess_files(additional_directory)
+            
+        # Combine all datasets
+        combined_data = (datasets["openwebtext"] + 
+                        datasets["medical"] + 
+                        datasets.get("additional", []))
+        
+        if not combined_data:
+            raise ValueError("No valid training data found")
+            
+        logger.info(f"Training tokenizer on {len(combined_data)} examples")
+        self.tokenizer.train_from_iterator(combined_data, self.trainer)
+        
+    def save(self, path: str = "LuminaLM_text_tokens.json") -> None:
+        """Saves the tokenizer with error handling."""
+        try:
+            self.tokenizer.save(path)
+            logger.info(f"Tokenizer saved to {path}")
+        except Exception as e:
+            logger.error(f"Error saving tokenizer: {str(e)}")
+            
+    @classmethod
+    def load(cls, path: str = "LuminaLM_text_tokens.json") -> 'MedicalTokenizer':
+        """Loads a saved tokenizer."""
+        instance = cls()
+        instance.tokenizer = Tokenizer.from_file(path)
+        return instance
 
-    tokenizer = Tokenizer(BPE())
-    tokenizer.pre_tokenizer = ByteLevel()
-    trainer = BpeTrainer(vocab_size=vocab_size, special_tokens=special_tokens)
-    return tokenizer, trainer
-
-# Preprocess OpenWebText data
-def preprocess_openwebtext():
-    """
-    Loads and preprocesses OpenWebText dataset.
-
-    Returns:
-        list: A list of text data from the OpenWebText dataset.
-    """
-    dataset = load_dataset("openwebtext", split="train", trust_remote_code=True)
-    return [item["text"] for item in dataset]
-
-# Preprocess Hugging Face medical datasets
-def preprocess_medical_datasets():
-    """
-    Loads and preprocesses various Hugging Face medical datasets.
-
-    Returns:
-        list: Combined text data from all medical datasets.
-    """
-    datasets_to_load = [
-        "pubmed_qa", "mednli", "i2b2_2010", "mimic_notes", "scicite"
-    ]
-
-    all_texts = []
-    for dataset_name in datasets_to_load:
-        dataset = load_dataset(dataset_name, split="train", trust_remote_code=True)
-        column_names = dataset.column_names
-        if "text" in column_names:
-            all_texts.extend(dataset["text"])
-        elif "question" in column_names and "context" in column_names:
-            all_texts.extend([f"{q} {c}" for q, c in zip(dataset["question"], dataset["context"])])
-        elif "sentence" in column_names:
-            all_texts.extend(dataset["sentence"])
-    return all_texts
-
-# Preprocess files from a directory
-def preprocess_files_from_directory(directory):
-    """
-    Loads and preprocesses text and CSV files from the given directory.
-
-    Parameters:
-        directory (str): Path to the directory containing text or CSV files.
-
-    Returns:
-        list: A list of preprocessed text data.
-    """
-    all_texts = []
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            file_path = os.path.join(root, file)
-            if file_path.endswith(".csv"):
-                all_texts.append(preprocess_csv(file_path))
-            elif file_path.endswith(".txt"):
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    all_texts.append(f.read())
-    return all_texts
-
-# Preprocess CSV files
-def preprocess_csv(file):
-    """
-    Loads and preprocesses a CSV file.
-
-    Parameters:
-        file (str): Path to the CSV file.
-
-    Returns:
-        str: Combined text from the CSV file.
-    """
-    df = pd.read_csv(file)
-    return " ".join(df.astype(str).values.flatten())
-
-# Train the tokenizer
-def train_tokenizer(tokenizer, trainer, additional_directory=None):
-    """
-    Trains the tokenizer on OpenWebText, Hugging Face medical datasets, and optional local data.
-
-    Parameters:
-        tokenizer (Tokenizer): The tokenizer to train.
-        trainer (BpeTrainer): The trainer object for the tokenizer.
-        additional_directory (str): Path to additional local data (optional).
-    """
-    openwebtext_data = preprocess_openwebtext()
-    medical_data = preprocess_medical_datasets()
-    additional_texts = preprocess_files_from_directory(additional_directory) if additional_directory else []
-
-    combined_data = openwebtext_data + medical_data + additional_texts
-    if combined_data:
-        tokenizer.train_from_iterator(combined_data, trainer)
-    else:
-        raise ValueError("No valid text data found for training.")
-
-# Save the tokenizer
-def save_tokenizer(tokenizer, path="LuminaLM_text_token.json"):
-    tokenizer.save(path)
-
-# Load a tokenizer
-def load_tokenizer(path="LuminaLM_text_token.json"):
-    return Tokenizer.from_file(path)
+def main():
+    # Example usage
+    tokenizer = MedicalTokenizer(vocab_size=50000)
+    tokenizer.train(additional_directory="path/to/data")
+    tokenizer.save()
 
 if __name__ == "__main__":
-    additional_directory = r"C:\\Users\\ASUS\\Desktop\\LuminaLM\\Data"  # Update with your directory path
-    tokenizer, trainer = create_tokenizer(vocab_size=50000)
-    train_tokenizer(tokenizer, trainer, additional_directory=additional_directory)
-    save_tokenizer(tokenizer)
+    main()
