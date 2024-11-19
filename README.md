@@ -6,7 +6,7 @@
 
 Lumina LM  generates human-like text from a given prompt and can be fine-tuned for specific domains, such as **medical text generation**. This flexibility makes the model useful for various applications, from creative writing to clinical report generation, medical diagnostics, and more.
 
-Visit the live project at [Lumina LM ](https://www.ellanorai.org)
+Visit the live project at [EllanorAI](https://www.ellanorai.org)
 ![EllanorAI](EllanorAI.jpg)
 
 ## Features
