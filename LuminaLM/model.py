@@ -1,17 +1,18 @@
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from transformers import AdamW
+from datasets import load_dataset
 from tqdm import tqdm
-import embeddings.embeddings as embeddings  # Custom embeddings logic in embeddings.py
-import embeddings.tokenizer as tokenizer  # Custom tokenizer from tokenizer.py
+import embeddings.embeddings as embeddings  # Custom embeddings logic
+import embeddings.tokenizer as tokenizer  # Custom tokenizer logic
 
-# Custom Causal Self-Attention Layer
+# Causal Self-Attention Layer
 class CausalSelfAttention(nn.Module):
     def __init__(self, config):
         super().__init__()
         assert config.n_embd % config.n_head == 0
-        self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd)  # For q, k, v
+        self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd)
         self.c_proj = nn.Linear(config.n_embd, config.n_embd)
         self.n_head = config.n_head
         self.n_embd = config.n_embd
@@ -34,7 +35,7 @@ class CausalSelfAttention(nn.Module):
         y = self.c_proj(y)
         return y
 
-# Multi-Layer Perceptron (Feed-Forward Network)
+# Multi-Layer Perceptron
 class MLP(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -64,19 +65,18 @@ class Block(nn.Module):
         x = x + self.mlp(self.ln_2(x))
         return x
 
-# Configuration for the LuminaLM Model
+# LuminaLM Configuration
 class LuminaLMConfig:
     block_size: int = 1024
     vocab_size: int = 50_000
-    n_layer: int = 120
-    n_head: int = 64
-    n_embd: int = 512  
+    n_layer: int = 24
+    n_head: int = 16
+    n_embd: int = 768
 
-# LuminaLM Model Class
+# LuminaLM Model
 class LuminaLM(nn.Module):
     def __init__(self, config):
         super().__init__()
-        # Load custom embeddings from embeddings.py
         self.config = config
         self.transformer = nn.ModuleDict({
             'wte': embeddings.load_pretrained_embeddings(),
@@ -104,32 +104,29 @@ class LuminaLM(nn.Module):
         return logits
 
     def generate_text(self, prompt, max_length=50):
-        input_ids = self.tokenizer.encode(prompt)
-        device = next(self.parameters()).device
-        input_ids = torch.tensor([input_ids], dtype=torch.long).to(device)
-
+        input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(next(self.parameters()).device)
         self.eval()
         with torch.no_grad():
             for _ in range(max_length):
                 logits = self(input_ids)
                 next_token_id = torch.argmax(logits[:, -1, :], dim=-1)
                 input_ids = torch.cat([input_ids, next_token_id.unsqueeze(-1)], dim=1)
+                if next_token_id.item() == self.tokenizer.eos_token_id:
+                    break
 
-        output_text = self.tokenizer.decode(input_ids[0].tolist())
+        output_text = self.tokenizer.decode(input_ids[0], skip_special_tokens=True)
         return output_text
 
-class TextDataset(Dataset):
-    def __init__(self, texts, tokenizer):
-        self.texts = texts
-        self.tokenizer = tokenizer
+# Hugging Face Dataset Preparation
+def prepare_dataset(dataset_name, split, tokenizer, block_size=1024):
+    dataset = load_dataset(dataset_name, split=split)
+    
+    def tokenize_function(examples):
+        return tokenizer.batch_encode_plus(examples['text'], truncation=True, max_length=block_size)
 
-    def __len__(self):
-        return len(self.texts)
-
-    def __getitem__(self, idx):
-        input_ids = self.tokenizer.encode(self.texts[idx])
-        target_ids = input_ids[1:]
-        return torch.tensor(input_ids[:-1], dtype=torch.long), torch.tensor(target_ids, dtype=torch.long)
+    tokenized_dataset = dataset.map(tokenize_function, batched=True)
+    tokenized_dataset.set_format(type='torch', columns=['input_ids'])
+    return tokenized_dataset
 
 if __name__ == "__main__":
     config = LuminaLMConfig()
@@ -137,8 +134,11 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
-    texts = ["Sample sentence for dataset.", "Another sample for the model."]
-    dataset = TextDataset(texts, model.tokenizer)
+    tokenizer = tokenizer.load_tokenizer()
+
+    # Load and prepare dataset
+    block_size = config.block_size
+    dataset = prepare_dataset("wikitext", "train", tokenizer, block_size)
     dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
     loss_fn = nn.CrossEntropyLoss()
@@ -148,19 +148,19 @@ if __name__ == "__main__":
     for epoch in range(epochs):
         model.train()
         loop = tqdm(dataloader, leave=True)
-        for input_ids, target_ids in loop:
+        for batch in loop:
             optimizer.zero_grad()
-            input_ids, target_ids = input_ids.to(device), target_ids.to(device)
+            input_ids = batch['input_ids'].to(device)
             outputs = model(input_ids)
-            logits = outputs[..., :-1, :].contiguous()
-            shift_labels = target_ids[..., :-1].contiguous()
-            loss = loss_fn(logits.view(-1, logits.size(-1)), shift_labels.view(-1))
+            shift_logits = outputs[..., :-1, :].contiguous()
+            shift_labels = input_ids[..., 1:].contiguous()
+            loss = loss_fn(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
             loss.backward()
             optimizer.step()
             loop.set_description(f"Epoch {epoch}")
             loop.set_postfix(loss=loss.item())
 
     model.eval()
-    prompt = input("Please input the prompt.")
+    prompt = input("Provide a task description: ")
     generated_text = model.generate_text(prompt, max_length=50)
     print("Generated Text:", generated_text)
