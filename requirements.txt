@@ -1,4 +1,4 @@
-torch                   # PyTorch for deep learning
+torch          # PyTorch for deep learning
 transformers           # Hugging Face Transformers library
 tokenizers             # Tokenizers for handling custom tokenization
 scikit-learn            # For PCA, t-SNE, and cosine similarity
@@ -12,4 +12,4 @@ psutil
 streamlit
 datasets
 pinecone-client
-python-dotenv
+

@@ -1,4 +1,4 @@
-import LuminaLM.model as model
+import model as model
 # Function to count the number of parameters
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
