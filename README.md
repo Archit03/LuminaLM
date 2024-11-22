@@ -22,14 +22,14 @@ Visit the live project at [EllanorAI](https://www.ellanorai.org)
 
 The new embeddings show improved clustering and separation compared to the previous ones:
 
-- **Cosine Similarity Matrix**: The values range between 0.92 to 1.0, showing some diversity in how the embeddings relate to each other.
+- **Cosine Similarity Matrix**: The values range between 0.92 and 1.0, showing some diversity in how the embeddings relate.
 - **3D t-SNE Projection**: The embeddings are more compact but less clearly separated, suggesting limited non-linear differentiation.
 - **3D PCA Projection**: The embeddings form distinct clusters, showing better linear separability and a more structured representation.
 
 
 ## Requirements
 
-To get started with **Lumina LM **, ensure you have the following dependencies installed:
+To get started with **Lumina LM**, ensure you have the following dependencies installed:
 
 - Python 3.7+
 - PyTorch 1.7+
