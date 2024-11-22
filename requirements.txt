@@ -12,4 +12,5 @@ psutil
 streamlit
 datasets
 pinecone-client
+python-dotenv
 

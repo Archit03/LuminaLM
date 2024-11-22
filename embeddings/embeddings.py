@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.distributed as dist
 from tokenizers import Tokenizer
-from Transformer import model
+import model
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import numpy as np
@@ -32,7 +32,6 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-
 class ConfigManager:
     def __init__(self, config_path: str = "config.yaml"):
         self.config_path = config_path
