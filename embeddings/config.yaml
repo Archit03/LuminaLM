@@ -1,0 +1,41 @@
+model:
+  d_model: 512
+  src_seq_len: 512
+  batch_size: 32
+  learning_rate: 5e-5
+  epochs: 10
+  patience: 3
+
+data:
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
+  max_samples: 100000
+
+training:
+  use_mixed_precision: true
+  gradient_accumulation_steps: 4
+  max_grad_norm: 1.0
+  warmup_steps: 1000
+  weight_decay: 0.01
+  dropout: 0.1
+
+logging:
+  level: INFO
+  save_dir: "logs"
+  metrics_file: "metrics.json"
+
+checkpointing:
+  save_dir: "checkpoints"
+  save_frequency: 1
+  keep_best_n: 3
+
+visualization:
+  plot_dir: "plots"
+  sample_size: 1000
+  embedding_dims: 3
+
+distributed:
+  backend: "nccl"
+  world_size: -1  # auto-detect
+  init_method: "env://"
