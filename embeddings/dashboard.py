@@ -1,77 +1,72 @@
 import streamlit as st
+import pandas as pd
 import matplotlib.pyplot as plt
-from embeddings import (
-    initialize_model,
-    fine_tune_model_with_early_stopping,
-    plot_training_loss,
-    plot_training_accuracy,
-    plot_training_perplexity,
-    plot_embeddings_3d,
-    plot_cosine_similarity_matrix,
-    load_openwebtext,
-    load_local_data,
-    tokenize_combined_data,
-    CustomDataset,
-    collate_fn,
+import os
+from pathlib import Path
+
+# Dashboard Configuration
+st.set_page_config(
+    page_title="LuminaLM Training Dashboard",
+    layout="wide",
 )
-import torch
-from torch.utils.data import DataLoader
 
-def main():
-    st.title("LuminaLM Training Dashboard")
+# Paths
+LOG_PATH = "training.log"
+PLOTS_DIR = "plots"
+METRICS_FILE = "metrics.csv"
 
-    # Input for local data directory
-    data_dir = st.text_input("Enter local data directory path", "")
-    if not data_dir:
-        st.error("Please provide a valid local data directory")
-        return
+# Load Training Logs
+def load_logs(log_path):
+    try:
+        with open(log_path, "r") as f:
+            logs = f.readlines()
+        return logs
+    except FileNotFoundError:
+        return ["No logs available."]
 
-    # Initialize model and tokenizer
-    transformer_model, tokenizer = initialize_model(tokenizer_path="LuminaLM_text_token.json", d_model=512)
+# Load Metrics
+def load_metrics(metrics_file):
+    try:
+        if os.path.exists(metrics_file):
+            df = pd.read_csv(metrics_file)
+            return df
+        else:
+            return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Error loading metrics: {e}")
+        return pd.DataFrame()
 
-    # Load datasets
-    openwebtext_data = load_openwebtext()
-    local_data = load_local_data(data_dir)
+# Load and Display Plots
+def display_plots(plot_dir):
+    plots = list(Path(plot_dir).glob("*.png"))
+    if not plots:
+        st.warning("No plots available.")
+    else:
+        for plot in plots:
+            st.image(str(plot), caption=plot.name)
 
-    # Tokenize and create batches
-    input_ids_batches, target_ids_batches = tokenize_combined_data(tokenizer, openwebtext_data, local_data)
-    dataset = CustomDataset(input_ids_batches, target_ids_batches)
-    train_loader = DataLoader(dataset, batch_size=2, shuffle=True, collate_fn=collate_fn)
-    val_loader = DataLoader(dataset, batch_size=2, shuffle=False, collate_fn=collate_fn)
+# Main Content
+st.title("LuminaLM Training Dashboard")
 
-    # Fine-tune model and collect metrics
-    loss_values, accuracy_values, perplexity_values, val_loss_values, val_accuracy_values, embeddings = fine_tune_model_with_early_stopping(
-        transformer_model, train_loader, input_ids_batches, val_loader
-    )
+# Logs Section
+st.header("Training Logs")
+logs = load_logs(LOG_PATH)
+st.text_area("Logs", value="\n".join(logs[-100:]), height=300)
 
-    # Display Training Loss Plot
-    st.subheader("Training Loss Over Epochs")
-    plot_training_loss(loss_values)
-    st.pyplot(plt.gcf())
+# Metrics Section
+st.header("Training Metrics")
+metrics_df = load_metrics(METRICS_FILE)
+if not metrics_df.empty:
+    st.dataframe(metrics_df)
+    for column in metrics_df.columns[1:]:  # Skip the epoch column
+        st.line_chart(metrics_df[["epoch", column]].set_index("epoch"))
+else:
+    st.warning("No metrics data available.")
 
-    # Display Training Accuracy Plot
-    st.subheader("Training Accuracy Over Epochs")
-    plot_training_accuracy(accuracy_values)
-    st.pyplot(plt.gcf())
+# Visualizations Section
+st.header("Visualizations")
+display_plots(PLOTS_DIR)
 
-    # Display Training Perplexity Plot
-    st.subheader("Training Perplexity Over Epochs")
-    plot_training_perplexity(perplexity_values)
-    st.pyplot(plt.gcf())
-
-    # Embedding Visualizations
-    st.subheader("Embedding Visualizations - PCA")
-    plot_embeddings_3d(embeddings, method="PCA")
-    st.pyplot(plt.gcf())
-
-    st.subheader("Embedding Visualizations - t-SNE")
-    plot_embeddings_3d(embeddings, method="t-SNE")
-    st.pyplot(plt.gcf())
-
-    # Cosine Similarity Visualization
-    st.subheader("Cosine Similarity Matrix (Sampled)")
-    plot_cosine_similarity_matrix(embeddings)
-    st.pyplot(plt.gcf())
-
-if __name__ == "__main__":
-    main()
+# Footer
+st.markdown("---")
+st.markdown("Developed for LuminaLM Training Monitoring.")
