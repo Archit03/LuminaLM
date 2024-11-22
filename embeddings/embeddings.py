@@ -376,7 +376,7 @@ class Visualizer:
 def main():
     parser = argparse.ArgumentParser(description='Train transformer model')
     parser.add_argument('--config', type=str, default='config.yaml', help='Path to config file')
-    parser.add_argument('--C:\Users\ASUS\Desktop\LuminaLM\Data', type=str, help='Path to local data directory')
+    parser.add_argument('--LuminaLM\Data', type=str, help='Path to local data directory')
     parser.add_argument('--LuminaLM_text_tokens.json', type=str, required=True, help='Path to tokenizer file')
     parser.add_argument('--checkpoint', type=str, help='Path to checkpoint to resume training')
     args = parser.parse_args()
