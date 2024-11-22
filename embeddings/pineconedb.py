@@ -1,7 +1,8 @@
 import pinecone
 from pinecone import Pinecone, ServerlessSpec
-from dotenv import load_dotenv
+from dotenv import load_dotenv # type: ignore
 import os
+import torch
 
 # Load environment variables from api.env
 load_dotenv("api.env")
@@ -25,3 +26,9 @@ def save_embeddings_to_pinecone(embeddings, batch_ids, index_name=index_name):
     index.upsert(vectors=data_to_upsert)
     print(f"Upserted {len(data_to_upsert)} embeddings to Pinecone.")
 
+def fetch_embeddings(self, input_ids):
+        # Convert token IDs to string keys for Pinecone
+        keys = [f"token_{token_id.item()}" for token_id in input_ids.flatten()]
+        response = self.pinecone_index.fetch(ids=keys)
+        embeddings = torch.tensor([response['vectors'][key] for key in keys], dtype=torch.float32)
+        return embeddings.view(input_ids.size(0), input_ids.size(1), -1)

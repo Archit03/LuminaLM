@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 from transformers import AdamW
 from datasets import load_dataset
 from tqdm import tqdm
-import embeddings.embeddings as embeddings  # Custom embeddings logic
+from embeddings.pineconedb import fetch_embeddings  # Import fetch_embeddings function
 import embeddings.tokenizer as tokenizer  # Custom tokenizer logic
 
 # Causal Self-Attention Layer
@@ -73,13 +73,12 @@ class LuminaLMConfig:
     n_head: int = 16
     n_embd: int = 768
 
-# LuminaLM Model
+# LuminaLM Model with Pinecone Integration
 class LuminaLM(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
         self.transformer = nn.ModuleDict({
-            'wte': embeddings.load_pretrained_embeddings(),
             'wpe': nn.Embedding(config.block_size, config.n_embd),
             'h': nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
             'ln_f': nn.LayerNorm(config.n_embd),
@@ -92,8 +91,9 @@ class LuminaLM(nn.Module):
         position_ids = torch.arange(0, input_ids.size(1), dtype=torch.long, device=device)
         position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
 
-        inputs_embeds = self.transformer.wte(input_ids)
-        position_embeds = self.transformer.wpe(position_ids)
+        # Fetch embeddings from PineconeDB
+        inputs_embeds = fetch_embeddings(input_ids)
+        position_embeds = self.transformer['wpe'](position_ids)
         hidden_states = inputs_embeds + position_embeds
 
         for block in self.transformer['h']:
@@ -117,17 +117,7 @@ class LuminaLM(nn.Module):
         output_text = self.tokenizer.decode(input_ids[0], skip_special_tokens=True)
         return output_text
 
-# Hugging Face Dataset Preparation
-def prepare_dataset(dataset_name, split, tokenizer, block_size=1024):
-    dataset = load_dataset(dataset_name, split=split)
-    
-    def tokenize_function(examples):
-        return tokenizer.batch_encode_plus(examples['text'], truncation=True, max_length=block_size)
-
-    tokenized_dataset = dataset.map(tokenize_function, batched=True)
-    tokenized_dataset.set_format(type='torch', columns=['input_ids'])
-    return tokenized_dataset
-
+# Main Training Loop
 if __name__ == "__main__":
     config = LuminaLMConfig()
     model = LuminaLM(config)
@@ -138,7 +128,7 @@ if __name__ == "__main__":
 
     # Load and prepare dataset
     block_size = config.block_size
-    dataset = prepare_dataset("wikitext", "train", tokenizer, block_size)
+    dataset = load_dataset("wikitext", "train")
     dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
     loss_fn = nn.CrossEntropyLoss()
