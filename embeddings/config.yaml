@@ -6,6 +6,10 @@ model:
   epochs: 5
   patience: 3
 
+tokenizer:
+  save_path: "embeddings/tokenizer.json"
+  load_path: "embeddings/tokenizer.json"
+
 data:
   train_split: 0.8
   val_split: 0.1
@@ -19,6 +23,8 @@ training:
   warmup_steps: 1000
   weight_decay: 0.01
   dropout: 0.1
+  validation_steps: 500  # Optional
+  gradient_noise_std: 0.0  # Set >0 to add gradient noise
 
 logging:
   level: INFO
@@ -39,3 +45,8 @@ distributed:
   backend: "nccl"
   world_size: -1  # auto-detect
   init_method: "env://"
+
+pinecone:
+  api_key: "e38016a0-15c6-4f83-aa30-9f3821a819fc"  # Use environment variable
+  environment: "us-east-1"  # Use environment variable
+  index_name: "luminalm-embeddings"

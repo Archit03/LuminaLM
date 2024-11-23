@@ -120,7 +120,7 @@ class MedicalTokenizer:
             
         datasets = {
             "openwebtext": self.preprocess_dataset("openwebtext"),
-            "medical": []
+            "medical": self.preprocess_dataset(""),
         }
         
         # Process medical datasets

@@ -7,7 +7,6 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics.pairwise import cosine_similarity
 import seaborn as sns
 from tqdm import tqdm
 import os
@@ -18,20 +17,25 @@ import argparse
 from datetime import datetime
 from torch.utils.data import DataLoader, Dataset, random_split
 import torch.nn.utils.rnn as rnn_utils
-from pineconedb import save_embeddings_to_pinecone
-from datasets import load_dataset
 from typing import List, Dict, Any, Optional, Tuple
 import yaml
+from multiprocessing import Pool
+from torch.optim.lr_scheduler import CosineAnnealingLR
+import pinecone  # Ensure pinecone-client is installed
 
 # Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('training.log'),
-        logging.StreamHandler()
-    ]
-)
+def setup_logging(config: Dict[str, Any]):
+    log_level = getattr(logging, config['logging']['level'].upper(), logging.INFO)
+    os.makedirs(config['logging']['save_dir'], exist_ok=True)
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(os.path.join(config['logging']['save_dir'], 'training.log')),
+            logging.StreamHandler()
+        ]
+    )
+
 class ConfigManager:
     def __init__(self, config_path: str = "config.yaml"):
         self.config_path = config_path
@@ -68,6 +72,35 @@ class ConfigManager:
                 'gradient_accumulation_steps': 1,
                 'max_grad_norm': 1.0,
                 'warmup_steps': 1000
+            },
+            'tokenizer': {
+                'save_path': "embeddings/tokenizer.json",
+                'load_path': "embeddings/tokenizer.json"
+            },
+            'logging': {
+                'level': 'INFO',
+                'save_dir': 'logs',
+                'metrics_file': 'metrics.json'
+            },
+            'checkpointing': {
+                'save_dir': 'checkpoints',
+                'save_frequency': 1,
+                'keep_best_n': 3
+            },
+            'visualization': {
+                'plot_dir': 'plots',
+                'sample_size': 1000,
+                'embedding_dims': 3
+            },
+            'distributed': {
+                'backend': 'nccl',
+                'world_size': -1,
+                'init_method': 'env://'
+            },
+            'pinecone': {
+                'api_key': "your_pinecone_api_key",
+                'environment': "your_pinecone_environment",
+                'index_name': "luminalm-embeddings"
             }
         }
 
@@ -78,6 +111,7 @@ class DataManager:
 
     def load_openwebtext(self) -> List[str]:
         try:
+            from datasets import load_dataset
             dataset = load_dataset(
                 "openwebtext",
                 split=f"train[:{self.config['data']['max_samples']}]",
@@ -89,6 +123,7 @@ class DataManager:
             return []
 
     def load_medical_datasets(self) -> List[str]:
+        from datasets import load_dataset
         datasets_to_load = ["pubmed_qa", "mednli", "i2b2_2010", "mimic_notes", "scicite"]
         texts = []
         for dataset_name in datasets_to_load:
@@ -155,25 +190,28 @@ class CustomDataset(Dataset):
                 "target_ids": torch.tensor(target_ids, dtype=torch.long)
             }
         return {"input_ids": torch.tensor(input_ids, dtype=torch.long)}
+
 class ModelManager:
     def __init__(self, config: Dict[str, Any], device: torch.device):
         self.config = config
         self.device = device
-        self.checkpoint_dir = "checkpoints"
+        self.checkpoint_dir = config['checkpointing']['save_dir']
         os.makedirs(self.checkpoint_dir, exist_ok=True)
 
-    def initialize_model(self, tokenizer_path: str) -> Tuple[nn.Module, Tokenizer]:
+    def initialize_model(self, config: Dict[str, Any]) -> Tuple[nn.Module, Tokenizer]:
         try:
+            tokenizer_path = config['tokenizer']['load_path']
             tokenizer = Tokenizer.from_file(tokenizer_path)
+            logging.info(f"Tokenizer loaded from {tokenizer_path}")
             src_vocab_size = tokenizer.get_vocab_size()
             tgt_vocab_size = src_vocab_size
-            
+
             transformer_model = model.build_transformer(
                 src_vocab_size,
                 tgt_vocab_size,
-                src_seq_len=self.config['model']['src_seq_len'],
-                tgt_seq_len=self.config['model']['src_seq_len'],
-                d_model=self.config['model']['d_model']
+                src_seq_len=config['model']['src_seq_len'],
+                tgt_seq_len=config['model']['src_seq_len'],
+                d_model=config['model']['d_model']
             ).to(self.device)
             
             return transformer_model, tokenizer
@@ -182,7 +220,7 @@ class ModelManager:
             raise
 
     def save_checkpoint(self, model: nn.Module, optimizer: torch.optim.Optimizer,
-                       epoch: int, loss: float) -> None:
+                        epoch: int, loss: float, is_best: bool = False) -> None:
         try:
             checkpoint_path = os.path.join(
                 self.checkpoint_dir,
@@ -195,11 +233,16 @@ class ModelManager:
                 'loss': loss,
             }, checkpoint_path)
             logging.info(f"Checkpoint saved: {checkpoint_path}")
+
+            if is_best:
+                best_path = os.path.join(self.checkpoint_dir, 'best_model.pt')
+                torch.save(model.state_dict(), best_path)
+                logging.info(f"Best model saved: {best_path}")
         except Exception as e:
             logging.error(f"Error saving checkpoint: {str(e)}")
 
     def load_checkpoint(self, model: nn.Module, optimizer: torch.optim.Optimizer,
-                       checkpoint_path: str) -> Tuple[nn.Module, torch.optim.Optimizer, int, float]:
+                        checkpoint_path: str) -> Tuple[nn.Module, torch.optim.Optimizer, int, float]:
         try:
             checkpoint = torch.load(checkpoint_path)
             model.load_state_dict(checkpoint['model_state_dict'])
@@ -211,15 +254,29 @@ class ModelManager:
             logging.error(f"Error loading checkpoint: {str(e)}")
             raise
 
+    def save_tokenizer(self, tokenizer: Tokenizer, config: Dict[str, Any]) -> None:
+        save_path = config['tokenizer']['save_path']
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        tokenizer.save(save_path)
+        logging.info(f"Tokenizer saved to {save_path}")
+
 class Trainer:
     def __init__(self, config: Dict[str, Any], model: nn.Module, device: torch.device):
         self.config = config
         self.model = model
         self.device = device
-        self.scaler = torch.amp.GradScaler()
+        self.scaler = torch.cuda.amp.GradScaler()
+        self.validation_steps = config.get('training', {}).get('validation_steps', None)
+        self.gradient_noise_std = config.get('training', {}).get('gradient_noise_std', 0.0)
 
-    def train_epoch(self, train_loader: DataLoader, optimizer: torch.optim.Optimizer,
-                   criterion: nn.Module) -> Tuple[float, float, float]:
+    def add_gradient_noise(self):
+        for param in self.model.parameters():
+            if param.grad is not None:
+                noise = torch.randn_like(param.grad) * self.gradient_noise_std
+                param.grad.add_(noise)
+
+    def train_epoch(self, train_loader: DataLoader, val_loader: DataLoader, optimizer: torch.optim.Optimizer,
+                    criterion: nn.Module, scheduler=None, epoch_num: int = 0) -> Tuple[float, float, float]:
         self.model.train()
         total_loss = 0
         correct_predictions = 0
@@ -231,7 +288,7 @@ class Trainer:
             input_ids = batch['input_ids'].to(self.device)
             target_ids = batch['target_ids'].to(self.device)
 
-            with torch.amp.autocast(enabled=self.config['training']['use_mixed_precision']):
+            with torch.cuda.amp.autocast(enabled=self.config['training']['use_mixed_precision']):
                 outputs = self.model(input_ids, target_ids)
                 loss = criterion(outputs.view(-1, outputs.size(-1)), target_ids.view(-1))
                 perplexity = torch.exp(loss)
@@ -239,7 +296,10 @@ class Trainer:
             # Gradient scaling and accumulation
             scaled_loss = self.scaler.scale(loss)
             scaled_loss.backward()
-            
+
+            if self.gradient_noise_std > 0:
+                self.add_gradient_noise()
+
             if (batch_idx + 1) % self.config['training']['gradient_accumulation_steps'] == 0:
                 self.scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_norm_(
@@ -248,6 +308,8 @@ class Trainer:
                 )
                 self.scaler.step(optimizer)
                 self.scaler.update()
+                if scheduler:
+                    scheduler.step()
 
             total_loss += loss.item()
             total_perplexity += perplexity.item()
@@ -260,6 +322,11 @@ class Trainer:
             torch.cuda.empty_cache()
             if batch_idx % 100 == 0:
                 gc.collect()
+
+            # Validation at regular steps
+            if self.validation_steps and batch_idx % self.validation_steps == 0 and batch_idx > 0:
+                val_loss, val_accuracy = self.validate(val_loader, criterion)
+                logging.info(f"Intermediate Validation - Loss: {val_loss:.4f}, Accuracy: {val_accuracy:.4f}")
 
         avg_loss = total_loss / len(train_loader)
         accuracy = correct_predictions / total_predictions
@@ -291,29 +358,27 @@ class Trainer:
         return avg_val_loss, val_accuracy
 
 class EmbeddingGenerator:
-    def __init__(self, model: nn.Module, device: torch.device):
+    def __init__(self, model: nn.Module, device: torch.device, index):
         self.model = model
         self.device = device
+        self.index = index
 
     @torch.no_grad()
     def generate_embeddings(self, input_ids_batches: List[List[int]], 
-                          index_name: str = "luminalm-embeddings",
-                          batch_size: int = 32) -> torch.Tensor:
+                            batch_size: int = 32, chunk_size: int = 1000) -> torch.Tensor:
         self.model.eval()
         all_embeddings = []
+        all_ids = []
         
         for i in tqdm(range(0, len(input_ids_batches), batch_size), desc="Generating Embeddings"):
             batch = input_ids_batches[i:i + batch_size]
             input_ids = torch.tensor(batch, dtype=torch.long).to(self.device)
             
             embeddings = self.model.encode(input_ids).cpu()
-            all_embeddings.extend(embeddings)
+            all_embeddings.append(embeddings)
             
-            batch_ids = [f"embedding_{i}_{j}" for j in range(len(embeddings))]
-            try:
-                save_embeddings_to_pinecone(embeddings, batch_ids, index_name=index_name)
-            except Exception as e:
-                logging.error(f"Error saving embeddings to Pinecone: {str(e)}")
+            batch_ids = [f"embedding_{i + j}" for j in range(len(embeddings))]
+            all_ids.extend(batch_ids)
             
             del embeddings, input_ids
             torch.cuda.empty_cache()
@@ -321,11 +386,33 @@ class EmbeddingGenerator:
             if i % 100 == 0:
                 gc.collect()
         
-        return torch.cat(all_embeddings, dim=0)
+        # Concatenate all embeddings
+        all_embeddings = torch.cat(all_embeddings, dim=0)
+        
+        # Save embeddings in chunks
+        for start_idx in range(0, len(all_embeddings), chunk_size):
+            end_idx = start_idx + chunk_size
+            chunk_embeddings = all_embeddings[start_idx:end_idx]
+            chunk_ids = all_ids[start_idx:end_idx]
+            self.save_embeddings_to_pinecone(chunk_embeddings, chunk_ids)
+        
+        logging.info("All embeddings saved to PineconeDB successfully.")
+        return all_embeddings
+
+    def save_embeddings_to_pinecone(self, embeddings: torch.Tensor, ids: List[str]):
+        embeddings_list = embeddings.numpy().tolist()
+        vectors = list(zip(ids, embeddings_list))
+        
+        try:
+            self.index.upsert(vectors)
+            logging.info(f"Saved {len(vectors)} embeddings to PineconeDB.")
+        except Exception as e:
+            logging.error(f"Error saving embeddings to PineconeDB: {str(e)}")
 
 class Visualizer:
     @staticmethod
-    def plot_metrics(metrics: Dict[str, List[float]], save_dir: str = "plots"):
+    def plot_metrics(metrics: Dict[str, List[float]], config: Dict[str, Any]):
+        save_dir = config['visualization']['plot_dir']
         os.makedirs(save_dir, exist_ok=True)
         for metric_name, values in metrics.items():
             plt.figure(figsize=(10, 6))
@@ -339,54 +426,96 @@ class Visualizer:
             plt.close()
 
     @staticmethod
-    def plot_embeddings_3d(embeddings: torch.Tensor, method: str = "PCA",
-                          save_dir: str = "plots"):
+    def plot_embeddings_3d(embeddings: torch.Tensor, method: str, config: Dict[str, Any]):
+        save_dir = config['visualization']['plot_dir']
         os.makedirs(save_dir, exist_ok=True)
-        sample_size = min(len(embeddings), 1000)
+        sample_size = min(len(embeddings), config['visualization']['sample_size'])
         embeddings_sample = embeddings[:sample_size]
-        
+
         try:
             if method == "PCA":
-                reducer = PCA(n_components=3)
+                reducer = PCA(n_components=config['visualization']['embedding_dims'])
             elif method == "t-SNE":
-                reducer = TSNE(n_components=3, random_state=42)
+                reducer = TSNE(n_components=config['visualization']['embedding_dims'], random_state=42)
             else:
                 raise ValueError(f"Unknown reduction method: {method}")
                 
             reduced_embeddings = reducer.fit_transform(embeddings_sample)
-            
-            fig = plt.figure(figsize=(10, 8))
-            ax = fig.add_subplot(111, projection='3d')
-            scatter = ax.scatter(
-                reduced_embeddings[:, 0],
-                reduced_embeddings[:, 1],
-                reduced_embeddings[:, 2],
-                alpha=0.5,
-                c=range(len(reduced_embeddings)),
-                cmap='viridis'
-            )
-            plt.colorbar(scatter)
-            ax.set_title(f'3D {method} Projection of Embeddings')
+
+            if config['visualization']['embedding_dims'] == 3:
+                fig = plt.figure(figsize=(10, 8))
+                ax = fig.add_subplot(111, projection='3d')
+                scatter = ax.scatter(
+                    reduced_embeddings[:, 0],
+                    reduced_embeddings[:, 1],
+                    reduced_embeddings[:, 2],
+                    alpha=0.5,
+                    c=range(len(reduced_embeddings)),
+                    cmap='viridis'
+                )
+                plt.colorbar(scatter)
+                ax.set_title(f'3D {method} Projection of Embeddings')
+            else:
+                plt.figure(figsize=(10, 8))
+                plt.scatter(
+                    reduced_embeddings[:, 0],
+                    reduced_embeddings[:, 1],
+                    alpha=0.5,
+                    c=range(len(reduced_embeddings)),
+                    cmap='viridis'
+                )
+                plt.colorbar()
+                plt.title(f'2D {method} Projection of Embeddings')
+
             plt.savefig(os.path.join(save_dir, f"{method}_embeddings.png"))
             plt.close()
         except Exception as e:
             logging.error(f"Error plotting embeddings: {str(e)}")
 
+def ensure_directories(config: Dict[str, Any]) -> None:
+    os.makedirs(os.path.dirname(config['tokenizer']['save_path']), exist_ok=True)
+    os.makedirs(config['logging']['save_dir'], exist_ok=True)
+    os.makedirs(config['checkpointing']['save_dir'], exist_ok=True)
+    os.makedirs(config['visualization']['plot_dir'], exist_ok=True)
+
+def tokenize_text(text: str, tokenizer: Tokenizer, seq_length: int) -> List[List[int]]:
+    tokens = tokenizer.encode(text).ids
+    sequences = [tokens[i:i + seq_length] for i in range(0, len(tokens) - seq_length + 1, seq_length // 2)]
+    return sequences
+
+def tokenize_texts_in_parallel(texts: List[str], tokenizer: Tokenizer, seq_length: int, num_workers: int = 4) -> List[List[int]]:
+    with Pool(num_workers) as pool:
+        results = pool.starmap(tokenize_text, [(text, tokenizer, seq_length) for text in texts])
+    return [sequence for result in results for sequence in result]  # Flatten results
+
+def initialize_pinecone(index_name: str, api_key: str, environment: str, embedding_dimension: int):
+    pinecone.init(api_key=api_key, environment=environment)
+    if index_name not in pinecone.list_indexes():
+        pinecone.create_index(index_name, dimension=embedding_dimension)
+    index = pinecone.Index(index_name)
+    return index
+
 def main():
-    parser = argparse.ArgumentParser(description='Train transformer model')
+    parser = argparse.ArgumentParser(description='Train transformer-based embeddings model')
     parser.add_argument('--config', type=str, default='config.yaml', help='Path to config file')
-    parser.add_argument('--LuminaLM\Data', type=str, help='Path to local data directory')
-    parser.add_argument('--LuminaLM_text_tokens.json', type=str, required=True, help='Path to tokenizer file')
+    parser.add_argument('--local_data_dir', type=str, help='Path to local data directory')
     parser.add_argument('--checkpoint', type=str, help='Path to checkpoint to resume training')
+
     args = parser.parse_args()
 
     # Initialize configuration
     config_manager = ConfigManager(args.config)
     config = config_manager.config
 
+    # Setup logging
+    setup_logging(config)
+
+    # Ensure directories exist
+    ensure_directories(config)
+
     # Set up distributed training if available
     if torch.cuda.device_count() > 1:
-        dist.init_process_group(backend='nccl')
+        dist.init_process_group(backend=config['distributed']['backend'])
         local_rank = dist.get_rank()
         torch.cuda.set_device(local_rank)
         device = torch.device(f"cuda:{local_rank}")
@@ -407,21 +536,14 @@ def main():
         local_data = data_manager.load_local_data(args.local_data_dir) if args.local_data_dir else []
 
         # Initialize model and tokenizer
-        model, tokenizer = model_manager.initialize_model(args.tokenizer_path)
+        model, tokenizer = model_manager.initialize_model(config)
 
         # Prepare datasets
         def prepare_datasets(texts, tokenizer, config):
-            # Tokenize all texts
+            # Tokenize all texts in parallel
             logging.info("Tokenizing datasets...")
-            tokenized_data = []
-            for text in tqdm(texts, desc="Tokenizing"):
-                tokens = tokenizer.encode(text).ids
-                # Create sequences of fixed length with overlap
-                seq_length = config['model']['src_seq_len']
-                for i in range(0, len(tokens) - seq_length + 1, seq_length // 2):
-                    sequence = tokens[i:i + seq_length]
-                    if len(sequence) == seq_length:
-                        tokenized_data.append(sequence)
+            seq_length = config['model']['src_seq_len']
+            tokenized_data = tokenize_texts_in_parallel(texts, tokenizer, seq_length, num_workers=4)
 
             # Create dataset splits
             total_size = len(tokenized_data)
@@ -477,11 +599,14 @@ def main():
         optimizer = torch.optim.AdamW(
             model.parameters(),
             lr=config['model']['learning_rate'],
-            weight_decay=0.01
+            weight_decay=config['training'].get('weight_decay', 0.01)
         )
         criterion = nn.CrossEntropyLoss()
         trainer = Trainer(config, model, device)
         
+        # Learning rate scheduler
+        scheduler = CosineAnnealingLR(optimizer, T_max=config['model']['epochs'])
+
         # Load checkpoint if specified
         start_epoch = 0
         if args.checkpoint:
@@ -505,7 +630,7 @@ def main():
             
             # Training phase
             train_loss, train_accuracy, train_perplexity = trainer.train_epoch(
-                train_loader, optimizer, criterion
+                train_loader, val_loader, optimizer, criterion, scheduler, epoch
             )
             
             # Validation phase
@@ -545,17 +670,28 @@ def main():
                     logging.info("Early stopping triggered")
                     break
 
-        # Generate and visualize embeddings
+        # Save tokenizer after training
+        model_manager.save_tokenizer(tokenizer, config)
+
+        # Initialize Pinecone
+        pinecone_api_key = config['pinecone']['api_key']
+        pinecone_env = config['pinecone']['environment']
+        index_name = config['pinecone']['index_name']
+        embedding_dimension = config['model']['d_model']
+
+        index = initialize_pinecone(index_name, pinecone_api_key, pinecone_env, embedding_dimension)
+
+        # Generate and save embeddings
         logging.info("Generating embeddings...")
-        embedding_generator = EmbeddingGenerator(model, device)
-        embeddings = embedding_generator.generate_embeddings(test_data)
+        embedding_generator = EmbeddingGenerator(model, device, index)
+        embeddings = embedding_generator.generate_embeddings([data['input_ids'] for data in test_dataset])
 
         # Create visualizations
         logging.info("Creating visualizations...")
         visualizer = Visualizer()
-        visualizer.plot_metrics(metrics)
-        visualizer.plot_embeddings_3d(embeddings, method="PCA")
-        visualizer.plot_embeddings_3d(embeddings, method="t-SNE")
+        visualizer.plot_metrics(metrics, config)
+        visualizer.plot_embeddings_3d(embeddings, method="PCA", config=config)
+        visualizer.plot_embeddings_3d(embeddings, method="t-SNE", config=config)
 
         logging.info("Training completed successfully!")
 
