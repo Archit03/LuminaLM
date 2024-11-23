@@ -1,22 +1,36 @@
 #!/bin/bash
 
+# Exit immediately if a command exits with a non-zero status.
+set -e
+
 # Variables
 CONFIG_PATH="config.yaml"
-TOKENIZER_PATH="LuminaLMtokenizer.json"
-LOCAL_DATA_DIR="/mnt/c/Users/ASUS/Desktop/LuminaLM/Data"  # Adjust this path as needed
+LOCAL_DATA_DIR="LuminaLM/Data"  # Set your local data directory here
+TOKENIZER_PATH="embeddings/tokenizer.json"
 CHECKPOINT=""  # Set this to the path of a checkpoint if resuming training
 
 # Parse command-line arguments for optional checkpoint
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        --checkpoint) CHECKPOINT="--checkpoint $2"; shift ;;
-        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+        --checkpoint)
+            CHECKPOINT="--checkpoint $2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown parameter passed: $1"
+            exit 1
+            ;;
     esac
-    shift
 done
 
 # Run tokenizer
-python tokenizer.py --config "$CONFIG_PATH" --tokenizer_path "$TOKENIZER_PATH" --local_data_dir "$LOCAL_DATA_DIR"
+python tokenizer.py \
+    --config "$CONFIG_PATH" \
+    --tokenizer_path "$TOKENIZER_PATH" \
+    --local_data_dir "$LOCAL_DATA_DIR"
 
 # Run the training script
-python train_transformer_embeddings.py --config "$CONFIG_PATH" --local_data_dir "$LOCAL_DATA_DIR" --tokenizer_path "$TOKENIZER_PATH" $CHECKPOINT
+python embeddings.py \
+    --config "$CONFIG_PATH" \
+    --local_data_dir "$LOCAL_DATA_DIR" \
+    $CHECKPOINT

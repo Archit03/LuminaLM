@@ -1,16 +1,12 @@
-torch          # PyTorch for deep learning
-transformers           # Hugging Face Transformers library
-tokenizers             # Tokenizers for handling custom tokenization
-scikit-learn            # For PCA, t-SNE, and cosine similarity
-umap-learn              # For UMAP dimensionality reduction
-matplotlib              # For plotting graphs
-numpy<2                        # For numerical operations
-pandas                  # For data handling and CSV I/O
-seaborn                # For heatmap visualizations
-tbb==2021.13.1                 # Threading Building Blocks (Intel TBB)
-psutil  
-streamlit
-datasets
-pinecone-client
-python-dotenv
-
+torch>=1.8.0
+torchvision>=0.9.0
+torchaudio>=0.8.0
+tokenizers>=0.10.0
+datasets>=1.6.0
+numpy>=1.19.0
+scikit-learn>=0.24.0
+matplotlib>=3.3.0
+tqdm>=4.50.0
+pyyaml>=5.3.0
+pinecone-client>=2.0.0
+torch-xla  # Only if using TPU

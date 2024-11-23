@@ -1,29 +1,43 @@
+import os
+import gc
+import json
+import yaml
+import argparse
+import logging
 import torch
 import torch.nn as nn
 import torch.distributed as dist
+import torch.nn.utils.rnn as rnn_utils
+from torch.utils.data import DataLoader, Dataset
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch_xla.core import xla_model
+from torch_xla.utils.utils import tpu_available
 from tokenizers import Tokenizer
-import model
+from datetime import datetime
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from tqdm import tqdm
-import os
-import gc
-import json
-import logging
-import argparse
-from datetime import datetime
-from torch.utils.data import DataLoader, Dataset, random_split
-import torch.nn.utils.rnn as rnn_utils
 from typing import List, Dict, Any, Optional, Tuple
-import yaml
 from multiprocessing import Pool
-from torch.optim.lr_scheduler import CosineAnnealingLR
 import pinecone  # Ensure pinecone-client is installed
 
-# Setup logging
+import model  # Assuming model.py is in the same directory or accessible in PYTHONPATH
+
+def initialize_device(config: Dict[str, Any]):
+    """Initialize the appropriate device based on the configuration."""
+    if config['device']['type'] == "tpu" or (config['device']['type'] == "auto" and tpu_available()):
+        logging.info("Using TPU as the training device.")
+        device = xla_model.xla_device()
+    elif config['device']['type'] == "gpu" or (config['device']['type'] == "auto" and torch.cuda.is_available()):
+        logging.info("Using GPU as the training device.")
+        device = torch.device("cuda")
+    else:
+        logging.info("Using CPU as the training device.")
+        device = torch.device("cpu")
+    return device
+
 def setup_logging(config: Dict[str, Any]):
     log_level = getattr(logging, config['logging']['level'].upper(), logging.INFO)
     os.makedirs(config['logging']['save_dir'], exist_ok=True)
@@ -71,7 +85,9 @@ class ConfigManager:
                 'use_mixed_precision': True,
                 'gradient_accumulation_steps': 1,
                 'max_grad_norm': 1.0,
-                'warmup_steps': 1000
+                'warmup_steps': 1000,
+                'validation_steps': None,
+                'gradient_noise_std': 0.0
             },
             'tokenizer': {
                 'save_path': "embeddings/tokenizer.json",
@@ -101,6 +117,9 @@ class ConfigManager:
                 'api_key': "your_pinecone_api_key",
                 'environment': "your_pinecone_environment",
                 'index_name': "luminalm-embeddings"
+            },
+            'device': {
+                'type': 'auto'
             }
         }
 
@@ -124,29 +143,47 @@ class DataManager:
 
     def load_medical_datasets(self) -> List[str]:
         from datasets import load_dataset
-        datasets_to_load = ["pubmed_qa", "mednli", "i2b2_2010", "mimic_notes", "scicite"]
+        datasets_to_load = [
+            {"name": "pubmed_qa", "config": "pqa_artificial", "split": "train"},
+            {"name": "scicite", "split": "train"},
+            # Add others as they become accessible
+        ]
         texts = []
-        for dataset_name in datasets_to_load:
+
+        for dataset_info in datasets_to_load:
             try:
-                dataset = load_dataset(dataset_name, split="train", trust_remote_code=False)
+                name = dataset_info["name"]
+                config_name = dataset_info.get("config")
+                split = dataset_info.get("split", "train")
+                
+                if config_name:
+                    dataset = load_dataset(name, config_name, split=split)
+                else:
+                    dataset = load_dataset(name, split=split)
+                
+                # Extract the relevant column(s)
                 if "text" in dataset.column_names:
                     texts.extend(dataset["text"])
-                elif all(col in dataset.column_names for col in ["question", "context"]):
-                    texts.extend([f"{q.strip()} {c.strip()}" 
-                                for q, c in zip(dataset["question"], dataset["context"])])
                 elif "sentence" in dataset.column_names:
                     texts.extend(dataset["sentence"])
+                elif all(col in dataset.column_names for col in ["question", "context"]):
+                    texts.extend([f"{q.strip()} {c.strip()}" for q, c in zip(dataset["question"], dataset["context"])])
+                else:
+                    logging.warning(f"No relevant text columns found in {name}. Skipping dataset.")
+                
+                logging.info(f"Loaded {len(dataset)} examples from {name}")
+
             except Exception as e:
-                logging.warning(f"Error loading dataset {dataset_name}: {str(e)}")
-                continue
+                logging.error(f"Error processing dataset {name}: {str(e)}")
+
         return texts[:self.config['data']['max_samples']]
 
     def load_local_data(self, directory: str) -> List[str]:
         texts = []
         try:
             file_list = [os.path.join(directory, file) 
-                        for file in os.listdir(directory) 
-                        if file.endswith(".txt")]
+                         for file in os.listdir(directory) 
+                         if file.endswith(".txt")]
             for file_name in file_list:
                 if not os.path.exists(file_name):
                     logging.warning(f"File not found: {file_name}")
@@ -159,37 +196,32 @@ class DataManager:
         except Exception as e:
             logging.error(f"Error accessing directory {directory}: {str(e)}")
         return texts[:self.config['data']['max_samples']]
-    
+
     @staticmethod
     def collate_fn(batch):
-        input_ids = [torch.tensor(item['input_ids'], dtype=torch.long) for item in batch]
-        target_ids = [torch.tensor(item['target_ids'], dtype=torch.long) for item in batch] if 'target_ids' in batch[0] else None
+        input_ids = [item['input_ids'] for item in batch]
+        target_ids = [item['target_ids'] for item in batch]
 
         input_ids_padded = rnn_utils.pad_sequence(input_ids, batch_first=True, padding_value=0)
+        target_ids_padded = rnn_utils.pad_sequence(target_ids, batch_first=True, padding_value=0)
 
-        if target_ids:
-            target_ids_padded = rnn_utils.pad_sequence(target_ids, batch_first=True, padding_value=0)
-            return {"input_ids": input_ids_padded, "target_ids": target_ids_padded}
-
-        return {"input_ids": input_ids_padded}
+        return {"input_ids": input_ids_padded, "target_ids": target_ids_padded}
 
 class CustomDataset(Dataset):
-    def __init__(self, tokenized_inputs: List[int], tokenized_targets: Optional[List[int]] = None):
-        self.inputs = tokenized_inputs
-        self.targets = tokenized_targets
+    def __init__(self, sequences: List[List[int]]):
+        self.sequences = sequences
 
     def __len__(self) -> int:
-        return len(self.inputs)
+        return len(self.sequences)
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        input_ids = self.inputs[idx]
-        if self.targets is not None:
-            target_ids = self.targets[idx]
-            return {
-                "input_ids": torch.tensor(input_ids, dtype=torch.long),
-                "target_ids": torch.tensor(target_ids, dtype=torch.long)
-            }
-        return {"input_ids": torch.tensor(input_ids, dtype=torch.long)}
+        sequence = self.sequences[idx]
+        input_ids = torch.tensor(sequence[:-1], dtype=torch.long)
+        target_ids = torch.tensor(sequence[1:], dtype=torch.long)
+        return {
+            "input_ids": input_ids,
+            "target_ids": target_ids
+        }
 
 class ModelManager:
     def __init__(self, config: Dict[str, Any], device: torch.device):
@@ -198,9 +230,9 @@ class ModelManager:
         self.checkpoint_dir = config['checkpointing']['save_dir']
         os.makedirs(self.checkpoint_dir, exist_ok=True)
 
-    def initialize_model(self, config: Dict[str, Any]) -> Tuple[nn.Module, Tokenizer]:
+    def initialize_model(self) -> Tuple[nn.Module, Tokenizer]:
         try:
-            tokenizer_path = config['tokenizer']['load_path']
+            tokenizer_path = self.config['tokenizer']['load_path']
             tokenizer = Tokenizer.from_file(tokenizer_path)
             logging.info(f"Tokenizer loaded from {tokenizer_path}")
             src_vocab_size = tokenizer.get_vocab_size()
@@ -209,9 +241,9 @@ class ModelManager:
             transformer_model = model.build_transformer(
                 src_vocab_size,
                 tgt_vocab_size,
-                src_seq_len=config['model']['src_seq_len'],
-                tgt_seq_len=config['model']['src_seq_len'],
-                d_model=config['model']['d_model']
+                src_seq_len=self.config['model']['src_seq_len'],
+                tgt_seq_len=self.config['model']['src_seq_len'],
+                d_model=self.config['model']['d_model']
             ).to(self.device)
             
             return transformer_model, tokenizer
@@ -254,8 +286,8 @@ class ModelManager:
             logging.error(f"Error loading checkpoint: {str(e)}")
             raise
 
-    def save_tokenizer(self, tokenizer: Tokenizer, config: Dict[str, Any]) -> None:
-        save_path = config['tokenizer']['save_path']
+    def save_tokenizer(self, tokenizer: Tokenizer) -> None:
+        save_path = self.config['tokenizer']['save_path']
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         tokenizer.save(save_path)
         logging.info(f"Tokenizer saved to {save_path}")
@@ -265,9 +297,9 @@ class Trainer:
         self.config = config
         self.model = model
         self.device = device
-        self.scaler = torch.cuda.amp.GradScaler()
-        self.validation_steps = config.get('training', {}).get('validation_steps', None)
-        self.gradient_noise_std = config.get('training', {}).get('gradient_noise_std', 0.0)
+        self.scaler = torch.cuda.amp.GradScaler(enabled=config['training']['use_mixed_precision'])
+        self.validation_steps = config['training'].get('validation_steps')
+        self.gradient_noise_std = config['training'].get('gradient_noise_std', 0.0)
 
     def add_gradient_noise(self):
         for param in self.model.parameters():
@@ -294,8 +326,7 @@ class Trainer:
                 perplexity = torch.exp(loss)
 
             # Gradient scaling and accumulation
-            scaled_loss = self.scaler.scale(loss)
-            scaled_loss.backward()
+            self.scaler.scale(loss).backward()
 
             if self.gradient_noise_std > 0:
                 self.add_gradient_noise()
@@ -318,7 +349,7 @@ class Trainer:
             total_predictions += target_ids.numel()
 
             # Memory management
-            del outputs, loss, scaled_loss
+            del outputs, loss
             torch.cuda.empty_cache()
             if batch_idx % 100 == 0:
                 gc.collect()
@@ -372,9 +403,9 @@ class EmbeddingGenerator:
         
         for i in tqdm(range(0, len(input_ids_batches), batch_size), desc="Generating Embeddings"):
             batch = input_ids_batches[i:i + batch_size]
-            input_ids = torch.tensor(batch, dtype=torch.long).to(self.device)
+            input_ids = rnn_utils.pad_sequence([torch.tensor(ids, dtype=torch.long) for ids in batch], batch_first=True, padding_value=0).to(self.device)
             
-            embeddings = self.model.encode(input_ids).cpu()
+            embeddings = self.model.encode(input_ids, src_mask=None).cpu()
             all_embeddings.append(embeddings)
             
             batch_ids = [f"embedding_{i + j}" for j in range(len(embeddings))]
@@ -495,6 +526,30 @@ def initialize_pinecone(index_name: str, api_key: str, environment: str, embeddi
     index = pinecone.Index(index_name)
     return index
 
+def prepare_datasets(texts, tokenizer, config):
+    logging.info("Tokenizing datasets...")
+    seq_length = config['model']['src_seq_len']
+    tokenized_sequences = tokenize_texts_in_parallel(texts, tokenizer, seq_length, num_workers=4)
+
+    logging.info("Preparing datasets...")
+    total_size = len(tokenized_sequences)
+    indices = list(range(total_size))
+    np.random.seed(42)
+    np.random.shuffle(indices)
+
+    train_size = int(config['data']['train_split'] * total_size)
+    val_size = int(config['data']['val_split'] * total_size)
+
+    train_indices = indices[:train_size]
+    val_indices = indices[train_size:train_size+val_size]
+    test_indices = indices[train_size+val_size:]
+
+    train_sequences = [tokenized_sequences[i] for i in train_indices]
+    val_sequences = [tokenized_sequences[i] for i in val_indices]
+    test_sequences = [tokenized_sequences[i] for i in test_indices]
+
+    return train_sequences, val_sequences, test_sequences
+
 def main():
     parser = argparse.ArgumentParser(description='Train transformer-based embeddings model')
     parser.add_argument('--config', type=str, default='config.yaml', help='Path to config file')
@@ -513,15 +568,8 @@ def main():
     # Ensure directories exist
     ensure_directories(config)
 
-    # Set up distributed training if available
-    if torch.cuda.device_count() > 1:
-        dist.init_process_group(backend=config['distributed']['backend'])
-        local_rank = dist.get_rank()
-        torch.cuda.set_device(local_rank)
-        device = torch.device(f"cuda:{local_rank}")
-    else:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    # Initialize device
+    device = initialize_device(config)
     logging.info(f"Using device: {device}")
 
     try:
@@ -535,39 +583,19 @@ def main():
         medical_data = data_manager.load_medical_datasets()
         local_data = data_manager.load_local_data(args.local_data_dir) if args.local_data_dir else []
 
-        # Initialize model and tokenizer
-        model, tokenizer = model_manager.initialize_model(config)
-
-        # Prepare datasets
-        def prepare_datasets(texts, tokenizer, config):
-            # Tokenize all texts in parallel
-            logging.info("Tokenizing datasets...")
-            seq_length = config['model']['src_seq_len']
-            tokenized_data = tokenize_texts_in_parallel(texts, tokenizer, seq_length, num_workers=4)
-
-            # Create dataset splits
-            total_size = len(tokenized_data)
-            train_size = int(config['data']['train_split'] * total_size)
-            val_size = int(config['data']['val_split'] * total_size)
-            test_size = total_size - train_size - val_size
-
-            train_data, val_data, test_data = random_split(
-                tokenized_data, 
-                [train_size, val_size, test_size],
-                generator=torch.Generator().manual_seed(42)
-            )
-
-            return train_data, val_data, test_data
-
         # Combine and prepare all datasets
         all_texts = openwebtext_data + medical_data + local_data
-        train_data, val_data, test_data = prepare_datasets(all_texts, tokenizer, config)
+        train_sequences, val_sequences, test_sequences = prepare_datasets(all_texts, config['tokenizer']['load_path'], config)
+
+        # Initialize model and tokenizer
+        model, tokenizer = model_manager.initialize_model()
+
+        # Create datasets
+        train_dataset = CustomDataset(train_sequences)
+        val_dataset = CustomDataset(val_sequences)
+        test_dataset = CustomDataset(test_sequences)
 
         # Create data loaders
-        train_dataset = CustomDataset(train_data, train_data)
-        val_dataset = CustomDataset(val_data, val_data)
-        test_dataset = CustomDataset(test_data, test_data)
-
         train_loader = DataLoader(
             train_dataset,
             batch_size=config['model']['batch_size'],
@@ -671,7 +699,7 @@ def main():
                     break
 
         # Save tokenizer after training
-        model_manager.save_tokenizer(tokenizer, config)
+        model_manager.save_tokenizer(tokenizer)
 
         # Initialize Pinecone
         pinecone_api_key = config['pinecone']['api_key']
@@ -684,7 +712,7 @@ def main():
         # Generate and save embeddings
         logging.info("Generating embeddings...")
         embedding_generator = EmbeddingGenerator(model, device, index)
-        embeddings = embedding_generator.generate_embeddings([data['input_ids'] for data in test_dataset])
+        embeddings = embedding_generator.generate_embeddings([data['input_ids'].tolist() for data in test_dataset])
 
         # Create visualizations
         logging.info("Creating visualizations...")
