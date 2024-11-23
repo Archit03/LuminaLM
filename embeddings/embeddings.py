@@ -105,7 +105,7 @@ class ConfigManager:
             },
             'visualization': {
                 'plot_dir': 'plots',
-                'sample_size': 1000,
+                'sample_size': 100000,
                 'embedding_dims': 3
             },
             'distributed': {
@@ -114,8 +114,8 @@ class ConfigManager:
                 'init_method': 'env://'
             },
             'pinecone': {
-                'api_key': "your_pinecone_api_key",
-                'environment': "your_pinecone_environment",
+                'api_key': "e38016a0-15c6-4f83-aa30-9f3821a819fc",
+                'environment': "us-east-1",
                 'index_name': "luminalm-embeddings"
             },
             'device': {
@@ -297,7 +297,7 @@ class Trainer:
         self.config = config
         self.model = model
         self.device = device
-        self.scaler = torch.cuda.amp.GradScaler(enabled=config['training']['use_mixed_precision'])
+        self.scaler = torch.amp.GradScaler(enabled=config['training']['use_mixed_precision'])
         self.validation_steps = config['training'].get('validation_steps')
         self.gradient_noise_std = config['training'].get('gradient_noise_std', 0.0)
 
