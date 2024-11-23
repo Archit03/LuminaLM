@@ -20,23 +20,45 @@ class DatasetLoader:
 
     def __init__(self):
         self.datasets = [
-            {"name": "Malikeh1375/medical-question-answering-datasets", "config": None},
-            {"name": "lavita/medical-qa-datasets", "config": None},
-            {"name": "Karmukilan/Malikeh1375_medical-question-answering-datasets", "config": None},
-            {"name": "balu1235/medical_question_answering_datasets", "config": None},
-            {"name": "community-datasets/swedish_medical_ner", "config": None},
-            {"name": "bio-datasets/re-medical-annotations", "config": None},
-            {"name": "Lei-USYD/datasets_medical", "config": None},
-            {"name": "xDAN-datasets/medical_meadow_wikidoc_10k", "config": None},
-            {"name": "xDAN-datasets/medical_meadow_wikidoc_patient_information_6k", "config": None},
-            {"name": "xDAN-datasets/medical_meadow_mediqa_2k", "config": None},
-            {"name": "kd4ser/medical-question-answering-datasets", "config": None},
-            {"name": "blue-blue/medical_dataset_shards", "config": None},
-            {"name": "qiaojin/PubMedQA", "config": "pqa_artificial"},
-            {"name": "qiaojin/PubMedQA", "config": "pqa_labeled"},
-            {"name": "qiaojin/PubMedQA", "config": "pqa_unlabeled"},
-            {"name": "bigbio/scicite", "config": "scicite_bigbio_text"},
-            {"name": "ruslanmv/ai-medical-dataset", "config": None},
+            {"name": "ruslanmv/ai-medical-chatbot", "config": None},
+            {"name": "qanastek/ELRC-Medical-V2", "config": "en-bg"},
+            {"name": "qanastek/ELRC-Medical-V2", "config": "en-cs"},
+            {"name": "qanastek/ELRC-Medical-V2", "config": "en-da"},
+            {"name": "rungalileo/medical_transcription_40", "config": None},
+            {"name": "gamino/wiki_medical_terms", "config": None},
+            {"name": "medalpaca/medical_meadow_medqa", "config": None},
+            {"name": "medalpaca/medical_meadow_wikidoc_patient_information", "config": None},
+            {"name": "joey234/mmlu-medical_genetics-neg", "config": None},
+            {"name": "joey234/mmlu-medical_genetics-verbal-neg-prepend", "config": None},
+            {"name": "joey234/mmlu-medical_genetics-rule-neg", "config": None},
+            {"name": "joey234/mmlu-medical_genetics", "config": None},
+            {"name": "tchebonenko/MedicalTranscriptions", "config": None},
+            {"name": "lavita/medical-qa-shared-task-v1-toy", "config": None},
+            {"name": "lavita/medical-qa-shared-task-v1-all", "config": None},
+            {"name": "lavita/medical-qa-shared-task-v1-half", "config": None},
+            {"name": "lavita/medical-qa-shared-task-v1-toy-eval", "config": None},
+            {"name": "hari560/medical-data", "config": None},
+            {"name": "srikanthsri/medical_biological", "config": None},
+            {"name": "jayantdocplix/medical_dataset", "config": None},
+            {"name": "owkin/medical_knowledge_from_extracts", "config": None},
+            {"name": "joey234/mmlu-medical_genetics-neg-prepend-fix", "config": None},
+            {"name": "taaredikahan23/medical-llama2-1k", "config": None},
+            {"name": "keivalya/MedQuad-MedicalQnADataset", "config": None},
+            {"name": "Kabatubare/medical-alpaca", "config": None},
+            {"name": "Kabatubare/medical", "config": None},
+            {"name": "Malikeh1375/medical-question-answering-datasets", "config": "all-processed"},
+            {"name": "Malikeh1375/medical-question-answering-datasets", "config": "chatdoctor_healthcaremagic"},
+            {"name": "Malikeh1375/medical-question-answering-datasets", "config": "chatdoctor_icliniq"},
+            {"name": "lavita/medical-qa-datasets", "config": "all-processed"},
+            {"name": "lavita/medical-qa-datasets", "config": "chatdoctor-icliniq"},
+            {"name": "lavita/medical-qa-datasets", "config": "chatdoctor_healthcaremagic"},
+            {"name": "mamachang/medical-reasoning", "config": None},
+            {"name": "Mohammed-Altaf/medical-instruction-100k", "config": None},
+            {"name": "joey234/mmlu-medical_genetics-neg-prepend-verbal", "config": None},
+            {"name": "hpe-ai/medical-cases-classification-tutorial", "config": None},
+            {"name": "bhargavi909/Medical_Transcriptions_upsampled", "config": None},
+            {"name": "lamhieu/medical_medqa_dialogue_en", "config": None},
+            {"name": "bala1524/Medical-QA-Mistral7B-Finetuning", "config": None}
         ]
 
     def load_all_datasets(self) -> list:
@@ -98,10 +120,7 @@ class MedicalTokenizer:
     @staticmethod
     def _get_default_special_tokens() -> List[str]:
         """Returns the default set of special tokens for medical text processing."""
-        return [
-            "<pad>", "<unk>", "<s>", "</s>", "<cls>", "<sep>", "<mask>", "<eot>", "<bos>", "<eos>",
-            # Add additional medical-specific tokens here
-        ]
+        return ["<pad>", "<unk>", "<s>", "</s>", "<cls>", "<sep>", "<mask>", "<eot>", "<bos>", "<eos>"]
 
     def create_tokenizer(self) -> None:
         """Initializes the tokenizer with BPE and special tokens."""
@@ -110,102 +129,47 @@ class MedicalTokenizer:
         self.trainer = BpeTrainer(
             vocab_size=self.vocab_size,
             special_tokens=self.special_tokens,
-            min_frequency=2  # Minimum frequency for a token to be included
+            min_frequency=2
         )
 
-        # Add post-processor for handling special tokens
-        self.tokenizer.train_from_iterator(["dummy text for training"], self.trainer)  # Dummy training to register special tokens
-        special_tokens = [
-            ("<s>", self.tokenizer.token_to_id("<s>")),
-            ("</s>", self.tokenizer.token_to_id("</s>"))
-        ]
+        self.tokenizer.train_from_iterator(["dummy text for training"], self.trainer)
 
         self.tokenizer.post_processor = TemplateProcessing(
             single="<s> $A </s>",
             pair="<s> $A </s> $B:1 </s>:1",
-            special_tokens=special_tokens
+            special_tokens=[
+                ("<s>", self.tokenizer.token_to_id("<s>")),
+                ("</s>", self.tokenizer.token_to_id("</s>"))
+            ]
         )
 
-    def train(self, additional_directory: Optional[str] = None) -> int:
+    def train(self) -> int:
         """Trains the tokenizer and counts total tokens."""
         if not self.tokenizer:
             self.create_tokenizer()
 
-        # Load all datasets dynamically
         loader = DatasetLoader()
-        datasets = {
-            "all_datasets": loader.load_all_datasets(),
-            "additional": []
-        }
-
-        # Process additional files if provided
-        if additional_directory:
-            datasets["additional"] = self.preprocess_files(additional_directory)
-
-        # Combine all datasets
-        combined_data = datasets["all_datasets"] + datasets.get("additional", [])
-
-        if not combined_data:
-            raise ValueError("No valid training data found")
+        combined_data = loader.load_all_datasets()
 
         logger.info(f"Training tokenizer on {len(combined_data)} examples")
         self.tokenizer.train_from_iterator(combined_data, self.trainer)
 
-        # Count tokens
         total_tokens = sum(len(self.tokenizer.encode(text).ids) for text in combined_data)
         logger.info(f"Total tokens processed: {total_tokens}")
 
         return total_tokens
 
-    def preprocess_files(self, directory: str) -> List[str]:
-        """Processes files from a directory with enhanced error handling."""
-        texts = []
-        directory_path = Path(directory)
-
-        if not directory_path.exists():
-            logger.error(f"Directory {directory} does not exist")
-            return texts
-
-        for file_path in directory_path.rglob("*"):
-            try:
-                if file_path.suffix == ".csv":
-                    df = pd.read_csv(file_path)
-                    text = " ".join(df.astype(str).values.flatten())
-                    texts.append(text)
-                elif file_path.suffix == ".txt":
-                    text = file_path.read_text(encoding='utf-8')
-                    texts.append(text)
-
-                logger.info(f"Processed {file_path.name}")
-
-            except Exception as e:
-                logger.error(f"Error processing {file_path}: {str(e)}")
-                continue
-
-        return texts
-
     def save(self, path: str = "LuminaLM_text_tokens.json") -> None:
-        """Saves the tokenizer with error handling."""
-        try:
-            self.tokenizer.save(path)
-            logger.info(f"Tokenizer saved to {path}")
-        except Exception as e:
-            logger.error(f"Error saving tokenizer: {str(e)}")
-
-    @classmethod
-    def load(cls, path: str = "LuminaLM_text_tokens.json") -> 'MedicalTokenizer':
-        """Loads a saved tokenizer."""
-        instance = cls()
-        instance.tokenizer = Tokenizer.from_file(path)
-        return instance
+        """Saves the tokenizer."""
+        self.tokenizer.save(path)
+        logger.info(f"Tokenizer saved to {path}")
 
 
 def main():
     tokenizer = MedicalTokenizer(vocab_size=50000)
-    total_tokens = tokenizer.train(additional_directory="LuminaLM/Data")
+    total_tokens = tokenizer.train()
     tokenizer.save()
     logger.info(f"Tokenizer training completed. Total tokens processed: {total_tokens}")
-    print(f"Total tokens processed{total_tokens} tokens")
 
 
 if __name__ == "__main__":
