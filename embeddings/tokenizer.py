@@ -199,7 +199,10 @@ def main():
         # Only one Hugging Face dataset and one local directory
         datasets = [{"name": "rungalileo/medical_transcription_40"}, 
                    {"name": "qanastek/ELRC-Medical-V2", "config": "en-bg"},
-                   {"name": "qanastek/ELRC-Medical-V2", "config": "en-cs"}]
+                   {"name": "qanastek/ELRC-Medical-V2", "config": "en-cs"},
+                   {"name": "rungalileo/medical_transcription_40"}, 
+                   {"name" : "gamino/wiki_medical_terms"}, 
+                   {"name":"medalpaca/medical_meadow_medqa"}]
         local_data_path = r"C:\Users\ASUS\Desktop\LuminaLM\Data"
 
         tokenizer = MedicalTokenizer(local_data_path=local_data_path)
