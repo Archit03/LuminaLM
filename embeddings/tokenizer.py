@@ -182,10 +182,7 @@ class MedicalTokenizer:
 def main():
     try:
         datasets = [
-    {"name": "scibert/scibert-scivocab-uncased"},  # General scientific text
-    {"name": "medqa/medmcqa"},                    # Medical Q&A
-    {"name": "pubmed-rct/PubMed_200k_RCT"},       # Randomized Controlled Trials
-    {"name": "biomedical-blurbs/BioMedBlurb"}
+    {"name": "rungalileo/medical_transcription_40"},  # General scientific text
         ]
         local_data_paths = ["/content/LuminaLM/Data"]
 
