@@ -320,7 +320,7 @@ class Trainer:
             input_ids = batch['input_ids'].to(self.device)
             target_ids = batch['target_ids'].to(self.device)
 
-            with torch.cuda.amp.autocast(enabled=self.config['training']['use_mixed_precision']):
+            with torch.amp.autocast(enabled=self.config['training']['use_mixed_precision']):
                 outputs = self.model(input_ids, target_ids)
                 loss = criterion(outputs.view(-1, outputs.size(-1)), target_ids.view(-1))
                 perplexity = torch.exp(loss)

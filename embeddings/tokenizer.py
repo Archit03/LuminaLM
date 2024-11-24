@@ -182,15 +182,10 @@ class MedicalTokenizer:
 def main():
     try:
         datasets = [
-            {"name": "qanastek/ELRC-Medical-V2", "config": "en-bg"},
-            {"name": "qanastek/ELRC-Medical-V2", "config": "en-cs"},
-            {"name": "qanastek/ELRC-Medical-V2", "config": "en-da"},
-            {"name": "rungalileo/medical_transcription_40"},
-            {"name": "medalpaca/medical_meadow_medqa"},
-            {"name": "medalpaca/medical_meadow_wikidoc_patient_information"},
-            {"name": "joey234/mmlu-medical_genetics-neg"},
-            {"name": "joey234/mmlu-medical_genetics-verbal-neg-prepend"},
-            {"name": "lavita/medical-qa-shared-task-v1-all"}
+    {"name": "scibert/scibert-scivocab-uncased"},  # General scientific text
+    {"name": "medqa/medmcqa"},                    # Medical Q&A
+    {"name": "pubmed-rct/PubMed_200k_RCT"},       # Randomized Controlled Trials
+    {"name": "biomedical-blurbs/BioMedBlurb"}
         ]
         local_data_paths = ["/content/LuminaLM/Data"]
 
