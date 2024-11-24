@@ -75,7 +75,8 @@ class DatasetLoader:
                 name,
                 config,
                 split="train",
-                streaming=False
+                streaming=False, 
+                download_mode="force_download"  # To force re-downloading of the dataset if it already exists
             )
 
             logger.info(f"Loading dataset: {dataset_name}")
@@ -193,7 +194,7 @@ def main():
             {"name": "joey234/mmlu-medical_genetics-verbal-neg-prepend"},
             {"name": "lavita/medical-qa-shared-task-v1-all"}
         ]
-        local_data_paths = ["LuminaLM/Data"]
+        local_data_paths = ["/content/LuminaLM/Data"]
 
         tokenizer = MedicalTokenizer(local_data_paths=local_data_paths)
         tokenizer.train(datasets)
@@ -201,7 +202,6 @@ def main():
 
     except Exception as e:
         logger.error(f"Error in tokenizer training: {str(e)}")
-
 
 if __name__ == "__main__":
     main()
