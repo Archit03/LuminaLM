@@ -76,7 +76,7 @@ class DatasetLoader:
                 config,
                 split="train",
                 streaming=False, 
-                download_mode="force_download"  # To force re-downloading of the dataset if it already exists
+                download_mode="force_redownload"  # To force re-downloading of the dataset if it already exists
             )
 
             logger.info(f"Loading dataset: {dataset_name}")
