@@ -182,12 +182,10 @@ class MedicalTokenizer:
 def main():
     try:
         datasets = [
-            {"name": "ruslanmv/ai-medical-chatbot"},
             {"name": "qanastek/ELRC-Medical-V2", "config": "en-bg"},
             {"name": "qanastek/ELRC-Medical-V2", "config": "en-cs"},
             {"name": "qanastek/ELRC-Medical-V2", "config": "en-da"},
             {"name": "rungalileo/medical_transcription_40"},
-            {"name": "gamino/wiki_medical_terms"},
             {"name": "medalpaca/medical_meadow_medqa"},
             {"name": "medalpaca/medical_meadow_wikidoc_patient_information"},
             {"name": "joey234/mmlu-medical_genetics-neg"},
