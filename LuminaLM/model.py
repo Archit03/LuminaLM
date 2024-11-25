@@ -65,13 +65,14 @@ class Block(nn.Module):
         x = x + self.mlp(self.ln_2(x))
         return x
 
-# LuminaLM Configuration
+# LuminaLM Configuration 
+#504,686,592 parameters
 class LuminaLMConfig:
     block_size: int = 1024
     vocab_size: int = 50_000
-    n_layer: int = 24
+    n_layer: int = 28
     n_head: int = 16
-    n_embd: int = 768
+    n_embd: int = 1152
 
 # LuminaLM Model with Pinecone Integration
 class LuminaLM(nn.Module):
