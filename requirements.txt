@@ -12,3 +12,4 @@ pinecone-client>=2.0.0
 fsspec == 2024.10.0
 spacy
 Unidecode
+python-dotenv

@@ -6,12 +6,9 @@ import argparse
 import logging
 import torch
 import torch.nn as nn
-import torch.distributed as dist
 import torch.nn.utils.rnn as rnn_utils
 from torch.utils.data import DataLoader, Dataset
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch_xla.core import xla_model
-from torch_xla.utils.utils import tpu_available
 from tokenizers import Tokenizer
 from datetime import datetime
 from sklearn.decomposition import PCA
@@ -22,15 +19,16 @@ from tqdm import tqdm
 from typing import List, Dict, Any, Optional, Tuple
 from multiprocessing import Pool
 import pinecone  # Ensure pinecone-client is installed
+from dotenv import load_dotenv  # Import dotenv to load environment variables
 
-import model  # Assuming model.py is in the same directory or accessible in PYTHONPATH
+import model  # Ensure model.py is in the same directory or accessible in PYTHONPATH
+
+# Load environment variables from api.env
+load_dotenv('api.env')
 
 def initialize_device(config: Dict[str, Any]):
     """Initialize the appropriate device based on the configuration."""
-    if config['device']['type'] == "tpu" or (config['device']['type'] == "auto" and tpu_available()):
-        logging.info("Using TPU as the training device.")
-        device = xla_model.xla_device()
-    elif config['device']['type'] == "gpu" or (config['device']['type'] == "auto" and torch.cuda.is_available()):
+    if config['device']['type'] == "gpu" or (config['device']['type'] == "auto" and torch.cuda.is_available()):
         logging.info("Using GPU as the training device.")
         device = torch.device("cuda")
     else:
@@ -87,11 +85,13 @@ class ConfigManager:
                 'max_grad_norm': 1.0,
                 'warmup_steps': 1000,
                 'validation_steps': None,
-                'gradient_noise_std': 0.0
+                'gradient_noise_std': 0.0,
+                'weight_decay': 0.01
             },
             'tokenizer': {
-                'save_path': "embeddings/tokenizer.json",
-                'load_path': "embeddings/tokenizer.json"
+                'save_path': "C:/Users/ASUS/Desktop/LuminaLM/embeddings/tokenizer.json",
+                'load_path':"C:/Users/ASUS/Desktop/LuminaLM/embeddings/tokenizer.json"
+
             },
             'logging': {
                 'level': 'INFO',
@@ -114,19 +114,18 @@ class ConfigManager:
                 'init_method': 'env://'
             },
             'pinecone': {
-                'api_key': "e38016a0-15c6-4f83-aa30-9f3821a819fc",
+                'api_key': os.getenv("PINECONE_API_KEY"),  # Load from environment variable
                 'environment': "us-east-1",
                 'index_name': "luminalm-embeddings"
             },
             'device': {
-                'type': 'auto'
+                'type': 'auto'  # Options are 'auto', 'gpu', or 'cpu'
             }
         }
-
 class DataManager:
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], device: torch.device):
         self.config = config
-        self.device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
+        self.device = device
 
     def load_openwebtext(self) -> List[str]:
         try:
@@ -155,12 +154,12 @@ class DataManager:
                 name = dataset_info["name"]
                 config_name = dataset_info.get("config")
                 split = dataset_info.get("split", "train")
-                
+
                 if config_name:
                     dataset = load_dataset(name, config_name, split=split)
                 else:
                     dataset = load_dataset(name, split=split)
-                
+
                 # Extract the relevant column(s)
                 if "text" in dataset.column_names:
                     texts.extend(dataset["text"])
@@ -170,7 +169,7 @@ class DataManager:
                     texts.extend([f"{q.strip()} {c.strip()}" for q, c in zip(dataset["question"], dataset["context"])])
                 else:
                     logging.warning(f"No relevant text columns found in {name}. Skipping dataset.")
-                
+
                 logging.info(f"Loaded {len(dataset)} examples from {name}")
 
             except Exception as e:
@@ -181,8 +180,8 @@ class DataManager:
     def load_local_data(self, directory: str) -> List[str]:
         texts = []
         try:
-            file_list = [os.path.join(directory, file) 
-                         for file in os.listdir(directory) 
+            file_list = [os.path.join(directory, file)
+                         for file in os.listdir(directory)
                          if file.endswith(".txt")]
             for file_name in file_list:
                 if not os.path.exists(file_name):
@@ -245,7 +244,7 @@ class ModelManager:
                 tgt_seq_len=self.config['model']['src_seq_len'],
                 d_model=self.config['model']['d_model']
             ).to(self.device)
-            
+
             return transformer_model, tokenizer
         except Exception as e:
             logging.error(f"Error initializing model: {str(e)}")
@@ -297,7 +296,7 @@ class Trainer:
         self.config = config
         self.model = model
         self.device = device
-        self.scaler = torch.amp.GradScaler(enabled=config['training']['use_mixed_precision'])
+        self.scaler = torch.cuda.amp.GradScaler(enabled=config['training']['use_mixed_precision'])
         self.validation_steps = config['training'].get('validation_steps')
         self.gradient_noise_std = config['training'].get('gradient_noise_std', 0.0)
 
@@ -320,7 +319,7 @@ class Trainer:
             input_ids = batch['input_ids'].to(self.device)
             target_ids = batch['target_ids'].to(self.device)
 
-            with torch.amp.autocast(enabled=self.config['training']['use_mixed_precision']):
+            with torch.cuda.amp.autocast(enabled=self.config['training']['use_mixed_precision']):
                 outputs = self.model(input_ids, target_ids)
                 loss = criterion(outputs.view(-1, outputs.size(-1)), target_ids.view(-1))
                 perplexity = torch.exp(loss)
@@ -362,7 +361,7 @@ class Trainer:
         avg_loss = total_loss / len(train_loader)
         accuracy = correct_predictions / total_predictions
         avg_perplexity = total_perplexity / len(train_loader)
-        
+
         return avg_loss, accuracy, avg_perplexity
 
     @torch.no_grad()
@@ -375,10 +374,10 @@ class Trainer:
         for batch in tqdm(val_loader, desc="Validating"):
             input_ids = batch['input_ids'].to(self.device)
             target_ids = batch['target_ids'].to(self.device)
-            
+
             outputs = self.model(input_ids, target_ids)
             loss = criterion(outputs.view(-1, outputs.size(-1)), target_ids.view(-1))
-            
+
             total_val_loss += loss.item()
             _, predicted = torch.max(outputs, -1)
             correct_val_predictions += (predicted == target_ids).sum().item()
@@ -395,45 +394,45 @@ class EmbeddingGenerator:
         self.index = index
 
     @torch.no_grad()
-    def generate_embeddings(self, input_ids_batches: List[List[int]], 
+    def generate_embeddings(self, input_ids_batches: List[List[int]],
                             batch_size: int = 32, chunk_size: int = 1000) -> torch.Tensor:
         self.model.eval()
         all_embeddings = []
         all_ids = []
-        
+
         for i in tqdm(range(0, len(input_ids_batches), batch_size), desc="Generating Embeddings"):
             batch = input_ids_batches[i:i + batch_size]
             input_ids = rnn_utils.pad_sequence([torch.tensor(ids, dtype=torch.long) for ids in batch], batch_first=True, padding_value=0).to(self.device)
-            
+
             embeddings = self.model.encode(input_ids, src_mask=None).cpu()
             all_embeddings.append(embeddings)
-            
+
             batch_ids = [f"embedding_{i + j}" for j in range(len(embeddings))]
             all_ids.extend(batch_ids)
-            
+
             del embeddings, input_ids
             torch.cuda.empty_cache()
-            
+
             if i % 100 == 0:
                 gc.collect()
-        
+
         # Concatenate all embeddings
         all_embeddings = torch.cat(all_embeddings, dim=0)
-        
+
         # Save embeddings in chunks
         for start_idx in range(0, len(all_embeddings), chunk_size):
             end_idx = start_idx + chunk_size
             chunk_embeddings = all_embeddings[start_idx:end_idx]
             chunk_ids = all_ids[start_idx:end_idx]
             self.save_embeddings_to_pinecone(chunk_embeddings, chunk_ids)
-        
+
         logging.info("All embeddings saved to PineconeDB successfully.")
         return all_embeddings
 
     def save_embeddings_to_pinecone(self, embeddings: torch.Tensor, ids: List[str]):
         embeddings_list = embeddings.numpy().tolist()
         vectors = list(zip(ids, embeddings_list))
-        
+
         try:
             self.index.upsert(vectors)
             logging.info(f"Saved {len(vectors)} embeddings to PineconeDB.")
@@ -470,7 +469,7 @@ class Visualizer:
                 reducer = TSNE(n_components=config['visualization']['embedding_dims'], random_state=42)
             else:
                 raise ValueError(f"Unknown reduction method: {method}")
-                
+
             reduced_embeddings = reducer.fit_transform(embeddings_sample)
 
             if config['visualization']['embedding_dims'] == 3:
@@ -520,6 +519,9 @@ def tokenize_texts_in_parallel(texts: List[str], tokenizer: Tokenizer, seq_lengt
     return [sequence for result in results for sequence in result]  # Flatten results
 
 def initialize_pinecone(index_name: str, api_key: str, environment: str, embedding_dimension: int):
+    if not api_key:
+        logging.error("Pinecone API key not found. Please set it in the api.env file.")
+        exit(1)
     pinecone.init(api_key=api_key, environment=environment)
     if index_name not in pinecone.list_indexes():
         pinecone.create_index(index_name, dimension=embedding_dimension)
@@ -574,8 +576,13 @@ def main():
 
     try:
         # Initialize managers
-        data_manager = DataManager(config)
         model_manager = ModelManager(config, device)
+
+        # Initialize model and tokenizer
+        model, tokenizer = model_manager.initialize_model()
+
+        # Initialize data manager
+        data_manager = DataManager(config, device)
 
         # Load data
         logging.info("Loading datasets...")
@@ -585,10 +592,7 @@ def main():
 
         # Combine and prepare all datasets
         all_texts = openwebtext_data + medical_data + local_data
-        train_sequences, val_sequences, test_sequences = prepare_datasets(all_texts, config['tokenizer']['load_path'], config)
-
-        # Initialize model and tokenizer
-        model, tokenizer = model_manager.initialize_model()
+        train_sequences, val_sequences, test_sequences = prepare_datasets(all_texts, tokenizer, config)
 
         # Create datasets
         train_dataset = CustomDataset(train_sequences)
@@ -631,7 +635,7 @@ def main():
         )
         criterion = nn.CrossEntropyLoss()
         trainer = Trainer(config, model, device)
-        
+
         # Learning rate scheduler
         scheduler = CosineAnnealingLR(optimizer, T_max=config['model']['epochs'])
 
@@ -655,22 +659,22 @@ def main():
 
         for epoch in range(start_epoch, config['model']['epochs']):
             logging.info(f"Starting epoch {epoch + 1}/{config['model']['epochs']}")
-            
+
             # Training phase
             train_loss, train_accuracy, train_perplexity = trainer.train_epoch(
                 train_loader, val_loader, optimizer, criterion, scheduler, epoch
             )
-            
+
             # Validation phase
             val_loss, val_accuracy = trainer.validate(val_loader, criterion)
-            
+
             # Update metrics
             metrics['train_loss'].append(train_loss)
             metrics['train_accuracy'].append(train_accuracy)
             metrics['train_perplexity'].append(train_perplexity)
             metrics['val_loss'].append(val_loss)
             metrics['val_accuracy'].append(val_accuracy)
-            
+
             # Log metrics
             logging.info(
                 f"Epoch {epoch + 1} - "
@@ -680,10 +684,10 @@ def main():
                 f"Val Loss: {val_loss:.4f}, "
                 f"Val Accuracy: {val_accuracy:.4f}"
             )
-            
+
             # Save checkpoint
             model_manager.save_checkpoint(model, optimizer, epoch, train_loss)
-            
+
             # Early stopping check
             if val_loss < best_val_loss:
                 best_val_loss = val_loss

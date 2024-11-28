@@ -7,8 +7,9 @@ model:
   patience: 3
 
 tokenizer:
-  save_path: "embeddings/tokenizer.json"
-  load_path: "embeddings/tokenizer.json"
+  save_path: "C:/Users/ASUS/Desktop/LuminaLM/embeddings/tokenizer.json"
+  load_path: "C:/Users/ASUS/Desktop/LuminaLM/embeddings/tokenizer.json"
+
 
 data:
   train_split: 0.8
@@ -27,7 +28,7 @@ training:
   gradient_noise_std: 0.0  # Set >0 to add gradient noise
 
 logging:
-  level: INFO
+  level: 'INFO'
   save_dir: "logs"
   metrics_file: "metrics.json"
 
@@ -47,6 +48,9 @@ distributed:
   init_method: "env://"
 
 pinecone:
-  api_key: "e38016a0-15c6-4f83-aa30-9f3821a819fc"  # Use environment variable
-  environment: "us-east-1"  # Use environment variable
+  api_key: null  # Will be loaded from environment variable
+  environment: "us-east-1"
   index_name: "luminalm-embeddings"
+
+device:
+  type: 'auto'  # Options are 'auto', 'gpu', or 'cpu'

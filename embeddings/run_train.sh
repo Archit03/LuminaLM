@@ -6,7 +6,7 @@ set -e
 # Variables
 CONFIG_PATH="config.yaml"
 LOCAL_DATA_DIR="LuminaLM/Data"  # Set your local data directory here
-TOKENIZER_PATH="embeddings/tokenizer.json"
+TOKENIZER_PATH="./medical_tokenizer.json"
 CHECKPOINT=""  # Set this to the path of a checkpoint if resuming training
 
 # Parse command-line arguments for optional checkpoint
@@ -22,12 +22,6 @@ while [[ "$#" -gt 0 ]]; do
             ;;
     esac
 done
-
-# Run tokenizer
-python tokenizer.py \
-    --config "$CONFIG_PATH" \
-    --tokenizer_path "$TOKENIZER_PATH" \
-    --local_data_dir "$LOCAL_DATA_DIR"
 
 # Run the training script
 python embeddings.py \

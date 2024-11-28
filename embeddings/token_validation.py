@@ -172,6 +172,6 @@ def validate_tokenizer(tokenizer_path: str, config: TokenizerConfig):
 
 
 if __name__ == "__main__":
-    tokenizer_path = "LuminaLM_text_tokens.json"
+    tokenizer_path = "medical_tokenizer.json"
     config = TokenizerConfig(batch_size=32)
     validate_tokenizer(tokenizer_path, config)
