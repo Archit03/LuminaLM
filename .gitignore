@@ -2,3 +2,4 @@ LLM
 __pycache__
 llm
 luminalm
+embeddings/api.env

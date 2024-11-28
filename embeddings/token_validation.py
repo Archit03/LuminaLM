@@ -119,11 +119,12 @@ def benchmark_tokenizer(tokenizer: Tokenizer, test_cases: List[str], config: Tok
     logger.info(f"Min batch processing time: {min_time:.2f}s.")
     return metrics
 
-def save_results_to_log_file(results, file_name="tokenizer_validation_results.log"):
+def save_results_to_log_file(results, total_tokens, file_name="tokenizer_validation_results.log"):
     """Save validation results to a log file."""
     try:
         with open(file_name, "w", encoding="utf-8") as log_file:
             log_file.write("=== Tokenizer Validation Results ===\n\n")
+            log_file.write(f"Total number of tokens in the tokenizer: {total_tokens}\n\n")
             log_file.write("--- Tokenizer Performance Test ---\n")
             for result in results["performance_test"]:
                 log_file.write(f"Original Text: {result['original_text']}\n")
@@ -143,6 +144,11 @@ def save_results_to_log_file(results, file_name="tokenizer_validation_results.lo
 def validate_tokenizer(tokenizer_path: str, config: TokenizerConfig):
     """Main validation function."""
     tokenizer = load_tokenizer(tokenizer_path)
+
+    # Get the vocabulary and total number of tokens
+    vocab = tokenizer.get_vocab()
+    total_tokens = len(vocab)
+    logger.info(f"Total number of tokens in the tokenizer: {total_tokens}")
 
     # Test inputs
     test_inputs = [
@@ -168,8 +174,7 @@ def validate_tokenizer(tokenizer_path: str, config: TokenizerConfig):
     save_results_to_log_file({
         "performance_test": performance_results,
         "batch_metrics": batch_metrics
-    })
-
+    }, total_tokens)
 
 if __name__ == "__main__":
     tokenizer_path = "medical_tokenizer.json"
