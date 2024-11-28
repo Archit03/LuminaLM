@@ -99,7 +99,17 @@ class MedicalTokenizer:
             preprocessor_kwargs["custom_rules"] = custom_preprocessing_rules
         self.preprocessor = MedicalTextPreprocessor(**preprocessor_kwargs)
         self.tokenizer = Tokenizer(BPE(unk_token="<unk>"))
-        self.special_tokens = ["<pad>", "<unk>", "<s>", "</s>", "<mask>"]
+        # Added back the special medical tokens
+        self.special_tokens = [
+            "<pad>", "<unk>", "<s>", "</s>", "<mask>",
+            "<disease>", "</disease>",
+            "<symptom>", "</symptom>",
+            "<treatment>", "</treatment>",
+            "<medication>", "</medication>",
+            "<test>", "</test>",
+            "<procedure>", "</procedure>",
+            # Add any other special tokens
+        ]
 
     def _configure_tokenizer(self):
         self.tokenizer.add_special_tokens(self.special_tokens)
@@ -161,8 +171,7 @@ class MedicalTokenizer:
                                         text = entry.get("text", "") or entry.get("content", "")
                                         if text:
                                             yield self.preprocessor.preprocess(text)
-                            # Handle JSONL files
-                        elif file.endswith(".json"):
+                        elif file.endswith(".jsonl"):
                             with open(file_path, "r", encoding="utf-8") as f:
                                 for line in f:
                                     entry = json.loads(line)
@@ -223,7 +232,20 @@ class MedicalTokenizer:
     def save(self, path: str):
         self.tokenizer.save(path)
         logging.info(f"Tokenizer saved to {path}")
-
+    
+def load_tokenizer(tokenizer_path: str) -> Tokenizer:
+    """Load the tokenizer from a JSON file."""
+    try:
+        if not os.path.exists(tokenizer_path):
+            raise FileNotFoundError(f"Tokenizer file not found: {tokenizer_path}")
+        if not tokenizer_path.endswith('.json'):
+            raise ValueError("Invalid file format. Expected .json file")
+        tokenizer = Tokenizer.from_file(tokenizer_path)
+        logging.info(f"Tokenizer successfully loaded from {tokenizer_path}.")
+        return tokenizer
+    except Exception as e:
+        logging.error(f"Error loading tokenizer: {e}")
+        raise
 
 def main():
     logging.basicConfig(
