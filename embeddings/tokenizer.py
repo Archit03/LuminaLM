@@ -181,7 +181,7 @@ class EnhancedMedicalTextPreprocessor:
             MedicalDomain.NEUROLOGY: [
                 {"pattern": r"parkinson's disease", "repl": "PD"},
                 {"pattern": r"alzheimers", "repl": "AD"},
-            ]
+            ],
             # Add more domain-specific rules as needed
         }
 
@@ -397,6 +397,8 @@ class MedicalTokenizer:
                 if key in text:
                     return text[key]
             return json.dumps(text)
+        elif isinstance(text, list):
+            return " ".join(text)
         return text
 
     def _get_text_column(self, dataset):
@@ -415,15 +417,58 @@ class MedicalTokenizer:
 
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
     datasets = [
+        {"name": "ruslanmv/ai-medical-chatbot"},
+        {"name": "qanastek/ELRC-Medical-V2", "config": "en-bg"},
+        {"name": "qanastek/ELRC-Medical-V2", "config": "en-cs"},
+        {"name": "qanastek/ELRC-Medical-V2", "config": "en-da"},
+        {"name": "rungalileo/medical_transcription_40"},
+        {"name": "gamino/wiki_medical_terms"},
+        {"name": "medalpaca/medical_meadow_medqa"},
+        {"name": "medalpaca/medical_meadow_wikidoc_patient_information"},
+        {"name": "joey234/mmlu-medical_genetics-neg"},
+        {"name": "joey234/mmlu-medical_genetics-verbal-neg-prepend"},
+        {"name": "joey234/mmlu-medical_genetics-rule-neg"},
+        {"name": "joey234/mmlu-medical_genetics"},
+        {"name": "tchebonenko/MedicalTranscriptions"},
+        {"name": "lavita/medical-qa-shared-task-v1-toy"},
+        {"name": "lavita/medical-qa-shared-task-v1-all"},
+        {"name": "lavita/medical-qa-shared-task-v1-half"},
+        {"name": "lavita/medical-qa-shared-task-v1-toy-eval"},
+        {"name": "hari560/medical-data"},
+        {"name": "srikanthsri/medical_biological"},
+        {"name": "jayantdocplix/medical_dataset"},
+        {"name": "owkin/medical_knowledge_from_extracts"},
+        {"name": "joey234/mmlu-medical_genetics-neg-prepend-fix"},
+        {"name": "taaredikahan23/medical-llama2-1k"},
+        {"name": "keivalya/MedQuad-MedicalQnADataset"},
+        {"name": "Kabatubare/medical-alpaca"},
+        {"name": "Kabatubare/medical"},
+        {"name": "Malikeh1375/medical-question-answering-datasets", "config": "all-processed"},
+        {"name": "Malikeh1375/medical-question-answering-datasets", "config": "chatdoctor_healthcaremagic"},
+        {"name": "Malikeh1375/medical-question-answering-datasets", "config": "chatdoctor_icliniq"},
+        {"name": "lavita/medical-qa-datasets", "config": "all-processed"},
+        {"name": "lavita/medical-qa-datasets", "config": "chatdoctor-icliniq"},
+        {"name": "lavita/medical-qa-datasets", "config": "chatdoctor_healthcaremagic"},
+        {"name": "mamachang/medical-reasoning"},
+        {"name": "Mohammed-Altaf/medical-instruction-100k"},
+        {"name": "joey234/mmlu-medical_genetics-neg-prepend-verbal"},
+        {"name": "hpe-ai/medical-cases-classification-tutorial"},
+        {"name": "bhargavi909/Medical_Transcriptions_upsampled"},
+        {"name": "lamhieu/medical_medqa_dialogue_en"},
+        {"name": "bala1524/Medical-QA-Mistral7B-Finetuning"},
         {"name": "pubmed_qa", "config": "pqa_artificial"},
         {"name": "scicite"},
         {"name": "openwebtext"}
+
+        # Add any other datasets you wish to include
     ]
+
     local_data_path = "path_to_your_local_data"  # Update this path accordingly
 
     tokenizer = MedicalTokenizer(
-        vocab_size=50000,
+        vocab_size=50257,
         min_frequency=2,
         local_data_path=local_data_path,
         preprocessor_kwargs={
