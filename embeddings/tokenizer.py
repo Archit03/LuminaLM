@@ -1,133 +1,59 @@
+import logging
 import os
 import re
-import logging
-import json
 import traceback
-from typing import List, Dict, Any, Optional, Union
-from tqdm import tqdm
+import json
 import unidecode
+from typing import Any, Dict, List, Optional
+from enum import Enum
 
-# Expanded Tokenization and NLP Libraries
-import spacy
-from spacy.lang.en import English
+from tqdm import tqdm
+from datasets import load_dataset
 from tokenizers import Tokenizer
 from tokenizers.models import BPE, WordPiece
-from tokenizers.trainers import BpeTrainer, WordPieceTrainer
 from tokenizers.pre_tokenizers import ByteLevel
+from tokenizers.trainers import BpeTrainer, WordPieceTrainer
 from tokenizers.processors import TemplateProcessing
-from datasets import load_dataset
 
-# Expanded Medical Domains
-class MedicalDomain:
-    GENERAL = "GENERAL"
-    ONCOLOGY = "ONCOLOGY"
-    CARDIOLOGY = "CARDIOLOGY"
-    NEUROLOGY = "NEUROLOGY"
-    PEDIATRICS = "PEDIATRICS"
-    PSYCHIATRY = "PSYCHIATRY"
-    RADIOLOGY = "RADIOLOGY"
-    DERMATOLOGY = "DERMATOLOGY"
-    ENDOCRINOLOGY = "ENDOCRINOLOGY"
-    NEPHROLOGY = "NEPHROLOGY"
-    PULMONOLOGY = "PULMONOLOGY"
-    GASTROENTEROLOGY = "GASTROENTEROLOGY"
-    INFECTIOUS_DISEASE = "INFECTIOUS_DISEASE"
-    HEMATOLOGY = "HEMATOLOGY"
+import spacy
+from spacy.lang.en import English
 
-# Domain-Specific Tokens
-DOMAIN_SPECIFIC_TOKENS = {
-    MedicalDomain.GENERAL: [
-        "<disease>", "</disease>", "<symptom>", "</symptom>",
-        "<treatment>", "</treatment>", "<medication>", "</medication>"
-    ],
-    MedicalDomain.ONCOLOGY: [
-        "<tumor>", "</tumor>", "<metastasis>", "</metastasis>",
-        "<staging>", "</staging>", "<chemotherapy>", "</chemotherapy>"
-    ],
-    MedicalDomain.CARDIOLOGY: [
-        "<ECG>", "</ECG>", "<stent>", "</stent>",
-        "<cholesterol>", "</cholesterol>", "<cardiac_marker>", "</cardiac_marker>"
-    ],
-    MedicalDomain.NEUROLOGY: [
-        "<brain_region>", "</brain_region>", "<seizure>", "</seizure>",
-        "<neurodegeneration>", "</neurodegeneration>", "<cognition>", "</cognition>"
-    ],
-    MedicalDomain.PEDIATRICS: [
-        "<growth>", "</growth>", "<vaccine>", "</vaccine>",
-        "<development>", "</development>", "<pediatric_disease>", "</pediatric_disease>"
-    ],
-    MedicalDomain.PSYCHIATRY: [
-        "<mental_health>", "</mental_health>", "<anxiety>", "</anxiety>",
-        "<depression>", "</depression>", "<psychosis>", "</psychosis>"
-    ],
-    MedicalDomain.RADIOLOGY: [
-        "<xray>", "</xray>", "<MRI>", "</MRI>",
-        "<CT_scan>", "</CT_scan>", "<ultrasound>", "</ultrasound>"
-    ],
-    MedicalDomain.DERMATOLOGY: [
-        "<skin_lesion>", "</skin_lesion>", "<rash>", "</rash>",
-        "<melanoma>", "</melanoma>", "<eczema>", "</eczema>"
-    ],
-    MedicalDomain.ENDOCRINOLOGY: [
-        "<hormone>", "</hormone>", "<thyroid>", "</thyroid>",
-        "<insulin>", "</insulin>", "<diabetes>", "</diabetes>"
-    ],
-    MedicalDomain.NEPHROLOGY: [
-        "<kidney>", "</kidney>", "<dialysis>", "</dialysis>",
-        "<renal_function>", "</renal_function>", "<electrolyte>", "</electrolyte>"
-    ],
-    MedicalDomain.PULMONOLOGY: [
-        "<lung>", "</lung>", "<respiratory>", "</respiratory>",
-        "<breathing>", "</breathing>", "<pulmonary_marker>", "</pulmonary_marker>"
-    ],
-    MedicalDomain.GASTROENTEROLOGY: [
-        "<digestive_system>", "</digestive_system>", "<GI_tract>", "</GI_tract>",
-        "<intestinal_marker>", "</intestinal_marker>", "<gastric_condition>", "</gastric_condition>"
-    ],
-    MedicalDomain.INFECTIOUS_DISEASE: [
-        "<pathogen>", "</pathogen>", "<infection>", "</infection>",
-        "<immune_response>", "</immune_response>", "<viral_marker>", "</viral_marker>"
-    ],
-    MedicalDomain.HEMATOLOGY: [
-        "<blood_cell>", "</blood_cell>", "<platelet>", "</platelet>",
-        "<hemoglobin>", "</hemoglobin>", "<blood_disorder>", "</blood_disorder>"
-    ]
-}
+# Enums for various strategies and domains
+class MedicalDomain(Enum):
+    CARDIOLOGY = "cardiology"
+    NEUROLOGY = "neurology"
+    ONCOLOGY = "oncology"
 
-# Combine all special tokens from all domains
-ALL_SPECIAL_TOKENS = ["<pad>", "<unk>", "<s>", "</s>", "<mask>"]
-for tokens in DOMAIN_SPECIFIC_TOKENS.values():
-    ALL_SPECIAL_TOKENS.extend(tokens)
-# Remove duplicates
-ALL_SPECIAL_TOKENS = list(set(ALL_SPECIAL_TOKENS))
-
-class NormalizationStrategy:
-    """Enum-like class for normalization strategies"""
+class NormalizationStrategy(Enum):
+    NONE = "none"
     LEMMATIZATION = "lemmatization"
     STEMMING = "stemming"
-    NONE = "none"
 
-class TokenizationStrategy:
-    """Enum-like class for tokenization strategies"""
+class TokenizationStrategy(Enum):
     BPE = "bpe"
     WORDPIECE = "wordpiece"
 
+# Constants for domain-specific tokens (example)
+DOMAIN_SPECIFIC_TOKENS = {
+    MedicalDomain.CARDIOLOGY.value: ["<ECG>", "<ECHO>"],
+    MedicalDomain.NEUROLOGY.value: ["<EEG>", "<MRI>"],
+    MedicalDomain.ONCOLOGY.value: ["<CT>", "<PET>"],
+}
+
 class EnhancedMedicalTextPreprocessor:
-    """Advanced Medical Text Preprocessor with Enhanced Configurability"""
     def __init__(
         self,
         custom_rules: Optional[List[Dict[str, Any]]] = None,
-        min_token_length: int = 2,
-        max_token_length: int = 30,
-        normalization_strategy: str = NormalizationStrategy.LEMMATIZATION,
+        min_token_length: int = 1,
+        max_token_length: int = 100,
         use_medical_nlp: bool = True,
-        medical_domain: Optional[str] = None
+        normalization_strategy: str = NormalizationStrategy.NONE.value,
+        medical_domain: Optional[str] = None,
     ):
         self.min_token_length = min_token_length
         self.max_token_length = max_token_length
         self.normalization_strategy = normalization_strategy
-        self.medical_domain = medical_domain
-        self.rules = self._get_comprehensive_domain_rules(medical_domain) + (custom_rules or [])
+        self.rules = self._generate_rules(custom_rules, medical_domain)
         self.nlp = self._load_nlp_model(use_medical_nlp)
 
     def _load_nlp_model(self, use_medical_nlp: bool):
@@ -138,49 +64,52 @@ class EnhancedMedicalTextPreprocessor:
             if use_medical_nlp:
                 try:
                     # Attempt to load medical-specific model first
-                    return spacy.load("en_core_sci_md")
+                    nlp = spacy.load("en_core_sci_md")
                 except OSError:
                     try:
                         # Fallback to clinical model
-                        return spacy.load("en_core_sci_lg")
+                        nlp = spacy.load("en_core_sci_lg")
                     except OSError:
                         logging.warning("Medical NLP models not found. Using core English model.")
-                        return spacy.load("en_core_web_sm")
+                        nlp = spacy.load("en_core_web_sm")
             else:
-                return English()  # Minimal tokenization pipeline
+                nlp = English()  # Minimal tokenization pipeline
+            nlp.max_length = 3 * 10**7  # Set to 30 million characters
+            # Optionally disable unnecessary pipeline components
+            if self.normalization_strategy != NormalizationStrategy.LEMMATIZATION.value:
+                nlp.disable_pipes('tagger', 'parser', 'ner')
+            return nlp
         except Exception as e:
             logging.error(f"Critical NLP model loading failure: {e}")
             return None
 
-    def _get_comprehensive_domain_rules(self, medical_domain: Optional[str] = None) -> List[Dict[str, Any]]:
+    def _generate_rules(self, custom_rules: Optional[List[Dict[str, Any]]], medical_domain: Optional[str]):
         """
-        Expanded domain-specific normalization rules with more comprehensive coverage
+        Generate comprehensive regex-based rules
         """
         base_rules = [
-            # Standard medical notation normalization
-            {"pattern": r"(\d+)\s*mmHg", "repl": r"\1 mmHg"},
-            {"pattern": r"(\d+)\s*°\s*C", "repl": r"\1°C"},
-            {"pattern": r"(\d+)\s*mg/dL", "repl": r"\1 mg_per_dL"},
-
-            # Medical abbreviation standardization
-            {"pattern": r"\bBP\b", "repl": "blood_pressure"},
-            {"pattern": r"\bHR\b", "repl": "heart_rate"},
-            {"pattern": r"\bBMI\b", "repl": "body_mass_index"},
+            {"pattern": r"\d+", "repl": "<NUM>"},
+            {"pattern": r"http\S+|www\S+|https\S+", "repl": "<URL>"},
+            {"pattern": r"\b([A-Za-z])\b", "repl": ""},
+            # Remove single letters
         ]
 
-        # Specialized rules for specific domains
+        if custom_rules:
+            base_rules.extend(custom_rules)
+
+        # Example domain-specific rules
         domain_specific_rules = {
-            MedicalDomain.ONCOLOGY: [
-                {"pattern": r"stage\s*([IVAB]+)", "repl": r"stage_\1"},
-                {"pattern": r"metastatic", "repl": "advanced_cancer"},
+            MedicalDomain.CARDIOLOGY.value: [
+                {"pattern": r"electrocardiogram", "repl": "ECG"},
+                {"pattern": r"echocardiogram", "repl": "ECHO"},
             ],
-            MedicalDomain.CARDIOLOGY: [
-                {"pattern": r"coronary artery disease", "repl": "CAD"},
-                {"pattern": r"myocardial infarction", "repl": "heart_attack"},
+            MedicalDomain.NEUROLOGY.value: [
+                {"pattern": r"electroencephalogram", "repl": "EEG"},
+                {"pattern": r"magnetic resonance imaging", "repl": "MRI"},
             ],
-            MedicalDomain.NEUROLOGY: [
-                {"pattern": r"parkinson's disease", "repl": "PD"},
-                {"pattern": r"alzheimers", "repl": "AD"},
+            MedicalDomain.ONCOLOGY.value: [
+                {"pattern": r"computed tomography", "repl": "CT"},
+                {"pattern": r"positron emission tomography", "repl": "PET"},
             ],
             # Add more domain-specific rules as needed
         }
@@ -204,40 +133,49 @@ class EnhancedMedicalTextPreprocessor:
         for rule in self.rules:
             text = re.sub(rule["pattern"], rule["repl"], text, flags=re.IGNORECASE)
 
-        # Advanced text processing
-        if self.nlp:
-            doc = self.nlp(text)
+        # Split text if it's too long
+        if len(text) > self.nlp.max_length:
+            logging.warning(f"Text length {len(text)} exceeds max length {self.nlp.max_length}. Splitting text.")
+            chunks = [text[i:i + self.nlp.max_length] for i in range(0, len(text), self.nlp.max_length)]
+        else:
+            chunks = [text]
 
-            if self.normalization_strategy == NormalizationStrategy.LEMMATIZATION:
-                processed_tokens = [
-                    unidecode.unidecode(token.lemma_.lower())
-                    for token in doc
-                    if (self.min_token_length <= len(token.text) <= self.max_token_length
-                        and not token.is_punct
-                        and not token.is_space)
-                ]
-            elif self.normalization_strategy == NormalizationStrategy.STEMMING:
-                # Basic stemming using token text
-                processed_tokens = [
-                    unidecode.unidecode(token.text.lower())[:self.max_token_length]
-                    for token in doc
-                    if (self.min_token_length <= len(token.text) <= self.max_token_length
-                        and not token.is_punct
-                        and not token.is_space)
-                ]
+        processed_tokens = []
+        for chunk in chunks:
+            if self.nlp:
+                doc = self.nlp(chunk)
+
+                if self.normalization_strategy == NormalizationStrategy.LEMMATIZATION.value:
+                    tokens = [
+                        unidecode.unidecode(token.lemma_.lower())
+                        for token in doc
+                        if (self.min_token_length <= len(token.text) <= self.max_token_length
+                            and not token.is_punct
+                            and not token.is_space)
+                    ]
+                elif self.normalization_strategy == NormalizationStrategy.STEMMING.value:
+                    # Basic stemming using token text
+                    tokens = [
+                        unidecode.unidecode(token.text.lower())[:self.max_token_length]
+                        for token in doc
+                        if (self.min_token_length <= len(token.text) <= self.max_token_length
+                            and not token.is_punct
+                            and not token.is_space)
+                    ]
+                else:
+                    # No normalization
+                    tokens = [
+                        unidecode.unidecode(token.text.lower())
+                        for token in doc
+                        if (self.min_token_length <= len(token.text) <= self.max_token_length
+                            and not token.is_punct
+                            and not token.is_space)
+                    ]
+                processed_tokens.extend(tokens)
             else:
-                # No normalization
-                processed_tokens = [
-                    unidecode.unidecode(token.text.lower())
-                    for token in doc
-                    if (self.min_token_length <= len(token.text) <= self.max_token_length
-                        and not token.is_punct
-                        and not token.is_space)
-                ]
+                processed_tokens.extend(chunk.split())
 
-            return " ".join(processed_tokens)
-
-        return text
+        return " ".join(processed_tokens)
 
 class MedicalTokenizer:
     def __init__(
@@ -247,7 +185,7 @@ class MedicalTokenizer:
         custom_preprocessing_rules: Optional[List[Dict[str, Any]]] = None,
         local_data_path: str = "",
         preprocessor_kwargs: Optional[Dict[str, Any]] = None,
-        tokenization_strategy: str = TokenizationStrategy.BPE,
+        tokenization_strategy: str = TokenizationStrategy.BPE.value,
         medical_domain: Optional[str] = None
     ):
         preprocessor_kwargs = preprocessor_kwargs or {}
@@ -259,9 +197,9 @@ class MedicalTokenizer:
         )
 
         # Configurable tokenization strategy
-        if tokenization_strategy == TokenizationStrategy.BPE:
+        if tokenization_strategy == TokenizationStrategy.BPE.value:
             self.tokenizer = Tokenizer(BPE(unk_token="<unk>"))
-        elif tokenization_strategy == TokenizationStrategy.WORDPIECE:
+        elif tokenization_strategy == TokenizationStrategy.WORDPIECE.value:
             self.tokenizer = Tokenizer(WordPiece(unk_token="<unk>"))
         else:
             raise ValueError(f"Unsupported tokenization strategy: {tokenization_strategy}")
@@ -303,7 +241,7 @@ class MedicalTokenizer:
         self._configure_tokenizer()
 
         # Select appropriate trainer based on tokenization strategy
-        if self.tokenization_strategy == TokenizationStrategy.BPE:
+        if self.tokenization_strategy == TokenizationStrategy.BPE.value:
             trainer = BpeTrainer(
                 vocab_size=self.vocab_size,
                 min_frequency=self.min_frequency,
@@ -329,14 +267,18 @@ class MedicalTokenizer:
             split = dataset_info.get("split", "train")
             try:
                 logging.info(f"Loading dataset: {dataset_name}")
+                load_dataset_kwargs = {
+                    "path": dataset_name,
+                    "split": split,
+                }
                 if config_name:
-                    ds = load_dataset(
-                        dataset_name, config_name, split=split, trust_remote_code=True
-                    )
-                else:
-                    ds = load_dataset(
-                        dataset_name, split=split, trust_remote_code=True
-                    )
+                    load_dataset_kwargs["name"] = config_name
+
+                # Include 'trust_remote_code' only if specified
+                if dataset_info.get("trust_remote_code", False):
+                    load_dataset_kwargs["trust_remote_code"] = True
+
+                ds = load_dataset(**load_dataset_kwargs)
 
                 text_column = self._get_text_column(ds)
                 if not text_column:
@@ -419,10 +361,10 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     datasets = [
-        {"name": "ruslanmv/ai-medical-chatbot"},
-        {"name": "qanastek/ELRC-Medical-V2", "config": "en-bg"},
-        {"name": "qanastek/ELRC-Medical-V2", "config": "en-cs"},
-        {"name": "qanastek/ELRC-Medical-V2", "config": "en-da"},
+        {"name": "ruslanmv/ai-medical-chatbot", "trust_remote_code": True},
+        {"name": "qanastek/ELRC-Medical-V2", "config": "en-bg", "trust_remote_code": True},
+        {"name": "qanastek/ELRC-Medical-V2", "config": "en-cs", "trust_remote_code": True},
+        {"name": "qanastek/ELRC-Medical-V2", "config": "en-da", "trust_remote_code": True},
         {"name": "rungalileo/medical_transcription_40"},
         {"name": "gamino/wiki_medical_terms"},
         {"name": "medalpaca/medical_meadow_medqa"},
@@ -475,9 +417,9 @@ def main():
             "min_token_length": 2,
             "max_token_length": 40,
             "use_medical_nlp": True,
-            "normalization_strategy": NormalizationStrategy.LEMMATIZATION,
+            "normalization_strategy": NormalizationStrategy.LEMMATIZATION.value,
         },
-        tokenization_strategy=TokenizationStrategy.BPE,
+        tokenization_strategy=TokenizationStrategy.BPE.value,
         medical_domain=None  # Set to specific domain if needed
     )
     output_path = "medical_tokenizer.json"
