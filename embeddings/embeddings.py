@@ -587,7 +587,7 @@ def train_with_monitoring(
 
 class EmbeddingGenerator:
     def __init__(self, model: nn.Module, device: torch.device, index_name: str, cache_size: int = 100):
-        self.model = model
+        self.model = model.to(device)
         self.device = device
         self.index_name = index_name
         self.cache = OrderedDict()  # Cache with LRU eviction
@@ -611,11 +611,12 @@ class EmbeddingGenerator:
     def _update_cache(self, key: str, embedding: torch.Tensor):
         """Update the cache with LRU eviction."""
         if key in self.cache:
-            # Move key to end to show it was recently used
+            # Move key to the end to show it was recently used
             self.cache.move_to_end(key)
         elif len(self.cache) >= self.cache_size:
-            # Evict the least recently used item
-            self.cache.popitem(last=False)
+            # Evict the least recently used item (first item in the OrderedDict)
+            evicted_key, _ = self.cache.popitem(last=False)
+            logging.info(f"Evicted key from cache: {evicted_key}")
         self.cache[key] = embedding
 
     @torch.no_grad()
@@ -623,8 +624,16 @@ class EmbeddingGenerator:
         """Generate embedding for a single input sequence."""
         input_tensor = torch.tensor(input_ids, dtype=torch.long, device=self.device).unsqueeze(0)
         with autocast(enabled=True):
+            # Ensure that the forward pass returns embeddings
             output = self.model(input_tensor, input_tensor, return_embeddings=True)
-        return output.squeeze(0).cpu()
+        
+        if isinstance(output, tuple):
+            # If the model returns multiple items (e.g., logits, embeddings), handle appropriately
+            embedding = output[1]  # Assuming embeddings are at index 1
+        else:
+            embedding = output
+        
+        return embedding.squeeze(0).cpu()
 
     def get_embedding(self, input_ids: List[int], cache_only: bool = False) -> torch.Tensor:
         """Get embedding, either from cache or dynamically generate."""
@@ -650,13 +659,52 @@ class EmbeddingGenerator:
 
         for i in range(0, len(input_ids), batch_size):
             batch = input_ids[i:i + batch_size]
-            batch_embeddings = [self.get_embedding(ids) for ids in batch]
-            embeddings.extend(batch_embeddings)
-            ids.extend([f"embedding_{j}" for j in range(i, i + len(batch))])
+            batch_embeddings = []
 
-        # Save to Pinecone
-        save_embeddings_to_pinecone(torch.stack(embeddings), ids, self.index_name)rror(f"Error saving embeddings to Pinecone: {e}")
+            # Generate embeddings for each sequence in the batch
+            for ids in batch:
+                try:
+                    embedding = self.get_embedding(ids)
+                    batch_embeddings.append(embedding)
+                except Exception as e:
+                    logging.error(f"Error generating embedding for input_ids {ids}: {e}")
+                    continue
+
+            if batch_embeddings:
+                embeddings.extend(batch_embeddings)
+                ids.extend([f"embedding_{j}" for j in range(i, i + len(batch_embeddings))])
+
+        try:
+            # Save to Pinecone
+            if embeddings:
+                save_embeddings_to_pinecone(torch.stack(embeddings), ids, self.index_name)
+                logging.info(f"Embeddings successfully saved to Pinecone for batch of size {len(ids)}")
+            else:
+                logging.warning("No embeddings to save to Pinecone.")
+        except Exception as e:
+            logging.error(f"Error saving embeddings to Pinecone: {e}")
             raise
+
+    def save_embeddings_for_model(self, save_path: str = "pretrained_embeddings.pt"):
+        """
+        Save generated embeddings to a file to be loaded into the model's embedding layer.
+
+        Args:
+            save_path (str): The path where the embeddings should be saved.
+        """
+        logging.info(f"Saving pre-trained embeddings to {save_path}")
+
+        # Assuming that embeddings are to be saved as the full embedding matrix
+        # This should match the vocab size and embedding dimension
+        embeddings_matrix = torch.zeros(self.model.config.vocab_size, self.model.config.n_embd)
+
+        for i in range(self.model.config.vocab_size):
+            input_ids = [i]
+            embedding = self.get_embedding(input_ids)
+            embeddings_matrix[i] = embedding
+
+        torch.save(embeddings_matrix, save_path)
+        logging.info(f"Pre-trained embeddings successfully saved to {save_path}")
 
 def main() -> None:
     try:
@@ -676,6 +724,11 @@ def main() -> None:
         device = setup_device()
         model_manager = ModelManager(config, device)
         model, tokenizer = model_manager.initialize_model()
+
+        # Load pre-trained embeddings if available
+        if args.pretrained_embeddings:
+            load_pretrained_embeddings(model, args.pretrained_embeddings)
+
         data_manager = DataManager(config, device)
         data_manager.tokenizer = tokenizer
 
@@ -714,6 +767,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument('--config', type=str, default='config.yaml', help='Path to config file')
     parser.add_argument('--checkpoint', type=str, help='Path to checkpoint to resume training')
     parser.add_argument('--local_data_dir', type=str, help='Path to local data directory')
+    parser.add_argument('--pretrained_embeddings', type=str, help='Path to pre-trained embeddings file')
     return parser.parse_args()
 
 
@@ -754,7 +808,7 @@ def create_data_loader(sequences: List[List[int]], config: Dict[str, Any], devic
 
 def setup_optimizer_and_scheduler(model: nn.Module, config: Dict[str, Any]) -> Tuple[torch.optim.Optimizer, CosineAnnealingLR]:
     """Setup optimizer and learning rate scheduler."""
-    optimizer = torch.optim.AdamW(
+    optimizer = AdamW(
         model.parameters(),
         lr=config['model']['learning_rate'],
         weight_decay=config['training']['weight_decay']
@@ -802,6 +856,7 @@ def train_model(
             logging.info("Early stopping triggered.")
             break
 
+
 def generate_embeddings_and_save(model: nn.Module, sequences: List[List[int]], config: Dict[str, Any], device: torch.device) -> None:
     """Generate and save embeddings using the trained model."""
     logging.info("Generating and saving embeddings to Pinecone...")
@@ -809,8 +864,20 @@ def generate_embeddings_and_save(model: nn.Module, sequences: List[List[int]], c
     embedding_generator.save_embeddings_to_pinecone(sequences)
     logging.info("Embeddings saved successfully")
 
+
+def load_pretrained_embeddings(model: nn.Module, embeddings_path: str):
+    """Load pre-trained embeddings into the model's embedding layer."""
+    try:
+        logging.info(f"Loading pre-trained embeddings from {embeddings_path}")
+        pretrained_embeddings = torch.load(embeddings_path)
+        
+        # Assuming the embeddings are stored in a compatible format
+        model.transformer['wte'].weight.data.copy_(pretrained_embeddings)
+        logging.info("Pre-trained embeddings loaded successfully.")
+    except Exception as e:
+        logging.error(f"Failed to load pre-trained embeddings: {e}")
+        raise
+
 if __name__ == "__main__":
     main()
-
-
 
