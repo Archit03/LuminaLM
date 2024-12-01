@@ -1,735 +1,816 @@
 import os
 import gc
-import json
 import yaml
+import glob
 import argparse
 import logging
+from logging.handlers import RotatingFileHandler
+from dataclasses import dataclass
+from typing import List, Dict, Any, Tuple, Optional
 import torch
 import torch.nn as nn
 import torch.nn.utils.rnn as rnn_utils
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, IterableDataset
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.amp import autocast, GradScaler
 from tokenizers import Tokenizer
 from datetime import datetime
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
-import numpy as np
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-from typing import List, Dict, Any, Optional, Tuple
+from tqdm.auto import tqdm
 from multiprocessing import Pool
-import pinecone  # Ensure pinecone-client is installed
-from dotenv import load_dotenv  # Import dotenv to load environment variables
+import matplotlib.pyplot as plt
+import numpy as np
+from dotenv import load_dotenv
+from pathlib import Path
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+import wandb
+import threading
+from queue import Queue
+from functools import wraps  # Fixing missing import
+import model  # Importing model components from model.py
+from pineconedb import save_embeddings_to_pinecone, fetch_embeddings
+from torch.utils.tensorboard import SummaryWriter
+from rouge_score import rouge_scorer
+from nltk.translate.bleu_score import sentence_bleu
+from collections import defaultdict
 
-import model  # Ensure model.py is in the same directory or accessible in PYTHONPATH
 
-# Load environment variables from api.env
+# Load environment variables for Pinecone API key
 load_dotenv('api.env')
-
-def initialize_device(config: Dict[str, Any]):
-    """Initialize the appropriate device based on the configuration."""
-    if config['device']['type'] == "gpu" or (config['device']['type'] == "auto" and torch.cuda.is_available()):
-        logging.info("Using GPU as the training device.")
-        device = torch.device("cuda")
-    else:
-        logging.info("Using CPU as the training device.")
-        device = torch.device("cpu")
-    return device
-
-def setup_logging(config: Dict[str, Any]):
-    log_level = getattr(logging, config['logging']['level'].upper(), logging.INFO)
-    os.makedirs(config['logging']['save_dir'], exist_ok=True)
-    logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(os.path.join(config['logging']['save_dir'], 'training.log')),
-            logging.StreamHandler()
-        ]
-    )
 
 class ConfigManager:
     def __init__(self, config_path: str = "config.yaml"):
         self.config_path = config_path
         self.config = self.load_config()
+        self._validate_config()
 
     def load_config(self) -> Dict[str, Any]:
-        try:
-            with open(self.config_path, 'r') as f:
-                config = yaml.safe_load(f)
-            return config
-        except Exception as e:
-            logging.error(f"Error loading config: {str(e)}")
-            return self.get_default_config()
+        with open(self.config_path, 'r') as f:
+            return yaml.safe_load(f)
 
-    @staticmethod
-    def get_default_config() -> Dict[str, Any]:
-        return {
-            'model': {
-                'd_model': 512,
-                'src_seq_len': 512,
-                'batch_size': 128,
-                'learning_rate': 5e-5,
-                'epochs': 3,
-                'patience': 3
-            },
-            'data': {
-                'train_split': 0.8,
-                'val_split': 0.1,
-                'test_split': 0.1,
-                'max_samples': 100000
-            },
-            'training': {
-                'use_mixed_precision': True,
-                'gradient_accumulation_steps': 1,
-                'max_grad_norm': 1.0,
-                'warmup_steps': 1000,
-                'validation_steps': None,
-                'gradient_noise_std': 0.0,
-                'weight_decay': 0.01
-            },
-            'tokenizer': {
-                'save_path': "C:/Users/ASUS/Desktop/LuminaLM/embeddings/tokenizer.json",
-                'load_path':"C:/Users/ASUS/Desktop/LuminaLM/embeddings/tokenizer.json"
+    def _validate_config(self):
+        required_sections = ['model', 'data', 'tokenizer', 'logging', 'checkpointing', 'training']
+        for section in required_sections:
+            if section not in self.config:
+                raise ValueError(f"Missing required configuration section: {section}")
 
-            },
-            'logging': {
-                'level': 'INFO',
-                'save_dir': 'logs',
-                'metrics_file': 'metrics.json'
-            },
-            'checkpointing': {
-                'save_dir': 'checkpoints',
-                'save_frequency': 1,
-                'keep_best_n': 3
-            },
-            'visualization': {
-                'plot_dir': 'plots',
-                'sample_size': 100000,
-                'embedding_dims': 3
-            },
-            'distributed': {
-                'backend': 'nccl',
-                'world_size': -1,
-                'init_method': 'env://'
-            },
-            'pinecone': {
-                'api_key': os.getenv("PINECONE_API_KEY"),  # Load from environment variable
-                'environment': "us-east-1",
-                'index_name': "luminalm-embeddings"
-            },
-            'device': {
-                'type': 'auto'  # Options are 'auto', 'gpu', or 'cpu'
-            }
-        }
-class DataManager:
-    def __init__(self, config: Dict[str, Any], device: torch.device):
-        self.config = config
-        self.device = device
+def setup_logging(config: Dict[str, Any]):
+    log_dir = config['logging']['save_dir']
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, 'training.log')
+    log_level = getattr(logging, config['logging'].get('level', 'INFO').upper())
 
-    def load_openwebtext(self) -> List[str]:
-        try:
-            from datasets import load_dataset
-            dataset = load_dataset(
-                "openwebtext",
-                split=f"train[:{self.config['data']['max_samples']}]",
-                trust_remote_code=False
-            )
-            return [item['text'] for item in dataset]
-        except Exception as e:
-            logging.error(f"Error loading OpenWebText: {str(e)}")
-            return []
+    logging.basicConfig(level=log_level, filename=log_file,
+                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logging.getLogger().addHandler(logging.StreamHandler())
 
-    def load_medical_datasets(self) -> List[str]:
-        from datasets import load_dataset
-        datasets_to_load = [
-            {"name": "pubmed_qa", "config": "pqa_artificial", "split": "train"},
-            {"name": "scicite", "split": "train"},
-            # Add others as they become accessible
-        ]
-        texts = []
+# Metrics Tracker
+class MetricsTracker:
+    def __init__(self):
+        self.scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
+        self.bleu_scores = []
+        self.rouge_scores = defaultdict(list)
 
-        for dataset_info in datasets_to_load:
-            try:
-                name = dataset_info["name"]
-                config_name = dataset_info.get("config")
-                split = dataset_info.get("split", "train")
+    def update_metrics(self, reference: List[str], hypothesis: List[str]):
+        bleu = sentence_bleu([reference], hypothesis)
+        self.bleu_scores.append(bleu)
+        rouge = self.scorer.score(" ".join(reference), " ".join(hypothesis))
+        for key, value in rouge.items():
+            self.rouge_scores[key].append(value.fmeasure)
 
-                if config_name:
-                    dataset = load_dataset(name, config_name, split=split)
-                else:
-                    dataset = load_dataset(name, split=split)
+    def get_average_metrics(self) -> Dict[str, float]:
+        avg_bleu = sum(self.bleu_scores) / len(self.bleu_scores) if self.bleu_scores else 0.0
+        avg_rouge = {key: sum(values) / len(values) if values else 0.0 for key, values in self.rouge_scores.items()}
+        return {'avg_bleu': avg_bleu, **avg_rouge}
 
-                # Extract the relevant column(s)
-                if "text" in dataset.column_names:
-                    texts.extend(dataset["text"])
-                elif "sentence" in dataset.column_names:
-                    texts.extend(dataset["sentence"])
-                elif all(col in dataset.column_names for col in ["question", "context"]):
-                    texts.extend([f"{q.strip()} {c.strip()}" for q, c in zip(dataset["question"], dataset["context"])])
-                else:
-                    logging.warning(f"No relevant text columns found in {name}. Skipping dataset.")
-
-                logging.info(f"Loaded {len(dataset)} examples from {name}")
-
-            except Exception as e:
-                logging.error(f"Error processing dataset {name}: {str(e)}")
-
-        return texts[:self.config['data']['max_samples']]
-
-    def load_local_data(self, directory: str) -> List[str]:
-        texts = []
-        try:
-            file_list = [os.path.join(directory, file)
-                         for file in os.listdir(directory)
-                         if file.endswith(".txt")]
-            for file_name in file_list:
-                if not os.path.exists(file_name):
-                    logging.warning(f"File not found: {file_name}")
-                    continue
-                try:
-                    with open(file_name, "r", encoding="utf-8", errors="ignore") as f:
-                        texts.extend(f.readlines())
-                except Exception as e:
-                    logging.error(f"Error reading file {file_name}: {str(e)}")
-        except Exception as e:
-            logging.error(f"Error accessing directory {directory}: {str(e)}")
-        return texts[:self.config['data']['max_samples']]
-
-    @staticmethod
-    def collate_fn(batch):
-        input_ids = [item['input_ids'] for item in batch]
-        target_ids = [item['target_ids'] for item in batch]
-
-        input_ids_padded = rnn_utils.pad_sequence(input_ids, batch_first=True, padding_value=0)
-        target_ids_padded = rnn_utils.pad_sequence(target_ids, batch_first=True, padding_value=0)
-
-        return {"input_ids": input_ids_padded, "target_ids": target_ids_padded}
-
-class CustomDataset(Dataset):
-    def __init__(self, sequences: List[List[int]]):
-        self.sequences = sequences
-
-    def __len__(self) -> int:
-        return len(self.sequences)
-
-    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        sequence = self.sequences[idx]
-        input_ids = torch.tensor(sequence[:-1], dtype=torch.long)
-        target_ids = torch.tensor(sequence[1:], dtype=torch.long)
-        return {
-            "input_ids": input_ids,
-            "target_ids": target_ids
-        }
-
+# Model Setup
 class ModelManager:
     def __init__(self, config: Dict[str, Any], device: torch.device):
         self.config = config
         self.device = device
-        self.checkpoint_dir = config['checkpointing']['save_dir']
-        os.makedirs(self.checkpoint_dir, exist_ok=True)
 
     def initialize_model(self) -> Tuple[nn.Module, Tokenizer]:
+        """Initialize the Transformer model and tokenizer."""
         try:
             tokenizer_path = self.config['tokenizer']['load_path']
             tokenizer = Tokenizer.from_file(tokenizer_path)
             logging.info(f"Tokenizer loaded from {tokenizer_path}")
-            src_vocab_size = tokenizer.get_vocab_size()
-            tgt_vocab_size = src_vocab_size
 
-            transformer_model = model.build_transformer(
-                src_vocab_size,
-                tgt_vocab_size,
+            # Initialize the Transformer model using the build function from model.py
+            src_vocab_size = tokenizer.get_vocab_size()
+            tgt_vocab_size = src_vocab_size  # Assuming src and tgt vocab sizes are the same
+            transformer = model.build_unified_transformer(
+                src_vocab_size=src_vocab_size,
+                tgt_vocab_size=tgt_vocab_size,
                 src_seq_len=self.config['model']['src_seq_len'],
-                tgt_seq_len=self.config['model']['src_seq_len'],
+                tgt_seq_len=self.config['model']['tgt_seq_len'],
                 d_model=self.config['model']['d_model']
             ).to(self.device)
 
-            return transformer_model, tokenizer
+            return transformer, tokenizer
         except Exception as e:
-            logging.error(f"Error initializing model: {str(e)}")
+            logging.error(f"Error initializing model: {e}")
             raise
+# Security Utilities
+class SecurityUtils:
+    @staticmethod
+    def validate_input_data(texts: List[str], max_length: int = 1000000) -> None:
+        """Validate input text data for security concerns."""
+        for text in texts:
+            if len(text) > max_length:
+                raise ValueError(f"Input text exceeds maximum length of {max_length}")
+            if not text.isprintable():
+                raise ValueError("Input text contains non-printable characters")
+            SecurityUtils._check_for_suspicious_patterns(text)
+    
+    @staticmethod
+    def _check_for_suspicious_patterns(text: str) -> None:
+        suspicious_patterns = [
+            "<?php", "<%", "<script",
+            "SELECT.*FROM", "DELETE.*FROM", "DROP.*TABLE",
+            "../", "..\\", "/**/"
+        ]
+        for pattern in suspicious_patterns:
+            if pattern.lower() in text.lower():
+                raise ValueError(f"Suspicious pattern detected: {pattern}")
 
-    def save_checkpoint(self, model: nn.Module, optimizer: torch.optim.Optimizer,
-                        epoch: int, loss: float, is_best: bool = False) -> None:
-        try:
-            checkpoint_path = os.path.join(
-                self.checkpoint_dir,
-                f'checkpoint_epoch_{epoch}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pt'
-            )
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'loss': loss,
-            }, checkpoint_path)
-            logging.info(f"Checkpoint saved: {checkpoint_path}")
+# Data Validator
+class DataValidator:
+    @staticmethod
+    def validate_sequence_lengths(sequences: List[List[int]], max_length: int):
+        invalid_sequences = [i for i, seq in enumerate(sequences) if len(seq) > max_length]
+        if invalid_sequences:
+            raise ValueError(f"Found {len(invalid_sequences)} sequences exceeding max length")
 
-            if is_best:
-                best_path = os.path.join(self.checkpoint_dir, 'best_model.pt')
-                torch.save(model.state_dict(), best_path)
-                logging.info(f"Best model saved: {best_path}")
-        except Exception as e:
-            logging.error(f"Error saving checkpoint: {str(e)}")
+    @staticmethod
+    def check_data_distribution(sequences: List[List[int]]) -> Dict[str, float]:
+        lengths = [len(seq) for seq in sequences]
+        return {
+            'mean_length': np.mean(lengths),
+            'std_length': np.std(lengths),
+            'max_length': max(lengths),
+            'min_length': min(lengths)
+        }
 
-    def load_checkpoint(self, model: nn.Module, optimizer: torch.optim.Optimizer,
-                        checkpoint_path: str) -> Tuple[nn.Module, torch.optim.Optimizer, int, float]:
-        try:
-            checkpoint = torch.load(checkpoint_path)
-            model.load_state_dict(checkpoint['model_state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            epoch = checkpoint['epoch']
-            loss = checkpoint['loss']
-            return model, optimizer, epoch, loss
-        except Exception as e:
-            logging.error(f"Error loading checkpoint: {str(e)}")
-            raise
+# Validation Loop
+def validate(model: nn.Module, val_loader: DataLoader, device: torch.device) -> float:
+    model.eval()
+    total_val_loss = 0.0
+    with torch.no_grad():
+        for batch in tqdm(val_loader, desc="Validation", dynamic_ncols=True):
+            outputs = model(batch['input_ids'].to(device), batch['target_ids'].to(device))
+            total_val_loss += outputs.loss.item()
+    return total_val_loss / len(val_loader)
 
-    def save_tokenizer(self, tokenizer: Tokenizer) -> None:
-        save_path = self.config['tokenizer']['save_path']
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        tokenizer.save(save_path)
-        logging.info(f"Tokenizer saved to {save_path}")
-
-class Trainer:
-    def __init__(self, config: Dict[str, Any], model: nn.Module, device: torch.device):
-        self.config = config
-        self.model = model
+# Memory Monitor
+class MemoryMonitor:
+    def __init__(self, device: torch.device):
         self.device = device
-        self.scaler = torch.cuda.amp.GradScaler(enabled=config['training']['use_mixed_precision'])
-        self.validation_steps = config['training'].get('validation_steps')
-        self.gradient_noise_std = config['training'].get('gradient_noise_std', 0.0)
+        self.peak_memory = 0
+        self.memory_logs = []
 
-    def add_gradient_noise(self):
-        for param in self.model.parameters():
-            if param.grad is not None:
-                noise = torch.randn_like(param.grad) * self.gradient_noise_std
-                param.grad.add_(noise)
+    def log_memory(self, step: int):
+        if torch.cuda.is_available():
+            current_memory = torch.cuda.memory_allocated(self.device)
+            self.peak_memory = max(self.peak_memory, current_memory)
+            self.memory_logs.append((step, current_memory))
+            
+            # Alert if memory usage is too high (90% of available memory)
+            total_memory = torch.cuda.get_device_properties(self.device).total_memory
+            if current_memory > 0.9 * total_memory:
+                logging.warning(f"High memory usage detected: {current_memory / 1e9:.2f}GB")
 
-    def train_epoch(self, train_loader: DataLoader, val_loader: DataLoader, optimizer: torch.optim.Optimizer,
-                    criterion: nn.Module, scheduler=None, epoch_num: int = 0) -> Tuple[float, float, float]:
-        self.model.train()
-        total_loss = 0
-        correct_predictions = 0
-        total_predictions = 0
-        total_perplexity = 0
+# Data Manager for handling data loading
+class DataManager:
+    def __init__(self, config: Dict[str, Any], device: torch.device):
+        self.config = config
+        self.device = device
+        self.tokenizer: Optional[Tokenizer] = None
 
-        for batch_idx, batch in enumerate(tqdm(train_loader, desc="Training")):
-            optimizer.zero_grad()
-            input_ids = batch['input_ids'].to(self.device)
-            target_ids = batch['target_ids'].to(self.device)
+    def load_openwebtext(self) -> List[str]:
+        from datasets import load_dataset
+        dataset = load_dataset("openwebtext", split=f"train[:{self.config['data']['max_samples']}]")
+        return [item['text'] for item in dataset]
 
-            with torch.cuda.amp.autocast(enabled=self.config['training']['use_mixed_precision']):
-                outputs = self.model(input_ids, target_ids)
-                loss = criterion(outputs.view(-1, outputs.size(-1)), target_ids.view(-1))
-                perplexity = torch.exp(loss)
+    def load_medical_datasets(self) -> List[str]:
+        from datasets import load_dataset
+        medical_data = []
+        try:
+            pubmed_qa_data = load_dataset("pubmed_qa", "pqa_artificial", split="train")
+            medical_data.extend([item["question"] + " " + item["context"] for item in pubmed_qa_data])
+        except Exception as e:
+            logging.warning(f"Error loading PubMed QA dataset: {e}")
+        return medical_data[:self.config['data']['max_samples']]
 
-            # Gradient scaling and accumulation
-            self.scaler.scale(loss).backward()
+    def load_local_data(self, directory: str) -> List[str]:
+        texts = []
+        for file_name in glob.glob(os.path.join(directory, "*.txt")):
+            try:
+                with open(file_name, "r", encoding="utf-8", errors="ignore") as f:
+                    texts.extend(f.readlines())
+            except Exception as e:
+                logging.warning(f"Error reading file {file_name}: {e}")
+        return texts[:self.config['data']['max_samples']]
 
-            if self.gradient_noise_std > 0:
-                self.add_gradient_noise()
+    def load_data_parallel(self, texts: List[str], num_workers: int = 4) -> List[List[int]]:
+        chunk_size = len(texts) // num_workers
+        with Pool(num_workers) as pool:
+            chunks = [texts[i:i + chunk_size] for i in range(0, len(texts), chunk_size)]
+            results = pool.map(self._process_chunk, chunks)
+        return [item for sublist in results for item in sublist]
 
-            if (batch_idx + 1) % self.config['training']['gradient_accumulation_steps'] == 0:
-                self.scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(
-                    self.model.parameters(),
-                    self.config['training']['max_grad_norm']
+    def _process_chunk(self, texts: List[str]) -> List[List[int]]:
+        processed = []
+        for text in texts:
+            try:
+                tokens = self.tokenizer.encode(text).ids
+                if len(tokens) >= self.config['model']['src_seq_len']:
+                    processed.append(tokens[:self.config['model']['src_seq_len']])
+            except Exception as e:
+                logging.warning(f"Error processing text: {str(e)}")
+                continue
+        return processed
+
+# Async Prefetch Data Loader
+class AsyncPrefetchDataLoader:
+    def __init__(self, dataloader: DataLoader, device: torch.device, num_prefetch: int = 3):
+        self.dataloader = dataloader
+        self.device = device
+        self.num_prefetch = num_prefetch
+        self.queue = Queue(maxsize=num_prefetch)
+        self.stop_event = threading.Event()
+        self.prefetch_thread = threading.Thread(target=self._prefetch_data, daemon=True)
+        self.prefetch_thread.start()
+
+    def _prefetch_data(self):
+        try:
+            for batch in self.dataloader:
+                if self.stop_event.is_set():
+                    break
+                processed_batch = {k: v.to(self.device, non_blocking=True) 
+                                 if isinstance(v, torch.Tensor) else v 
+                                 for k, v in batch.items()}
+                self.queue.put(processed_batch)
+        except Exception as e:
+            logging.error(f"Error in prefetch thread: {e}")
+        finally:
+            self.queue.put(None)  # Signal end of data
+
+    def __iter__(self):
+        while True:
+            batch = self.queue.get()
+            if batch is None:
+                break
+            yield batch
+
+    def __del__(self):
+        self.stop_event.set()
+        if hasattr(self, 'prefetch_thread'):
+            self.prefetch_thread.join()
+
+# Model Manager for handling model initialization
+class ModelManager:
+    def __init__(self, config: Dict[str, Any], device: torch.device):
+        self.config = config
+        self.device = device
+        self.checkpoint_dir = Path(config['checkpointing']['save_dir'])
+        self.checkpoint_dir.mkdir(exist_ok=True)
+        self.scaler = GradScaler()
+
+    def initialize_model(self) -> Tuple[nn.Module, Tokenizer]:
+        """Initialize model and tokenizer with enhanced error handling"""
+        try:
+            tokenizer = Tokenizer.from_file(self.config['tokenizer']['load_path'])
+            logging.info(f"Tokenizer loaded from {self.config['tokenizer']['load_path']}")
+            
+            src_vocab_size = tokenizer.get_vocab_size()
+            model = torch.jit.script(model.build_unified_transformer(
+                src_vocab_size=src_vocab_size,
+                tgt_vocab_size=src_vocab_size,
+                src_seq_len=self.config['model']['src_seq_len'],
+                tgt_seq_len=self.config['model']['src_seq_len'],
+                d_model=self.config['model']['d_model']
+            )).to(self.device)
+
+            return model, tokenizer
+        except Exception as e:
+            logging.error(f"Error initializing model: {e}")
+            raise
+
+def handle_oom(func):
+    """Decorator to handle out-of-memory errors."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except RuntimeError as e:
+            if "out of memory" in str(e):
+                logging.error("Out of memory error detected. Clearing memory and attempting recovery...")
+                MemoryManager.clean_memory(aggressive=True)
+                optimizer = kwargs.get('optimizer')
+                if optimizer:
+                    optimizer.zero_grad()
+                return None  # Allow retry logic
+            raise e
+    return wrapper
+
+@handle_oom
+def train_model(
+    model: nn.Module,
+    train_loader: DataLoader,
+    val_loader: DataLoader,
+    optimizer: torch.optim.Optimizer,
+    scheduler: CosineAnnealingLR,
+    config: Dict[str, Any],
+    device: torch.device,
+    checkpoint_manager: CheckpointManager,
+    writer: SummaryWriter
+):
+    model.train()
+    scaler = GradScaler(enabled=config['training']['mixed_precision'])
+    best_val_loss = float('inf')
+    patience_counter = 0
+    val_frequency = config['training'].get('val_frequency', 1)  # Default: validate every epoch
+
+    for epoch in range(config['training']['epochs']):
+        logging.info(f"Starting epoch {epoch + 1}/{config['training']['epochs']}")
+        epoch_loss = 0.0
+        progress_bar = tqdm(train_loader, desc=f"Epoch {epoch + 1}", dynamic_ncols=True)
+
+        for batch_idx, batch in enumerate(progress_bar):
+            # Forward and backward pass with mixed precision
+            with autocast(enabled=config['training']['mixed_precision']):
+                outputs = model(batch['input_ids'].to(device), batch['target_ids'].to(device))
+                loss = outputs.loss / config['training']['gradient_accumulation_steps']
+
+            scaler.scale(loss).backward()
+
+            if (batch_idx + 1) % config['training']['gradient_accumulation_steps'] == 0:
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), config['training']['max_grad_norm'])
+                scaler.step(optimizer)
+                scaler.update()
+                scheduler.step()
+                optimizer.zero_grad()
+
+            epoch_loss += loss.item()
+            progress_bar.set_postfix(loss=f"{loss.item():.4f}", lr=f"{scheduler.get_last_lr()[0]:.6f}")
+
+            # Log batch loss
+            if (batch_idx + 1) % config['logging']['log_interval'] == 0:
+                writer.add_scalar('Loss/Batch', loss.item(), epoch * len(train_loader) + batch_idx)
+
+        # Average loss for the epoch
+        avg_train_loss = epoch_loss / len(train_loader)
+        writer.add_scalar('Loss/Train', avg_train_loss, epoch)
+        logging.info(f"Epoch {epoch + 1} Train Loss: {avg_train_loss:.4f}")
+
+        # Validation
+        if (epoch + 1) % val_frequency == 0:
+            val_loss = validate(model, val_loader, device)
+            writer.add_scalar('Loss/Validation', val_loss, epoch)
+            logging.info(f"Epoch {epoch + 1} Validation Loss: {val_loss:.4f}")
+
+            # Checkpoint and early stopping
+            if val_loss < best_val_loss - config['training']['early_stopping_threshold']:
+                best_val_loss = val_loss
+                patience_counter = 0
+                checkpoint_manager.save_checkpoint(model, optimizer, epoch, metrics={'val_loss': val_loss})
+                logging.info(f"Checkpoint saved for epoch {epoch + 1}")
+            else:
+                patience_counter += 1
+                if patience_counter >= config['training']['patience']:
+                    logging.info("Early stopping triggered.")
+                    break
+
+    writer.close()
+
+# Memory Management Class
+class MemoryManager:
+    @staticmethod
+    def clean_memory():
+        """Clean up memory across CPU and GPU."""
+        gc.collect()  # Trigger garbage collection
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()  # Clear CUDA cache
+            torch.cuda.synchronize()  # Ensure all operations are complete
+
+    @staticmethod
+    def log_memory_usage():
+        """Log the current and peak memory usage on the GPU."""
+        if torch.cuda.is_available():
+            allocated = torch.cuda.memory_allocated() / 1024 ** 3  # Convert to GB
+            max_allocated = torch.cuda.max_memory_allocated() / 1024 ** 3  # Peak allocated
+            reserved = torch.cuda.memory_reserved() / 1024 ** 3  # Cached memory
+            logging.info(
+                f"GPU Memory Usage: Allocated: {allocated:.2f} GB, "
+                f"Max Allocated: {max_allocated:.2f} GB, Reserved: {reserved:.2f} GB"
+            )
+        else:
+            logging.info("No GPU available to log memory usage.")
+
+    @staticmethod
+    def monitor_memory(func):
+        """Decorator to log memory usage before and after function execution."""
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
+            MemoryManager.log_memory_usage()
+            
+            result = func(*args, **kwargs)
+            
+            MemoryManager.log_memory_usage()
+            return result
+        return wrapper
+
+# Enhanced Checkpoint Management
+class CheckpointManager:
+    def __init__(self, save_dir: str, max_checkpoints: int = 3):
+        """
+        Manages saving and cleaning up model checkpoints.
+
+        Args:
+            save_dir (str): Directory to save checkpoints.
+            max_checkpoints (int): Maximum number of checkpoints to retain.
+        """
+        self.save_dir = Path(save_dir)
+        self.save_dir.mkdir(parents=True, exist_ok=True)
+        self.max_checkpoints = max_checkpoints
+        # Initialize checkpoints from existing files
+        self.checkpoints = sorted(self.save_dir.glob("*.pt"), key=os.path.getmtime)
+
+    def save_checkpoint(self, model: nn.Module, optimizer: torch.optim.Optimizer, epoch: int, loss: float, metrics: Dict[str, float]) -> None:
+        """
+        Saves a checkpoint and manages older ones.
+
+        Args:
+            model (nn.Module): The model to save.
+            optimizer (torch.optim.Optimizer): Optimizer to save.
+            epoch (int): The epoch number.
+            loss (float): Loss value.
+            metrics (Dict[str, float]): Additional metrics to save.
+        """
+        checkpoint_path = self.save_dir / f"checkpoint_epoch_{epoch}.pt"
+        checkpoint_data = {
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': loss,
+            'metrics': metrics,
+            'timestamp': datetime.now().isoformat()
+        }
+
+        try:
+            torch.save(checkpoint_data, checkpoint_path)
+            self.checkpoints.append(checkpoint_path)
+            logging.info(f"Saved checkpoint: {checkpoint_path}")
+
+            # Remove old checkpoints if exceeding the limit
+            self._cleanup_old_checkpoints()
+
+        except Exception as e:
+            logging.error(f"Failed to save checkpoint: {e}")
+            raise
+
+    def _cleanup_old_checkpoints(self) -> None:
+        """
+        Removes the oldest checkpoints if the total exceeds `max_checkpoints`.
+        """
+        while len(self.checkpoints) > self.max_checkpoints:
+            oldest_checkpoint = self.checkpoints.pop(0)
+            try:
+                oldest_checkpoint.unlink()
+                logging.info(f"Removed old checkpoint: {oldest_checkpoint}")
+            except Exception as e:
+                logging.warning(f"Failed to remove checkpoint {oldest_checkpoint}: {e}")
+
+    def load_latest_checkpoint(self, model: nn.Module, optimizer: Optional[torch.optim.Optimizer] = None):
+        """
+        Loads the latest checkpoint.
+
+        Args:
+            model (nn.Module): The model to load the state dict into.
+            optimizer (torch.optim.Optimizer, optional): The optimizer to load the state dict into.
+
+        Returns:
+            Tuple[int, Dict[str, float]]: The epoch and metrics from the checkpoint.
+        """
+        if not self.checkpoints:
+            logging.warning("No checkpoints available to load.")
+            return None, None
+
+        latest_checkpoint = self.checkpoints[-1]
+        logging.info(f"Loading checkpoint: {latest_checkpoint}")
+
+        try:
+            checkpoint_data = torch.load(latest_checkpoint)
+            model.load_state_dict(checkpoint_data['model_state_dict'])
+            if optimizer:
+                optimizer.load_state_dict(checkpoint_data['optimizer_state_dict'])
+            return checkpoint_data.get('epoch', 0), checkpoint_data.get('metrics', {})
+        except Exception as e:
+            logging.error(f"Failed to load checkpoint: {e}")
+            raise
+
+@dataclass
+class TrainingConfig:
+    epochs: int
+    weight_decay: float
+    max_grad_norm: float
+    patience: int
+    gradient_accumulation_steps: int = 1
+    mixed_precision: bool = True
+    warmup_steps: int = 1000
+    early_stopping_threshold: float = 0.01
+
+# Training loop with monitoring and gradient accumulation
+def train_with_monitoring(
+    model: nn.Module,
+    train_loader: DataLoader,
+    optimizer: torch.optim.Optimizer,
+    scheduler: CosineAnnealingLR,
+    config: TrainingConfig,
+    device: torch.device,
+    memory_monitor: MemoryMonitor,
+    checkpoint_manager: CheckpointManager
+) -> Dict[str, float]:
+    
+    model.train()
+    scaler = GradScaler(enabled=config.mixed_precision)
+    total_loss = 0.0
+    
+    # Training loop with error recovery
+    for batch_idx, batch in enumerate(tqdm(train_loader, desc="Training with Monitoring")):
+        try:
+            with autocast(enabled=config.mixed_precision):
+                outputs = model(batch['input_ids'].to(device), batch['target_ids'].to(device))
+                loss = outputs.loss / config.gradient_accumulation_steps
+            
+            # Gradient accumulation
+            scaler.scale(loss).backward()
+            
+            if (batch_idx + 1) % config.gradient_accumulation_steps == 0:
+                scaler.unscale_(optimizer)
+                grad_norm = torch.nn.utils.clip_grad_norm_(
+                    model.parameters(), config.max_grad_norm
                 )
-                self.scaler.step(optimizer)
-                self.scaler.update()
-                if scheduler:
-                    scheduler.step()
-
+                
+                # Log metrics
+                metrics = {
+                    'loss': loss.item(),
+                    'grad_norm': grad_norm,
+                    'lr': scheduler.get_last_lr()[0]
+                }
+                wandb.log(metrics)
+                
+                scaler.step(optimizer)
+                scaler.update()
+                scheduler.step()
+                optimizer.zero_grad()
+            
             total_loss += loss.item()
-            total_perplexity += perplexity.item()
-            _, predicted = torch.max(outputs, -1)
-            correct_predictions += (predicted == target_ids).sum().item()
-            total_predictions += target_ids.numel()
-
-            # Memory management
-            del outputs, loss
-            torch.cuda.empty_cache()
+            
+            # Monitor memory usage
             if batch_idx % 100 == 0:
-                gc.collect()
-
-            # Validation at regular steps
-            if self.validation_steps and batch_idx % self.validation_steps == 0 and batch_idx > 0:
-                val_loss, val_accuracy = self.validate(val_loader, criterion)
-                logging.info(f"Intermediate Validation - Loss: {val_loss:.4f}, Accuracy: {val_accuracy:.4f}")
-
-        avg_loss = total_loss / len(train_loader)
-        accuracy = correct_predictions / total_predictions
-        avg_perplexity = total_perplexity / len(train_loader)
-
-        return avg_loss, accuracy, avg_perplexity
-
-    @torch.no_grad()
-    def validate(self, val_loader: DataLoader, criterion: nn.Module) -> Tuple[float, float]:
-        self.model.eval()
-        total_val_loss = 0
-        correct_val_predictions = 0
-        total_val_predictions = 0
-
-        for batch in tqdm(val_loader, desc="Validating"):
-            input_ids = batch['input_ids'].to(self.device)
-            target_ids = batch['target_ids'].to(self.device)
-
-            outputs = self.model(input_ids, target_ids)
-            loss = criterion(outputs.view(-1, outputs.size(-1)), target_ids.view(-1))
-
-            total_val_loss += loss.item()
-            _, predicted = torch.max(outputs, -1)
-            correct_val_predictions += (predicted == target_ids).sum().item()
-            total_val_predictions += target_ids.numel()
-
-        avg_val_loss = total_val_loss / len(val_loader)
-        val_accuracy = correct_val_predictions / total_val_predictions
-        return avg_val_loss, val_accuracy
+                memory_monitor.log_memory(batch_idx)
+                
+        except RuntimeError as e:
+            if "out of memory" in str(e):
+                MemoryManager.clean_memory(aggressive=True)
+                logging.error(f"OOM error in batch {batch_idx}. Attempting recovery...")
+                optimizer.zero_grad()
+                continue
+            raise e
+    
+    return {'avg_loss': total_loss / len(train_loader)}
 
 class EmbeddingGenerator:
-    def __init__(self, model: nn.Module, device: torch.device, index):
+    def __init__(self, model: nn.Module, device: torch.device, index_name: str, cache_size: int = 100):
         self.model = model
         self.device = device
-        self.index = index
+        self.index_name = index_name
+        self.cache = OrderedDict()  # Cache with LRU eviction
+        self.cache_size = cache_size
+
+    def _save_cache_to_disk(self, file_path: str = "embedding_cache.pkl"):
+        """Save the cache to disk."""
+        with open(file_path, "wb") as f:
+            pickle.dump(self.cache, f)
+        logging.info("Embedding cache saved to disk.")
+
+    def _load_cache_from_disk(self, file_path: str = "embedding_cache.pkl"):
+        """Load the cache from disk."""
+        try:
+            with open(file_path, "rb") as f:
+                self.cache = pickle.load(f)
+            logging.info("Embedding cache loaded from disk.")
+        except FileNotFoundError:
+            logging.warning("No existing cache file found. Starting with an empty cache.")
+
+    def _update_cache(self, key: str, embedding: torch.Tensor):
+        """Update the cache with LRU eviction."""
+        if key in self.cache:
+            # Move key to end to show it was recently used
+            self.cache.move_to_end(key)
+        elif len(self.cache) >= self.cache_size:
+            # Evict the least recently used item
+            self.cache.popitem(last=False)
+        self.cache[key] = embedding
 
     @torch.no_grad()
-    def generate_embeddings(self, input_ids_batches: List[List[int]],
-                            batch_size: int = 32, chunk_size: int = 1000) -> torch.Tensor:
-        self.model.eval()
-        all_embeddings = []
-        all_ids = []
+    def _generate_embedding(self, input_ids: List[int]) -> torch.Tensor:
+        """Generate embedding for a single input sequence."""
+        input_tensor = torch.tensor(input_ids, dtype=torch.long, device=self.device).unsqueeze(0)
+        with autocast(enabled=True):
+            output = self.model(input_tensor, input_tensor, return_embeddings=True)
+        return output.squeeze(0).cpu()
 
-        for i in tqdm(range(0, len(input_ids_batches), batch_size), desc="Generating Embeddings"):
-            batch = input_ids_batches[i:i + batch_size]
-            input_ids = rnn_utils.pad_sequence([torch.tensor(ids, dtype=torch.long) for ids in batch], batch_first=True, padding_value=0).to(self.device)
+    def get_embedding(self, input_ids: List[int], cache_only: bool = False) -> torch.Tensor:
+        """Get embedding, either from cache or dynamically generate."""
+        key = str(input_ids)  # Use input sequence as a unique key
+        if key in self.cache:
+            logging.info("Embedding retrieved from cache.")
+            return self.cache[key]
 
-            embeddings = self.model.encode(input_ids, src_mask=None).cpu()
-            all_embeddings.append(embeddings)
+        if cache_only:
+            logging.error("Embedding not found in cache and `cache_only` is True.")
+            raise KeyError("Embedding not found in cache.")
 
-            batch_ids = [f"embedding_{i + j}" for j in range(len(embeddings))]
-            all_ids.extend(batch_ids)
+        # Dynamically generate embedding and update cache
+        embedding = self._generate_embedding(input_ids)
+        self._update_cache(key, embedding)
+        logging.info("Embedding generated dynamically and cached.")
+        return embedding
 
-            del embeddings, input_ids
-            torch.cuda.empty_cache()
+    def save_embeddings_to_pinecone(self, input_ids: List[List[int]], batch_size: int = 32):
+        """Generate and save embeddings to Pinecone."""
+        embeddings = []
+        ids = []
 
-            if i % 100 == 0:
-                gc.collect()
+        for i in range(0, len(input_ids), batch_size):
+            batch = input_ids[i:i + batch_size]
+            batch_embeddings = [self.get_embedding(ids) for ids in batch]
+            embeddings.extend(batch_embeddings)
+            ids.extend([f"embedding_{j}" for j in range(i, i + len(batch))])
 
-        # Concatenate all embeddings
-        all_embeddings = torch.cat(all_embeddings, dim=0)
+        # Save to Pinecone
+        save_embeddings_to_pinecone(torch.stack(embeddings), ids, self.index_name)rror(f"Error saving embeddings to Pinecone: {e}")
+            raise
 
-        # Save embeddings in chunks
-        for start_idx in range(0, len(all_embeddings), chunk_size):
-            end_idx = start_idx + chunk_size
-            chunk_embeddings = all_embeddings[start_idx:end_idx]
-            chunk_ids = all_ids[start_idx:end_idx]
-            self.save_embeddings_to_pinecone(chunk_embeddings, chunk_ids)
-
-        logging.info("All embeddings saved to PineconeDB successfully.")
-        return all_embeddings
-
-    def save_embeddings_to_pinecone(self, embeddings: torch.Tensor, ids: List[str]):
-        embeddings_list = embeddings.numpy().tolist()
-        vectors = list(zip(ids, embeddings_list))
-
-        try:
-            self.index.upsert(vectors)
-            logging.info(f"Saved {len(vectors)} embeddings to PineconeDB.")
-        except Exception as e:
-            logging.error(f"Error saving embeddings to PineconeDB: {str(e)}")
-
-class Visualizer:
-    @staticmethod
-    def plot_metrics(metrics: Dict[str, List[float]], config: Dict[str, Any]):
-        save_dir = config['visualization']['plot_dir']
-        os.makedirs(save_dir, exist_ok=True)
-        for metric_name, values in metrics.items():
-            plt.figure(figsize=(10, 6))
-            plt.plot(values, label=metric_name)
-            plt.title(f'Training {metric_name}')
-            plt.xlabel('Epochs')
-            plt.ylabel(metric_name)
-            plt.legend()
-            plt.tight_layout()
-            plt.savefig(os.path.join(save_dir, f'{metric_name}.png'))
-            plt.close()
-
-    @staticmethod
-    def plot_embeddings_3d(embeddings: torch.Tensor, method: str, config: Dict[str, Any]):
-        save_dir = config['visualization']['plot_dir']
-        os.makedirs(save_dir, exist_ok=True)
-        sample_size = min(len(embeddings), config['visualization']['sample_size'])
-        embeddings_sample = embeddings[:sample_size]
-
-        try:
-            if method == "PCA":
-                reducer = PCA(n_components=config['visualization']['embedding_dims'])
-            elif method == "t-SNE":
-                reducer = TSNE(n_components=config['visualization']['embedding_dims'], random_state=42)
-            else:
-                raise ValueError(f"Unknown reduction method: {method}")
-
-            reduced_embeddings = reducer.fit_transform(embeddings_sample)
-
-            if config['visualization']['embedding_dims'] == 3:
-                fig = plt.figure(figsize=(10, 8))
-                ax = fig.add_subplot(111, projection='3d')
-                scatter = ax.scatter(
-                    reduced_embeddings[:, 0],
-                    reduced_embeddings[:, 1],
-                    reduced_embeddings[:, 2],
-                    alpha=0.5,
-                    c=range(len(reduced_embeddings)),
-                    cmap='viridis'
-                )
-                plt.colorbar(scatter)
-                ax.set_title(f'3D {method} Projection of Embeddings')
-            else:
-                plt.figure(figsize=(10, 8))
-                plt.scatter(
-                    reduced_embeddings[:, 0],
-                    reduced_embeddings[:, 1],
-                    alpha=0.5,
-                    c=range(len(reduced_embeddings)),
-                    cmap='viridis'
-                )
-                plt.colorbar()
-                plt.title(f'2D {method} Projection of Embeddings')
-
-            plt.savefig(os.path.join(save_dir, f"{method}_embeddings.png"))
-            plt.close()
-        except Exception as e:
-            logging.error(f"Error plotting embeddings: {str(e)}")
-
-def ensure_directories(config: Dict[str, Any]) -> None:
-    os.makedirs(os.path.dirname(config['tokenizer']['save_path']), exist_ok=True)
-    os.makedirs(config['logging']['save_dir'], exist_ok=True)
-    os.makedirs(config['checkpointing']['save_dir'], exist_ok=True)
-    os.makedirs(config['visualization']['plot_dir'], exist_ok=True)
-
-def tokenize_text(text: str, tokenizer: Tokenizer, seq_length: int) -> List[List[int]]:
-    tokens = tokenizer.encode(text).ids
-    sequences = [tokens[i:i + seq_length] for i in range(0, len(tokens) - seq_length + 1, seq_length // 2)]
-    return sequences
-
-def tokenize_texts_in_parallel(texts: List[str], tokenizer: Tokenizer, seq_length: int, num_workers: int = 4) -> List[List[int]]:
-    with Pool(num_workers) as pool:
-        results = pool.starmap(tokenize_text, [(text, tokenizer, seq_length) for text in texts])
-    return [sequence for result in results for sequence in result]  # Flatten results
-
-def initialize_pinecone(index_name: str, api_key: str, environment: str, embedding_dimension: int):
-    if not api_key:
-        logging.error("Pinecone API key not found. Please set it in the api.env file.")
-        exit(1)
-    pinecone.init(api_key=api_key, environment=environment)
-    if index_name not in pinecone.list_indexes():
-        pinecone.create_index(index_name, dimension=embedding_dimension)
-    index = pinecone.Index(index_name)
-    return index
-
-def prepare_datasets(texts, tokenizer, config):
-    logging.info("Tokenizing datasets...")
-    seq_length = config['model']['src_seq_len']
-    tokenized_sequences = tokenize_texts_in_parallel(texts, tokenizer, seq_length, num_workers=4)
-
-    logging.info("Preparing datasets...")
-    total_size = len(tokenized_sequences)
-    indices = list(range(total_size))
-    np.random.seed(42)
-    np.random.shuffle(indices)
-
-    train_size = int(config['data']['train_split'] * total_size)
-    val_size = int(config['data']['val_split'] * total_size)
-
-    train_indices = indices[:train_size]
-    val_indices = indices[train_size:train_size+val_size]
-    test_indices = indices[train_size+val_size:]
-
-    train_sequences = [tokenized_sequences[i] for i in train_indices]
-    val_sequences = [tokenized_sequences[i] for i in val_indices]
-    test_sequences = [tokenized_sequences[i] for i in test_indices]
-
-    return train_sequences, val_sequences, test_sequences
-
-def main():
-    parser = argparse.ArgumentParser(description='Train transformer-based embeddings model')
-    parser.add_argument('--config', type=str, default='config.yaml', help='Path to config file')
-    parser.add_argument('--local_data_dir', type=str, help='Path to local data directory')
-    parser.add_argument('--checkpoint', type=str, help='Path to checkpoint to resume training')
-
-    args = parser.parse_args()
-
-    # Initialize configuration
-    config_manager = ConfigManager(args.config)
-    config = config_manager.config
-
-    # Setup logging
-    setup_logging(config)
-
-    # Ensure directories exist
-    ensure_directories(config)
-
-    # Initialize device
-    device = initialize_device(config)
-    logging.info(f"Using device: {device}")
-
+def main() -> None:
     try:
-        # Initialize managers
+        # Initialize wandb for experiment tracking
+        wandb.init(project="transformer-training", config="config.yaml")
+        logging.info("Initialized wandb for experiment tracking")
+
+        # Enhanced argument parsing
+        args = parse_arguments()
+
+        # Initialize configuration and logging
+        config_manager = ConfigManager(args.config)
+        config = config_manager.config
+        setup_logging(config)
+
+        # Initialize training components
+        device = setup_device()
         model_manager = ModelManager(config, device)
-
-        # Initialize model and tokenizer
         model, tokenizer = model_manager.initialize_model()
-
-        # Initialize data manager
         data_manager = DataManager(config, device)
+        data_manager.tokenizer = tokenizer
 
-        # Load data
-        logging.info("Loading datasets...")
+        # Load and process datasets
+        sequences = load_and_process_data(data_manager, args)
+
+        # Training setup
+        train_loader = create_data_loader(sequences, config, device)
+        optimizer, scheduler = setup_optimizer_and_scheduler(model, config)
+
+        # Initialize monitoring and checkpoint tools
+        memory_monitor = MemoryMonitor(device)
+        checkpoint_manager = CheckpointManager(config['checkpointing']['save_dir'], max_checkpoints=3)
+
+        # Start training loop
+        train_model(model, train_loader, optimizer, scheduler, config, device, memory_monitor, checkpoint_manager)
+
+        # Generate and save embeddings after training
+        generate_embeddings_and_save(model, sequences, config, device)
+
+    except Exception as e:
+        logging.error(f"Critical error during execution: {str(e)}")
+        raise
+    finally:
+        # Cleanup
+        wandb.finish()
+        MemoryManager.clean_memory(aggressive=True)
+
+
+def parse_arguments() -> argparse.Namespace:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description='Train hybrid transformer-based embeddings model',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument('--config', type=str, default='config.yaml', help='Path to config file')
+    parser.add_argument('--checkpoint', type=str, help='Path to checkpoint to resume training')
+    parser.add_argument('--local_data_dir', type=str, help='Path to local data directory')
+    return parser.parse_args()
+
+
+def setup_device() -> torch.device:
+    """Setup the device (CPU or GPU) to be used for training."""
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logging.info(f"Using device: {device}")
+    return device
+
+
+def load_and_process_data(data_manager: DataManager, args: argparse.Namespace) -> List[List[int]]:
+    """Load and process data from various sources."""
+    logging.info("Loading datasets...")
+    try:
         openwebtext_data = data_manager.load_openwebtext()
         medical_data = data_manager.load_medical_datasets()
         local_data = data_manager.load_local_data(args.local_data_dir) if args.local_data_dir else []
 
-        # Combine and prepare all datasets
         all_texts = openwebtext_data + medical_data + local_data
-        train_sequences, val_sequences, test_sequences = prepare_datasets(all_texts, tokenizer, config)
+        SecurityUtils.validate_input_data(all_texts)
+        sequences = data_manager.load_data_parallel(all_texts)
 
-        # Create datasets
-        train_dataset = CustomDataset(train_sequences)
-        val_dataset = CustomDataset(val_sequences)
-        test_dataset = CustomDataset(test_sequences)
-
-        # Create data loaders
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=config['model']['batch_size'],
-            shuffle=True,
-            num_workers=4,
-            pin_memory=True,
-            collate_fn=DataManager.collate_fn
-        )
-
-        val_loader = DataLoader(
-            val_dataset,
-            batch_size=config['model']['batch_size'],
-            shuffle=False,
-            num_workers=4,
-            pin_memory=True,
-            collate_fn=DataManager.collate_fn
-        )
-
-        test_loader = DataLoader(
-            test_dataset,
-            batch_size=config['model']['batch_size'],
-            shuffle=False,
-            num_workers=4,
-            pin_memory=True,
-            collate_fn=DataManager.collate_fn
-        )
-
-        # Initialize training components
-        optimizer = torch.optim.AdamW(
-            model.parameters(),
-            lr=config['model']['learning_rate'],
-            weight_decay=config['training'].get('weight_decay', 0.01)
-        )
-        criterion = nn.CrossEntropyLoss()
-        trainer = Trainer(config, model, device)
-
-        # Learning rate scheduler
-        scheduler = CosineAnnealingLR(optimizer, T_max=config['model']['epochs'])
-
-        # Load checkpoint if specified
-        start_epoch = 0
-        if args.checkpoint:
-            model, optimizer, start_epoch, _ = model_manager.load_checkpoint(
-                model, optimizer, args.checkpoint
-            )
-
-        # Training loop
-        best_val_loss = float('inf')
-        patience_counter = 0
-        metrics = {
-            'train_loss': [],
-            'train_accuracy': [],
-            'train_perplexity': [],
-            'val_loss': [],
-            'val_accuracy': []
-        }
-
-        for epoch in range(start_epoch, config['model']['epochs']):
-            logging.info(f"Starting epoch {epoch + 1}/{config['model']['epochs']}")
-
-            # Training phase
-            train_loss, train_accuracy, train_perplexity = trainer.train_epoch(
-                train_loader, val_loader, optimizer, criterion, scheduler, epoch
-            )
-
-            # Validation phase
-            val_loss, val_accuracy = trainer.validate(val_loader, criterion)
-
-            # Update metrics
-            metrics['train_loss'].append(train_loss)
-            metrics['train_accuracy'].append(train_accuracy)
-            metrics['train_perplexity'].append(train_perplexity)
-            metrics['val_loss'].append(val_loss)
-            metrics['val_accuracy'].append(val_accuracy)
-
-            # Log metrics
-            logging.info(
-                f"Epoch {epoch + 1} - "
-                f"Train Loss: {train_loss:.4f}, "
-                f"Train Accuracy: {train_accuracy:.4f}, "
-                f"Train Perplexity: {train_perplexity:.4f}, "
-                f"Val Loss: {val_loss:.4f}, "
-                f"Val Accuracy: {val_accuracy:.4f}"
-            )
-
-            # Save checkpoint
-            model_manager.save_checkpoint(model, optimizer, epoch, train_loss)
-
-            # Early stopping check
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                patience_counter = 0
-                # Save best model
-                model_manager.save_checkpoint(
-                    model, optimizer, epoch, val_loss, is_best=True
-                )
-            else:
-                patience_counter += 1
-                if patience_counter >= config['model']['patience']:
-                    logging.info("Early stopping triggered")
-                    break
-
-        # Save tokenizer after training
-        model_manager.save_tokenizer(tokenizer)
-
-        # Initialize Pinecone
-        pinecone_api_key = config['pinecone']['api_key']
-        pinecone_env = config['pinecone']['environment']
-        index_name = config['pinecone']['index_name']
-        embedding_dimension = config['model']['d_model']
-
-        index = initialize_pinecone(index_name, pinecone_api_key, pinecone_env, embedding_dimension)
-
-        # Generate and save embeddings
-        logging.info("Generating embeddings...")
-        embedding_generator = EmbeddingGenerator(model, device, index)
-        embeddings = embedding_generator.generate_embeddings([data['input_ids'].tolist() for data in test_dataset])
-
-        # Create visualizations
-        logging.info("Creating visualizations...")
-        visualizer = Visualizer()
-        visualizer.plot_metrics(metrics, config)
-        visualizer.plot_embeddings_3d(embeddings, method="PCA", config=config)
-        visualizer.plot_embeddings_3d(embeddings, method="t-SNE", config=config)
-
-        logging.info("Training completed successfully!")
-
+        # Validate sequence lengths
+        DataValidator.validate_sequence_lengths(sequences, max_length=data_manager.config['model']['src_seq_len'])
+        
+        return sequences
     except Exception as e:
-        logging.error(f"Error during training: {str(e)}")
+        logging.error(f"Error during data loading and processing: {str(e)}")
         raise
+
+
+def create_data_loader(sequences: List[List[int]], config: Dict[str, Any], device: torch.device) -> DataLoader:
+    """Create the DataLoader for training."""
+    dataset = AsyncPrefetchDataLoader(DataLoader(sequences, batch_size=config['model']['batch_size']), device)
+    logging.info("DataLoader created successfully")
+    return dataset
+
+
+def setup_optimizer_and_scheduler(model: nn.Module, config: Dict[str, Any]) -> Tuple[torch.optim.Optimizer, CosineAnnealingLR]:
+    """Setup optimizer and learning rate scheduler."""
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=config['model']['learning_rate'],
+        weight_decay=config['training']['weight_decay']
+    )
+    scheduler = CosineAnnealingLR(optimizer, T_max=config['model']['epochs'])
+    logging.info("Optimizer and scheduler initialized")
+    return optimizer, scheduler
+
+
+def train_model(
+    model: nn.Module,
+    train_loader: DataLoader,
+    optimizer: torch.optim.Optimizer,
+    scheduler: CosineAnnealingLR,
+    config: Dict[str, Any],
+    device: torch.device,
+    memory_monitor: MemoryMonitor,
+    checkpoint_manager: CheckpointManager
+) -> None:
+    """Training loop with enhanced monitoring and checkpointing."""
+    best_val_loss = float('inf')
+    patience_counter = 0
+    logging.info("Starting training loop")
+
+    for epoch in range(config['model']['epochs']):
+        logging.info(f"Starting epoch {epoch + 1}/{config['model']['epochs']}")
+        avg_loss = train_with_monitoring(
+            model, train_loader, optimizer, scheduler, TrainingConfig(**config['training']), device, memory_monitor, checkpoint_manager
+        )
+
+        logging.info(f"Epoch {epoch + 1} average loss: {avg_loss['avg_loss']}")
+        if avg_loss['avg_loss'] < best_val_loss:
+            best_val_loss = avg_loss['avg_loss']
+            patience_counter = 0
+            checkpoint_manager.save_checkpoint(
+                model, optimizer, epoch, avg_loss['avg_loss'],
+                metrics={'avg_loss': avg_loss['avg_loss']}
+            )
+            logging.info(f"Checkpoint saved for epoch {epoch + 1}")
+        else:
+            patience_counter += 1
+
+        # Early stopping
+        if patience_counter >= config['training']['patience']:
+            logging.info("Early stopping triggered.")
+            break
+
+def generate_embeddings_and_save(model: nn.Module, sequences: List[List[int]], config: Dict[str, Any], device: torch.device) -> None:
+    """Generate and save embeddings using the trained model."""
+    logging.info("Generating and saving embeddings to Pinecone...")
+    embedding_generator = EmbeddingGenerator(model, device, config['pinecone']['index_name'])
+    embedding_generator.save_embeddings_to_pinecone(sequences)
+    logging.info("Embeddings saved successfully")
 
 if __name__ == "__main__":
     main()
+
+
+

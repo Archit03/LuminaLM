@@ -1,56 +1,55 @@
 model:
-  d_model: 512
-  src_seq_len: 512
-  batch_size: 32
-  learning_rate: 5e-5
-  epochs: 5
-  patience: 3
+  d_model: 512              # Dimensionality of model embeddings
+  src_seq_len: 512          # Maximum sequence length for source inputs
+  batch_size: 32            # Initial batch size for training
+  learning_rate: 5e-5       # Learning rate for the optimizer
+  epochs: 5                 # Total number of epochs for training
+  patience: 3               # Early stopping patience for validation metrics
 
 tokenizer:
-  save_path: "C:/Users/ASUS/Desktop/LuminaLM/embeddings/tokenizer.json"
-  load_path: "C:/Users/ASUS/Desktop/LuminaLM/embeddings/tokenizer.json"
-
+  save_path: "C:/Users/ASUS/Desktop/LuminaLM/embeddings/tokenizer.json"  # Path to save tokenizer
+  load_path: "C:/Users/ASUS/Desktop/LuminaLM/embeddings/tokenizer.json"  # Path to load tokenizer
 
 data:
-  train_split: 0.8
-  val_split: 0.1
-  test_split: 0.1
-  max_samples: 100000
+  train_split: 0.8          # Fraction of data used for training
+  val_split: 0.1            # Fraction of data used for validation
+  test_split: 0.1           # Fraction of data used for testing
+  max_samples: 100000       # Maximum number of samples to load
 
 training:
-  use_mixed_precision: true
-  gradient_accumulation_steps: 4
-  max_grad_norm: 1.0
-  warmup_steps: 1000
-  weight_decay: 0.01
-  dropout: 0.1
-  validation_steps: 500  # Optional
-  gradient_noise_std: 0.0  # Set >0 to add gradient noise
+  use_mixed_precision: true # Use mixed precision for faster training and reduced memory usage
+  gradient_accumulation_steps: 4  # Number of steps to accumulate gradients
+  max_grad_norm: 1.0        # Maximum norm for gradient clipping
+  warmup_steps: 1000        # Number of warmup steps for learning rate scheduler
+  weight_decay: 0.01        # Weight decay for regularization
+  dropout: 0.1              # Dropout rate for model regularization
+  validation_steps: 500     # Number of steps between validation checks
+  gradient_noise_std: 0.0   # Add noise to gradients for robustness; set >0 to enable
 
 logging:
-  level: 'INFO'
-  save_dir: "logs"
-  metrics_file: "metrics.json"
+  level: 'INFO'             # Logging level: INFO, DEBUG, WARNING, etc.
+  save_dir: "logs"          # Directory to save logs
+  metrics_file: "metrics.json"  # File to save metrics for analysis
 
 checkpointing:
-  save_dir: "checkpoints"
-  save_frequency: 1
-  keep_best_n: 3
+  save_dir: "checkpoints"   # Directory to save model checkpoints
+  save_frequency: 1         # Save checkpoints every N epochs
+  keep_best_n: 3            # Keep only the top N best-performing checkpoints
 
 visualization:
-  plot_dir: "plots"
-  sample_size: 1000
-  embedding_dims: 3
+  plot_dir: "plots"         # Directory to save visualizations like training curves
+  sample_size: 1000         # Sample size for visualization plots
+  embedding_dims: 3         # Dimensionality for embedding visualizations (e.g., t-SNE)
 
 distributed:
-  backend: "nccl"
-  world_size: -1  # auto-detect
-  init_method: "env://"
+  backend: "nccl"           # Backend for distributed training; options are nccl, gloo, etc.
+  world_size: -1            # Auto-detect world size; set manually for multi-node setups
+  init_method: "env://"     # Initialization method for distributed training
 
 pinecone:
-  api_key: null  # Will be loaded from environment variable
-  environment: "us-east-1"
-  index_name: "luminalm-embeddings"
+  api_key: null             # API key for Pinecone; will be loaded from environment variable
+  environment: "us-east-1"  # Pinecone environment region
+  index_name: "luminalm-embeddings"  # Name of the Pinecone index for storing embeddings
 
 device:
-  type: 'auto'  # Options are 'auto', 'gpu', or 'cpu'
+  type: 'auto'              # Options: 'auto', 'gpu', 'cpu'. Auto-detect GPU or fallback to CPU.
