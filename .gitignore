@@ -5,3 +5,4 @@ luminalm
 embeddings/api.env
 LuminaLM\embeddings\data\medical
 LuminaLM\embeddings\api.env
+api.env
