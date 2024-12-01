@@ -321,7 +321,6 @@ class DatasetProcessor:
                         split='train',
                         cache_dir=self.local_data_path,
                         download_mode='reuse_dataset_if_exists',
-                        trust_remote_code=trust_remote_code
                         # Removed ignore_verifications=True
                     )
                 except TypeError as te:
@@ -381,7 +380,7 @@ def main():
         {"name": "openwebtext", "trust_remote_code": True},
         {"name": "pubmed_qa", "configs": ["pqa_artificial", "pqa_labeled", "pqa_unlabeled"]},
     ]
-    local_data_path = "data/medical"
+    local_data_path = "Update this"
 
     dataset_processor = DatasetProcessor(datasets, local_data_path)
     tokenizer = MedicalTokenizer(vocab_size=60000, min_frequency=3)
