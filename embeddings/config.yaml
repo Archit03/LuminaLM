@@ -2,13 +2,12 @@ model:
   d_model: 512              # Dimensionality of model embeddings
   src_seq_len: 512          # Maximum sequence length for source inputs
   batch_size: 32            # Initial batch size for training
-  learning_rate: 5e-5       # Learning rate for the optimizer
   epochs: 5                 # Total number of epochs for training
   patience: 3               # Early stopping patience for validation metrics
 
 tokenizer:
-  save_path: "./embeddings/tokenizer.json"  # Path to save tokenizer
-  load_path: "./embeddings/tokenizer.json"  # Path to load tokenizer
+  save_path: "C:/Users/ASUS/Desktop/LuminaLM/embeddings/Medical_tokenizer.json"  # Path to save tokenizer
+  load_path: "C:/Users/ASUS/Desktop/LuminaLM/embeddings/Medical_tokenizer.json"  # Path to load tokenizer
 
 data:
   train_split: 0.8          # Fraction of data used for training
@@ -17,6 +16,7 @@ data:
   max_samples: 100000       # Maximum number of samples to load
 
 training:
+  learning_rate: 0.00005      # Learning rate for the optimizer (THIS IS THE MISSING KEY)
   use_mixed_precision: true # Use mixed precision for faster training and reduced memory usage
   gradient_accumulation_steps: 4  # Number of steps to accumulate gradients
   max_grad_norm: 1.0        # Maximum norm for gradient clipping
@@ -25,19 +25,20 @@ training:
   dropout: 0.1              # Dropout rate for model regularization
   validation_steps: 500     # Number of steps between validation checks
   gradient_noise_std: 0.0   # Add noise to gradients for robustness; set >0 to enable
+  patience: 3               # Early stopping patience for validation metrics
 
 logging:
   level: 'INFO'             # Logging level: INFO, DEBUG, WARNING, etc.
-  save_dir: "./logs"        # Directory to save logs
-  metrics_file: "./logs/metrics.json"  # File to save metrics for analysis
+  save_dir: "logs"          # Directory to save logs
+  metrics_file: "metrics.json"  # File to save metrics for analysis
 
 checkpointing:
-  save_dir: "./checkpoints" # Directory to save model checkpoints
+  save_dir: "checkpoints"   # Directory to save model checkpoints
   save_frequency: 1         # Save checkpoints every N epochs
   keep_best_n: 3            # Keep only the top N best-performing checkpoints
 
 visualization:
-  plot_dir: "./plots"       # Directory to save visualizations like training curves
+  plot_dir: "plots"         # Directory to save visualizations like training curves
   sample_size: 1000         # Sample size for visualization plots
   embedding_dims: 3         # Dimensionality for embedding visualizations (e.g., t-SNE)
 

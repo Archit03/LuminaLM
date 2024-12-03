@@ -938,10 +938,6 @@ class EmbeddingGenerator:
 
 def main() -> None:
     try:
-        # Initialize wandb for experiment tracking
-        wandb.init(project="transformer-training", config="config.yaml")
-        logging.info("Initialized wandb for experiment tracking")
-
         # Parse arguments
         args = parse_arguments()
 
@@ -949,6 +945,14 @@ def main() -> None:
         config_manager = ConfigManager(args.config)
         config = config_manager.config
         setup_logging(config)
+
+        # Setup WandB properly
+        with open(args.config, "r") as config_file:
+            wandb_config = yaml.safe_load(config_file)
+
+        # Initialize wandb for experiment tracking
+        wandb.init(project="transformer-training", config=wandb_config)
+        logging.info("Initialized wandb for experiment tracking")
 
         # Setup device
         device = setup_device()
