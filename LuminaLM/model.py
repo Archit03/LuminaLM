@@ -3,22 +3,25 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from tokenizers import Tokenizer
-from typing import Optional, Tuple, List, Dict, Any
+from typing import Optional, Tuple, Dict, Union, List
 import logging
 from dataclasses import dataclass
-from torch.utils.tensorboard import SummaryWriter
 import json
+import math
+from torch.utils.checkpoint import checkpoint
+from torch.amp import autocast
 
-# Setup logging
+# Set up logging configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 @dataclass
-class ModelConfig:
-    """Configuration class for LuminaLM model parameters."""
+class LuminaLMConfig:
+    """Configuration for Encoder-Decoder LuminaLM model."""
     n_embd: int = 512
     n_head: int = 8
-    n_layer: int = 12
+    n_encoder_layers: int = 6
+    n_decoder_layers: int = 6
     block_size: int = 128
     vocab_size: int = 60000
     embd_pdrop: float = 0.1
@@ -31,164 +34,423 @@ class ModelConfig:
     bos_token_id: int = 1
     eos_token_id: int = 2
     max_position_embeddings: int = 128
+    shared_embeddings: bool = True
+    tie_word_embeddings: bool = True
+    use_cache: bool = True
+    use_rotary_embeddings: bool = True
+    fp16: bool = False
+    max_grad_norm: float = 1.0
 
     @classmethod
-    def from_json(cls, json_file: str) -> 'ModelConfig':
-        """Load configuration from JSON file."""
-        with open(json_file, 'r') as f:
-            config_dict = json.load(f)
-        return cls(**config_dict)
+    def from_json(cls, json_file: str) -> 'LuminaLMConfig':
+        """Load configuration from a JSON file."""
+        try:
+            with open(json_file, 'r') as f:
+                return cls(**json.load(f))
+        except FileNotFoundError:
+            logger.error(f"Configuration file '{json_file}' not found.")
+            raise
+        except json.JSONDecodeError:
+            logger.error(f"Invalid JSON format in file '{json_file}'.")
+            raise
 
-    def save_pretrained(self, save_directory: str):
-        """Save configuration to JSON file."""
-        os.makedirs(save_directory, exist_ok=True)
-        with open(os.path.join(save_directory, 'config.json'), 'w') as f:
-            json.dump(self.__dict__, f, indent=2)
+    def to_json(self, json_file: str) -> None:
+        """Save configuration to a JSON file."""
+        try:
+            with open(json_file, 'w') as f:
+                json.dump(self.__dict__, f, indent=2)
+        except IOError as e:
+            logger.error(f"Failed to save configuration to '{json_file}': {e}")
+            raise
+
+    def validate(self) -> None:
+        """Validate configuration parameters."""
+        logger.debug("Validating configuration parameters.")
+        assert self.n_embd % self.n_head == 0, "n_embd must be divisible by n_head"
+        assert self.block_size <= self.max_position_embeddings, "block_size cannot exceed max_position_embeddings"
+        assert self.block_size > 0, "block_size must be positive"
+        assert self.n_head > 0, "n_head must be positive"
+        assert self.vocab_size > 0, "vocab_size must be positive"
+        assert 0.0 <= self.embd_pdrop <= 1.0, "embd_pdrop must be between 0 and 1"
+        assert 0.0 <= self.resid_pdrop <= 1.0, "resid_pdrop must be between 0 and 1"
+        assert 0.0 <= self.attn_pdrop <= 1.0, "attn_pdrop must be between 0 and 1"
+        logger.info("Configuration parameters are valid.")
+
+def rotate_half(x: torch.Tensor) -> torch.Tensor:
+    """Rotate half of the dimensions of the tensor for rotary embeddings."""
+    x1 = x[..., :x.shape[-1] // 2]
+    x2 = x[..., x.shape[-1] // 2:]
+    return torch.cat((-x2, x1), dim=-1)
+
+def apply_rotary_pos_emb(q: torch.Tensor, k: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Apply rotary position embeddings to the query and key tensors.
+
+    Args:
+        q (torch.Tensor): Query tensor of shape (batch_size, num_heads, seq_len, head_dim).
+        k (torch.Tensor): Key tensor of shape (batch_size, num_heads, seq_len, head_dim).
+        cos (torch.Tensor): Cosine component of the rotary embeddings.
+        sin (torch.Tensor): Sine component of the rotary embeddings.
+
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor]: Tuple containing updated query and key tensors.
+    """
+    return (q * cos) + (rotate_half(q) * sin), (k * cos) + (rotate_half(k) * sin)
+
+class RotaryEmbedding(nn.Module):
+    """Rotary Embeddings for enhanced positional encoding."""
+    def __init__(self, dim: int, max_position_embeddings: int = 2048):
+        super().__init__()
+        inv_freq = 1. / (10000 ** (torch.arange(0, dim, 2).float() / dim))
+        self.register_buffer('inv_freq', inv_freq)
+        self.max_seq_len_cached = max_position_embeddings
+        t = torch.arange(self.max_seq_len_cached).type_as(self.inv_freq)
+        freqs = torch.einsum('i,j->ij', t, self.inv_freq)
+        emb = torch.cat((freqs, freqs), dim=-1)
+        self.register_buffer('cos_cached', emb.cos()[None, None, :, :])
+        self.register_buffer('sin_cached', emb.sin()[None, None, :, :])
+
+    def forward(self, seq_len: int, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Get cached rotary embeddings for a given sequence length.
+
+        Args:
+            seq_len (int): Length of the sequence.
+            device (torch.device): Device to place embeddings on.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Cosine and sine components of rotary embeddings.
+        """
+        if seq_len > self.max_seq_len_cached:
+            raise ValueError(f"Requested sequence length {seq_len} exceeds max cached length {self.max_seq_len_cached}.")
+        return self.cos_cached[:, :, :seq_len, :].to(device), self.sin_cached[:, :, :seq_len, :].to(device)
+
+class PositionEmbeddings(nn.Module):
+    """Learned positional embeddings for the model."""
+    def __init__(self, config: LuminaLMConfig):
+        super().__init__()
+        self.embeddings = nn.Embedding(config.max_position_embeddings, config.n_embd)
+        self.dropout = nn.Dropout(config.embd_pdrop)
+
+    def forward(self, position_ids: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass for position embeddings.
+
+        Args:
+            position_ids (torch.Tensor): Tensor of position IDs.
+
+        Returns:
+            torch.Tensor: Positional embeddings.
+        """
+        return self.dropout(self.embeddings(position_ids))
+
+class FlashAttention(nn.Module):
+    """FlashAttention with support for rotary embeddings for efficient memory usage."""
+    def __init__(self, config: LuminaLMConfig):
+        super().__init__()
+        self.n_head = config.n_head
+        self.head_dim = config.n_embd // config.n_head
+        self.scaling = self.head_dim ** -0.5
+
+        self.k_proj = nn.Linear(config.n_embd, config.n_embd, bias=False)
+        self.v_proj = nn.Linear(config.n_embd, config.n_embd, bias=False)
+        self.q_proj = nn.Linear(config.n_embd, config.n_embd, bias=False)
+        self.out_proj = nn.Linear(config.n_embd, config.n_embd)
+        self.dropout = nn.Dropout(config.attn_pdrop)
+        
+        if config.use_rotary_embeddings:
+            self.rotary_emb = RotaryEmbedding(self.head_dim, config.max_position_embeddings)
+
+    def forward(self, query: torch.Tensor, key: torch.Tensor, value: torch.Tensor, mask: Optional[torch.Tensor] = None, position_ids: Optional[torch.Tensor] = None) -> torch.Tensor:
+        batch_size, seq_len, _ = query.size()
+
+        # Input validation for tensor types and shapes
+        if not isinstance(query, torch.Tensor) or not isinstance(key, torch.Tensor) or not isinstance(value, torch.Tensor):
+            raise TypeError("Query, key, and value must all be torch.Tensor.")
+        if query.shape != key.shape or key.shape != value.shape:
+            raise ValueError("Query, key, and value must have the same shape.")
+        if mask is not None and mask.shape != (batch_size, 1, 1, seq_len):
+            raise ValueError(f"Invalid attention mask shape. Expected ({batch_size}, 1, 1, {seq_len}), got {mask.shape}")
+
+        # Project and reshape
+        q = self.q_proj(query).view(batch_size, -1, self.n_head, self.head_dim).transpose(1, 2)
+        k = self.k_proj(key).view(batch_size, -1, self.n_head, self.head_dim).transpose(1, 2)
+        v = self.v_proj(value).view(batch_size, -1, self.n_head, self.head_dim).transpose(1, 2)
+
+        # Apply rotary embeddings if enabled
+        if hasattr(self, 'rotary_emb') and position_ids is not None:
+            cos, sin = self.rotary_emb(seq_len, query.device)
+            q, k = apply_rotary_pos_emb(q, k, cos, sin)
+
+        # Scaled dot-product attention
+        with autocast(enabled=True):
+            attn_weights = torch.matmul(q, k.transpose(-2, -1)) * self.scaling
+
+            if mask is not None:
+                attn_weights = attn_weights.masked_fill(mask == 0, float('-inf'))
+
+            attn_weights = F.softmax(attn_weights, dim=-1)
+            attn_weights = self.dropout(attn_weights)
+
+            context = torch.matmul(attn_weights, v)
+
+        context = context.transpose(1, 2).contiguous().view(batch_size, -1, self.n_head * self.head_dim)
+        output = self.out_proj(context)
+
+        return output
+class FeedForward(nn.Module):
+    """Feed Forward Layer of the Transformer."""
+    def __init__(self, config: LuminaLMConfig):
+        super().__init__()
+        self.fc1 = nn.Linear(config.n_embd, 4 * config.n_embd)
+        self.gelu = nn.GELU()
+        self.fc2 = nn.Linear(4 * config.n_embd, config.n_embd)
+        self.dropout = nn.Dropout(config.resid_pdrop)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass for feed-forward layer.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor after feed-forward computation.
+        """
+        with autocast(enabled=True):
+            x = self.gelu(self.fc1(x))
+            x = self.dropout(x)
+            x = self.fc2(x)
+            x = self.dropout(x)
+        return x
+
+class EncoderBlock(nn.Module):
+    """Encoder block consisting of multi-head attention and feed-forward layers."""
+    def __init__(self, config: LuminaLMConfig):
+        super().__init__()
+        self.attn = FlashAttention(config)
+        self.ff = FeedForward(config)
+        self.ln1 = nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
+        self.ln2 = nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
+        self.use_checkpoint = config.use_checkpoint
+
+    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None, position_ids: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """
+        Forward pass for encoder block.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            mask (Optional[torch.Tensor]): Attention mask.
+            position_ids (Optional[torch.Tensor]): Positional IDs for rotary embeddings.
+
+        Returns:
+            torch.Tensor: Encoder output.
+        """
+        def _forward(x: torch.Tensor) -> torch.Tensor:
+            with autocast(enabled=True):
+                attn_output = self.attn(self.ln1(x), self.ln1(x), self.ln1(x), mask, position_ids)
+                x = x + attn_output
+                x = x + self.ff(self.ln2(x))
+            return x
+
+        if self.use_checkpoint and x.requires_grad:
+            return checkpoint(_forward, x)
+        return _forward(x)
+
+class DecoderBlock(nn.Module):
+    """Decoder block consisting of self-attention, cross-attention, and feed-forward layers."""
+    def __init__(self, config: LuminaLMConfig):
+        super().__init__()
+        self.self_attn = FlashAttention(config)
+        self.cross_attn = FlashAttention(config)
+        self.ff = FeedForward(config)
+        self.ln1 = nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
+        self.ln2 = nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
+        self.ln3 = nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
+        self.use_checkpoint = config.use_checkpoint
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        encoder_output: torch.Tensor,
+        self_mask: Optional[torch.Tensor] = None,
+        cross_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        """
+        Forward pass for decoder block.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            encoder_output (torch.Tensor): Encoder output for cross-attention.
+            self_mask (Optional[torch.Tensor]): Self-attention mask.
+            cross_mask (Optional[torch.Tensor]): Cross-attention mask.
+            position_ids (Optional[torch.Tensor]): Positional IDs for rotary embeddings.
+
+        Returns:
+            torch.Tensor: Decoder output.
+        """
+        def _forward(x: torch.Tensor) -> torch.Tensor:
+            with autocast(enabled=True):
+                # Self-attention layer
+                self_attn_output = self.self_attn(self.ln1(x), self.ln1(x), self.ln1(x), mask=self_mask, position_ids=position_ids)
+                x = x + self_attn_output
+
+                # Cross-attention layer
+                cross_attn_output = self.cross_attn(self.ln2(x), encoder_output, encoder_output, mask=cross_mask, position_ids=position_ids)
+                x = x + cross_attn_output
+
+                # Feed-forward layer
+                x = x + self.ff(self.ln3(x))
+            return x
+
+        if self.use_checkpoint and x.requires_grad:
+            return checkpoint(_forward, x)
+        return _forward(x)
 
 class LuminaLM(nn.Module):
-    """Main LuminaLM model class."""
-    def __init__(self, config: ModelConfig, tokenizer: Tokenizer):
+    """Encoder-Decoder Transformer model: LuminaLM."""
+    def __init__(self, config: LuminaLMConfig):
         super().__init__()
         self.config = config
-        self.tokenizer = tokenizer
-        
-        self.transformer = nn.ModuleDict({
-            'wte': nn.Embedding(config.vocab_size, config.n_embd),
-            'wpe': nn.Embedding(config.max_position_embeddings, config.n_embd),
-            'drop': nn.Dropout(config.embd_pdrop),
-            'h': nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
-            'ln_f': nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon),
-        })
-        
-        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
-        
+        config.validate()
+
+        # Embedding layers
+        self.wte = nn.Embedding(config.vocab_size, config.n_embd)
+        self.position_embeddings = PositionEmbeddings(config)
+        self.drop = nn.Dropout(config.embd_pdrop)
+
+        # Encoder
+        self.encoder = nn.ModuleList([EncoderBlock(config) for _ in range(config.n_encoder_layers)])
+        self.encoder_ln = nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
+
+        # Decoder
+        self.decoder = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_decoder_layers)])
+        self.decoder_ln = nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
+
+        # Output head
+        if config.shared_embeddings:
+            self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+            self.lm_head.weight = self.wte.weight
+        else:
+            self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+
         # Initialize weights
         self.apply(self._init_weights)
-        # Tie weights
-        self.transformer.wte.weight = self.lm_head.weight
 
-    def _init_weights(self, module):
+    def _init_weights(self, module: nn.Module) -> None:
+        """
+        Custom weight initialization with variance scaling based on layer depth.
+
+        Args:
+            module (nn.Module): A model module to apply weight initialization.
+        """
         if isinstance(module, (nn.Linear, nn.Embedding)):
-            module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
+            layer_depth = self.get_depth(module)
+            std_dev = self.config.initializer_range / math.sqrt(layer_depth + 1)
+            module.weight.data.normal_(mean=0.0, std=std_dev)
             if isinstance(module, nn.Linear) and module.bias is not None:
                 module.bias.data.zero_()
         elif isinstance(module, nn.LayerNorm):
             module.bias.data.zero_()
             module.weight.data.fill_(1.0)
 
+    def get_depth(self, module: nn.Module) -> int:
+        """
+        Get the depth of a module within the network.
+
+        Args:
+            module (nn.Module): Module whose depth is to be determined.
+
+        Returns:
+            int: Depth of the module within the network.
+        """
+        if isinstance(module, (EncoderBlock, DecoderBlock)):
+            return 1
+        return 0
+
+    def save_pretrained(self, save_path: str) -> None:
+        """
+        Save the model weights and configuration.
+
+        Args:
+            save_path (str): Directory path where model and config will be saved.
+        """
+        try:
+            os.makedirs(save_path, exist_ok=True)
+            torch.save(self.state_dict(), os.path.join(save_path, "LuminaLM.pt"))
+            self.config.to_json(os.path.join(save_path, "config.json"))
+            logger.info(f"Model and config saved to '{save_path}'.")
+        except IOError as e:
+            logger.error(f"Failed to save the model to '{save_path}': {e}")
+            raise
+
     @classmethod
-    def from_pretrained(cls, pretrained_dir: str) -> 'LuminaLM':
-        """Load pretrained model from directory."""
-        config = ModelConfig.from_json(os.path.join(pretrained_dir, 'config.json'))
-        tokenizer = Tokenizer.from_file(os.path.join(pretrained_dir, 'tokenizer.json'))
-        model = cls(config, tokenizer)
-        model.load_state_dict(torch.load(os.path.join(pretrained_dir, 'pytorch_model.bin')))
-        return model
+    def from_pretrained(cls, load_path: str) -> 'LuminaLM':
+        """
+        Load the model weights and configuration from a pretrained checkpoint.
 
-    def forward(self, input_ids: torch.Tensor, position_ids: Optional[torch.Tensor] = None,
-                past_key_values: Optional[Tuple[Tuple[torch.Tensor, ...], ...]] = None) -> torch.Tensor:
+        Args:
+            load_path (str): Path to the directory containing model weights and config.
+
+        Returns:
+            LuminaLM: The loaded model instance.
+        """
+        try:
+            config = LuminaLMConfig.from_json(os.path.join(load_path, "config.json"))
+            model = cls(config)
+            state_dict = torch.load(os.path.join(load_path, "LuminaLM.pt"))
+            model.load_state_dict(state_dict)
+            logger.info(f"Model loaded from '{load_path}'.")
+            return model
+        except (IOError, KeyError) as e:
+            logger.error(f"Failed to load the model from '{load_path}': {e}")
+            raise
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        decoder_input_ids: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        decoder_attention_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Forward pass of the LuminaLM model.
+
+        Args:
+            input_ids (torch.Tensor): Input tensor for encoder (batch_size, seq_len).
+            decoder_input_ids (torch.Tensor): Input tensor for decoder (batch_size, seq_len).
+            attention_mask (Optional[torch.Tensor]): Mask tensor for encoder.
+            decoder_attention_mask (Optional[torch.Tensor]): Mask tensor for decoder.
+
+        Returns:
+            torch.Tensor: Model output logits of shape (batch_size, seq_len, vocab_size).
+        """
         device = input_ids.device
-        batch_size, seq_len = input_ids.shape
 
-        if position_ids is None:
-            position_ids = torch.arange(0, seq_len, dtype=torch.long, device=device)
-            position_ids = position_ids.unsqueeze(0).expand(batch_size, seq_len)
+        # Input Validation
+        if not isinstance(input_ids, torch.Tensor) or not isinstance(decoder_input_ids, torch.Tensor):
+            raise TypeError("Input tensors must be of type torch.Tensor.")
+        if input_ids.dim() != 2 or decoder_input_ids.dim() != 2:
+            raise ValueError("Input tensors must be of rank 2 (batch_size, seq_len).")
 
-        # Get embeddings
-        token_embeddings = self.transformer.wte(input_ids)
-        position_embeddings = self.transformer.wpe(position_ids)
-        hidden_states = self.transformer.drop(token_embeddings + position_embeddings)
+        # Encode if encoder_outputs not provided
+        encoder_embeddings = self.drop(self.wte(input_ids) + self.position_embeddings(input_ids))
+        encoder_hidden_states = encoder_embeddings
 
-        # Process through transformer blocks
-        for i, block in enumerate(self.transformer.h):
-            hidden_states = block(hidden_states)
+        for layer in self.encoder:
+            encoder_hidden_states = layer(encoder_hidden_states, attention_mask)
 
-        hidden_states = self.transformer.ln_f(hidden_states)
-        logits = self.lm_head(hidden_states)
+        encoder_outputs = self.encoder_ln(encoder_hidden_states)
+
+        # Decode
+        decoder_embeddings = self.drop(self.wte(decoder_input_ids) + self.position_embeddings(decoder_input_ids))
+        decoder_hidden_states = decoder_embeddings
+
+        for idx, decoder_layer in enumerate(self.decoder):
+            decoder_hidden_states = decoder_layer(decoder_hidden_states, encoder_outputs, self_mask=decoder_attention_mask)
+
+        decoder_outputs = self.decoder_ln(decoder_hidden_states)
+        logits = self.lm_head(decoder_outputs)
 
         return logits
-
-    @torch.no_grad()
-    def generate_text(self, prompt: str, max_length: int = 50, 
-                      temperature: float = 0.7, top_k: int = 10) -> List[str]:
-        """
-        Generate text using various sampling strategies.
-        """
-        self.eval()
-        device = next(self.parameters()).device
-        
-        # Tokenize prompt
-        input_ids = torch.tensor(self.tokenizer.encode(prompt).ids, device=device).unsqueeze(0)
-        
-        generated_tokens = []
-        
-        for _ in range(max_length):
-            logits = self.forward(input_ids)
-            logits = logits[:, -1, :] / temperature
-            
-            if top_k > 0:
-                indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
-                logits[indices_to_remove] = float('-inf')
-            
-            probs = F.softmax(logits, dim=-1)
-            next_token = torch.multinomial(probs, num_samples=1)
-            
-            generated_tokens.append(next_token.item())
-            input_ids = torch.cat((input_ids, next_token), dim=1)
-            
-            if next_token.item() == self.config.eos_token_id:
-                break
-        
-        return [self.tokenizer.decode(generated_tokens, skip_special_tokens=True)]
-
-# Function to load the model and generate text based on a prompt
-def generate_response(model_dir: str, prompt: str, pretrained_embeddings: Optional[str] = None,
-                      max_length: int = 50, top_k: int = 10, temperature: float = 0.7):
-    # Load configuration
-    config_path = f"{model_dir}/config.json"
-    config = ModelConfig.from_json(config_path)
-
-    # Load tokenizer
-    tokenizer_path = f"{model_dir}/tokenizer.json"
-    tokenizer = Tokenizer.from_file(tokenizer_path)
-
-    # Load model
-    model = LuminaLM.from_pretrained(model_dir)
-    
-    # Load pre-trained embeddings if specified
-    if pretrained_embeddings:
-        model.load_trained_embeddings(pretrained_embeddings)
-    
-    model.eval()
-
-    # Check for CUDA availability and set device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
-
-    # Generate text
-    generated_texts = model.generate_text(prompt, max_length=max_length, temperature=temperature, top_k=top_k)
-    return generated_texts[0]  # Assuming num_return_sequences=1 for simplicity
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate a response using a pre-trained LuminaLM model")
-    parser.add_argument("--model_dir", type=str, required=True, help="Path to the directory containing the trained model")
-    parser.add_argument("--prompt", type=str, required=True, help="The input prompt for generating the response")
-    parser.add_argument("--pretrained_embeddings", type=str, help="Path to pre-trained embeddings file", default=None)
-    parser.add_argument("--max_length", type=int, default=50, help="Maximum length of the generated response")
-    parser.add_argument("--top_k", type=int, default=10, help="Top-k sampling for text generation")
-    parser.add_argument("--temperature", type=float, default=0.7, help="Temperature for sampling")
-    args = parser.parse_args()
-
-    # Generate response
-    response = generate_response(
-        model_dir=args.model_dir,
-        prompt=args.prompt,
-        pretrained_embeddings=args.pretrained_embeddings,
-        max_length=args.max_length,
-        top_k=args.top_k,
-        temperature=args.temperature
-    )
-
-    # Print the generated response
-    print("Prompt: ", args.prompt)
-    print("Generated Response: ", response)
