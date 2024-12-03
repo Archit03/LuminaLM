@@ -1,171 +1,190 @@
-# Transformer-based Embeddings Training Pipeline Documentation
 
-## Table of Contents
 
+# **Embeddings.py - Detailed Documentation**
+
+## **Table of Contents**
 1. [Introduction](#introduction)
-2. [Environment Setup](#environment-setup)
-3. [Configuration Management](#configuration-management)
-4. [Logging Setup](#logging-setup)
-5. [Metrics Tracking](#metrics-tracking)
-6. [Model Management](#model-management)
-7. [Security Utilities](#security-utilities)
-8. [Data Management](#data-management)
-9. [Training Loop](#training-loop)
-10. [Checkpoint Management](#checkpoint-management)
-11. [Embedding Generation](#embedding-generation)
+2. [Module Dependencies](#module-dependencies)
+3. [Class and Function Overviews](#class-and-function-overviews)
+   - [1. ConfigManager](#configmanager)
+   - [2. ModelManager](#modelmanager)
+   - [3. DataManager](#datamanager)
+   - [4. MemoryMonitor](#memorymonitor)
+   - [5. MemoryManager](#memorymanager)
+   - [6. SecurityUtils](#securityutils)
+   - [7. DataValidator](#datavalidator)
+   - [8. AsyncPrefetchDataLoader](#asyncprefetchdataloader)
+   - [9. EmbeddingGenerator](#embeddinggenerator)
+   - [10. CheckpointManager](#checkpointmanager)
+4. [Training Utilities](#training-utilities)
+   - [1. Training Loop](#training-loop)
+5. [Main Function](#main-function)
+6. [Decorator Functions](#decorator-functions)
+7. [Usage and Execution](#usage-and-execution)
 
-## Introduction
+---
 
-This documentation provides a detailed overview of the transformer-based embeddings training pipeline. The pipeline is designed to train a hybrid transformer model that generates text embeddings using large datasets. The codebase includes model training, data loading, metric tracking, and checkpointing functionalities.
+## **Introduction**
 
-## Environment Setup
+The `embeddings.py` script is designed for training a Transformer-based model, managing the dataset, and generating embeddings. It provides a structured approach for:
+- Data loading and preprocessing.
+- Model training with validation and checkpointing.
+- Efficient embedding generation and management.
 
-To run the pipeline, set up your environment as follows:
+The file utilizes several advanced features like mixed precision training, memory monitoring, caching, and distributed data loading to optimize the workflow.
 
-1. Install necessary Python packages:
+## **Module Dependencies**
 
-   ```sh
-   pip install torch transformers datasets wandb pinecone-client
-   ```
+The script uses numerous dependencies that include:
+- **PyTorch** for deep learning tasks.
+- **Tokenizers** and **Datasets** for text processing and dataset handling.
+- **Multiprocessing**, **threading**, and **asyncio** to improve efficiency.
+- **WandB** for experiment tracking.
+- **Numpy**, **Pickle**, and **Matplotlib** for numerical operations, serialization, and visualization.
 
-2. Load environment variables from the `.env` file:
+## **Class and Function Overviews**
 
-   ```python
-   load_dotenv('api.env')
-   ```
+### **1. ConfigManager**
+- **Purpose:** Manages configuration settings for the training and embedding generation processes.
+- **Methods:**
+  - **`__init__(self, config_path: str = "config.yaml")`**: Initializes the configuration manager by loading a YAML configuration file.
+  - **`load_config(self) -> Dict[str, Any]`**: Loads the YAML configuration and returns it as a dictionary.
+  - **`_validate_config(self)`**: Validates that all required configuration sections and key-value types are provided.
+  - **`_get_nested_value(self, path: str)`**: Retrieves nested values from the configuration using dot notation.
+- **Usage:** Instantiate this class to load and validate configuration parameters for training and embedding generation.
 
-   This will load your Pinecone API key and any other required environment variables.
+### **2. ModelManager**
+- **Purpose:** Manages the initialization and setup of the Transformer model and tokenizer.
+- **Methods:**
+  - **`__init__(self, config: Dict[str, Any], device: torch.device)`**: Sets up the model configuration and device.
+  - **`initialize_model(self) -> Tuple[nn.Module, Tokenizer]`**: Loads the tokenizer and initializes the Transformer model with the specified parameters.
+  - **`initialize_model(self)`**: Utilizes `torch.jit.script` to script the model, enhancing its performance during inference.
+- **Usage:** The class is responsible for building and initializing the model to be used in training and embedding tasks.
 
-## Configuration Management
+### **3. DataManager**
+- **Purpose:** Handles loading and processing of datasets from multiple sources.
+- **Methods:**
+  - **`__init__(self, config: Dict[str, Any], device: torch.device)`**: Initializes the data manager with configuration details.
+  - **`load_openwebtext(self) -> List[str]`**: Loads a subset of the OpenWebText dataset.
+  - **`load_medical_datasets(self) -> List[str]`**: Loads medical datasets such as PubMed QA data.
+  - **`load_local_data(self, directory: str) -> List[str]`**: Loads text data from local files in a specified directory.
+  - **`load_data_parallel(self, texts: List[str], num_workers: int = 4) -> List[List[int]]`**: Utilizes multiprocessing to efficiently process and tokenize large amounts of text.
+  - **`_process_chunk(self, texts: List[str]) -> List[List[int]]`**: Processes individual chunks of text, applying tokenization.
+- **Usage:** Use this class for dataset loading and preprocessing to prepare sequences for training.
 
-Configuration management is handled using the `ConfigManager` class, which loads and validates the YAML configuration file (`config.yaml`). This file contains parameters such as model architecture, data paths, logging configurations, and training hyperparameters.
+### **4. MemoryMonitor**
+- **Purpose:** Tracks GPU memory usage during the training process.
+- **Methods:**
+  - **`__init__(self, device: torch.device)`**: Initializes the memory monitor with the specified device.
+  - **`log_memory(self, step: int)`**: Logs memory usage at a given step during training.
+- **Usage:** Helps in monitoring and logging GPU memory usage to prevent out-of-memory issues.
 
-```python
-class ConfigManager:
-    def __init__(self, config_path: str = "config.yaml"):
-        self.config_path = config_path
-        self.config = self.load_config()
-        self._validate_config()
-```
+### **5. MemoryManager**
+- **Purpose:** Handles proactive memory cleanup to prevent out-of-memory errors during model training.
+- **Methods:**
+  - **`clean_memory(aggressive: bool = False)`**: Releases unused memory, optionally performing an aggressive cleanup for the GPU.
+  - **`log_memory_usage()`**: Logs current and peak GPU memory usage.
+  - **`monitor_memory_usage(threshold_ratio: float = 0.85)`**: Alerts if GPU memory usage exceeds a specified threshold ratio.
+- **Usage:** This class is particularly useful during model training to ensure that GPU memory is efficiently managed.
 
-The configuration file must include the following sections:
+### **6. SecurityUtils**
+- **Purpose:** Provides security checks for the text data to prevent injections and other vulnerabilities.
+- **Methods:**
+  - **`validate_input_data(texts: List[str], max_length: int = 1000000)`**: Validates input text data against suspicious patterns and non-printable characters.
+  - **`_check_for_suspicious_patterns(text: str)`**: Checks the text for potentially harmful patterns like SQL injections.
+- **Usage:** Should be used before feeding data into the training pipeline to ensure the data is sanitized.
 
-- `model`: Parameters for the model.
-- `data`: Paths and settings for loading datasets.
-- `tokenizer`: Settings for loading the tokenizer.
-- `logging`: Directory and level of logging.
-- `checkpointing`: Directory for saving model checkpoints.
-- `training`: Hyperparameters for training.
+### **7. DataValidator**
+- **Purpose:** Validates the length and distribution of the training sequences.
+- **Methods:**
+  - **`validate_sequence_lengths(sequences: List[List[int]], max_length: int)`**: Ensures that sequences do not exceed a specified maximum length.
+  - **`check_data_distribution(sequences: List[List[int]]) -> Dict[str, float]`**: Returns statistics (mean, standard deviation, max, min) on the sequence lengths.
+- **Usage:** Helpful in ensuring that the sequences are within acceptable length limits to prevent issues during model training.
 
-## Logging Setup
+### **8. AsyncPrefetchDataLoader**
+- **Purpose:** Implements an asynchronous data loader that prefetches data to speed up training.
+- **Methods:**
+  - **`__init__(self, dataloader: DataLoader, device: torch.device, num_prefetch: int = 3)`**: Sets up an asynchronous data loader.
+  - **`_prefetch_data(self)`**: Prefetches data in a separate thread.
+  - **`__iter__(self)`**: Implements iteration, yielding prefetched batches.
+- **Usage:** Used to improve data loading efficiency during the training process.
 
-Logging is used throughout the training pipeline for debugging and tracking. Logs are saved to a file in the directory specified in the configuration.
+### **9. EmbeddingGenerator**
+- **Purpose:** Generates embeddings for input sequences, caches results, and stores them.
+- **Methods:**
+  - **`__init__(self, model: nn.Module, device: torch.device, index_name: str, cache_size: int = 100)`**: Initializes the embedding generator.
+  - **`_save_cache_to_disk(self, file_path: str = "embedding_cache.pkl")`**: Saves the cache to disk for later use.
+  - **`_load_cache_from_disk(self, file_path: str = "embedding_cache.pkl")`**: Loads cached embeddings from disk.
+  - **`_generate_embedding(self, input_ids: List[int]) -> torch.Tensor`**: Generates an embedding for a given sequence.
+  - **`get_embedding(self, input_ids: List[int], cache_only: bool = False) -> torch.Tensor`**: Retrieves an embedding from the cache or generates it dynamically.
+  - **`save_embeddings_to_pinecone(self, input_ids: List[List[int]], batch_size: int = 32)`**: Generates and saves embeddings to Pinecone.
+  - **`save_embeddings_for_model(self, version: str = "v1", save_path: str = None)`**: Saves generated embeddings in a format compatible with the model's embedding layer.
+- **Usage:** Use this class for generating embeddings for a model or dataset and saving them to a distributed database.
 
-```python
-def setup_logging(config: Dict[str, Any]):
-    log_dir = config['logging']['save_dir']
-    os.makedirs(log_dir, exist_ok=True)
-    log_file = os.path.join(log_dir, 'training.log')
-    logging.basicConfig(level=log_level, filename=log_file, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-```
+### **10. CheckpointManager**
+- **Purpose:** Manages model checkpoints, including saving, loading, and cleanup.
+- **Methods:**
+  - **`__init__(self, save_dir: str, max_checkpoints: int = 3)`**: Initializes checkpoint management.
+  - **`save_checkpoint(self, model: nn.Module, optimizer: torch.optim.Optimizer, epoch: int, loss: float, metrics: Dict[str, float], best: bool = False)`**: Saves a model checkpoint.
+  - **`load_latest_checkpoint(self, model: nn.Module, optimizer: Optional[torch.optim.Optimizer] = None, map_location: Optional[Any] = None)`**: Loads the latest checkpoint.
+- **Usage:** Useful for keeping track of model state during training and for resuming training from the last saved state.
 
-## Metrics Tracking
+## **Training Utilities**
 
-Metrics are tracked using the `MetricsTracker` class. The metrics tracked include BLEU and ROUGE scores, which are calculated based on reference and hypothesis text.
+### **1. Training Loop**
+- **Function: `train_with_monitoring`**
+  - **Purpose:** Handles the training process while monitoring memory and tracking metrics.
+  - **Parameters:** Takes the model, data loader, optimizer, scheduler, device, memory monitor, and checkpoint manager.
+  - **Implementation:** Implements gradient accumulation, mixed precision training, and regular checkpoint saving. Logs training metrics to WandB and TensorBoard.
 
-```python
-class MetricsTracker:
-    def __init__(self):
-        self.scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
-        self.bleu_scores = []
-```
+## **Main Function**
 
-## Model Management
+- **Function: `main()`**
+  - **Purpose:** Serves as the entry point for executing the script. It handles:
+    - Argument parsing.
+    - Config loading.
+    - Model initialization.
+    - Data loading and processing.
+    - Training the model.
+    - Generating and saving embeddings.
+  - **Implementation:** 
+    - **WandB Initialization:** Initializes WandB for experiment tracking.
+    - **Configuration Management:** Loads
 
-Model management is handled by the `ModelManager` class. The transformer model is built using a custom function from `model.py`. The model is configured with parameters such as `src_vocab_size`, `tgt_vocab_size`, `src_seq_len`, `tgt_seq_len`, and `d_model`.
+ settings from the provided YAML file.
+    - **Training and Embedding Generation:** Executes the entire training workflow, followed by embedding generation.
 
-```python
-class ModelManager:
-    def initialize_model(self) -> Tuple[nn.Module, Tokenizer]:
-        tokenizer_path = self.config['tokenizer']['load_path']
-        tokenizer = Tokenizer.from_file(tokenizer_path)
-        transformer = model.build_unified_transformer(src_vocab_size=src_vocab_size, ...)
-        return transformer, tokenizer
-```
+## **Decorator Functions**
 
-## Security Utilities
+- **`handle_oom(func)`**: Handles out-of-memory errors during function execution, attempts a retry after clearing memory.
+- **`MemoryManager.monitor_memory(func)`**: Logs memory usage before and after executing the decorated function.
 
-To ensure safe data usage, the `SecurityUtils` class provides methods for validating input data:
+## **Usage and Execution**
 
-- Checks for maximum input length.
-- Checks for non-printable characters.
-- Checks for suspicious patterns in input text to prevent injection attacks.
+### **Execution**
+- Execute the `embeddings.py` script by running:
+  ```bash
+  python embeddings.py --config path/to/config.yaml --local_data_dir path/to/data/
+  ```
+- Ensure that dependencies are installed as specified in `requirements.txt`.
 
-```python
-class SecurityUtils:
-    @staticmethod
-    def validate_input_data(texts: List[str], max_length: int = 1000000) -> None:
-        # Validates text data
-```
+### **Configurations**
+- All configuration settings are defined in the `config.yaml` file. Key sections include:
+  - `model` for model hyperparameters.
+  - `tokenizer` for tokenizer load/save paths.
+  - `data` for specifying dataset-related configurations.
+  - `training` for training hyperparameters such as `epochs` and `gradient_accumulation_steps`.
+  - `logging` and `checkpointing` for managing logs and checkpoints.
+  - `pinecone` for embedding storage settings.
 
-## Data Management
+### **Environment Variables**
+- Ensure the `.env` file is configured with your **Pinecone API key** for storing embeddings.
 
-Data is loaded using the `DataManager` class. It can load different datasets, including OpenWebText, PubMed QA, and custom local data files. It supports parallel data loading and prefetching using the `AsyncPrefetchDataLoader` class.
+### **Requirements**
+- Install required packages from `requirements.txt`:
+  ```bash
+  pip install -r requirements.txt
+  ```
+- The script is built to be compatible with **Python 3.11** and **PyTorch >= 2.0.0**.
 
-```python
-class DataManager:
-    def load_openwebtext(self) -> List[str]:
-        dataset = load_dataset("openwebtext", split=f"train[:{self.config['data']['max_samples']}]")
-        return [item['text'] for item in dataset]
-```
-
-The class also provides functions for parallel processing of data to tokenize and batch data efficiently.
-
-## Training Loop
-
-The model is trained using the `train_model` function, which handles multiple aspects of training:
-
-- Uses mixed precision training for faster and memory-efficient training.
-- Tracks training and validation losses.
-- Supports early stopping and gradient accumulation.
-
-```python
-@handle_oom
-def train_model(...):
-    model.train()
-    scaler = GradScaler(enabled=config['training']['mixed_precision'])
-    ...
-```
-
-The training loop also incorporates error handling using the `handle_oom` decorator to manage out-of-memory errors.
-
-## Checkpoint Management
-
-The `CheckpointManager` class is used to save model checkpoints during training. Checkpoints are saved periodically, and older checkpoints are deleted if they exceed the maximum number allowed.
-
-```python
-class CheckpointManager:
-    def save_checkpoint(self, model: nn.Module, optimizer: torch.optim.Optimizer, epoch: int, loss: float, metrics: Dict[str, float]) -> None:
-        checkpoint_path = self.save_dir / f"checkpoint_epoch_{epoch}.pt"
-        torch.save(checkpoint_data, checkpoint_path)
-```
-
-This functionality is useful for resuming training from a particular point or preventing loss of progress due to interruptions.
-
-## Embedding Generation
-
-The `EmbeddingGenerator` class is responsible for generating embeddings for a given input sequence and saving them to Pinecone.
-
-```python
-class EmbeddingGenerator:
-    def generate_embeddings(self, input_ids: List[List[int]], batch_size: int = 32) -> torch.Tensor:
-        self.model.eval()
-        ...
-```
-
-After training, this class helps create embeddings to store in a Pinecone index, which can be used for downstream tasks like similarity search or clustering.
-
-## Conclusion
-
-This documentation provides a comprehensive overview of the transformer-based embeddings training pipeline. It covers configuration management, data loading, model training, checkpoint management, and embedding generation. Each pipeline component is designed for modularity, making it easier to extend or replace parts of the system as needed.
-
+---

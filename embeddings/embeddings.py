@@ -28,11 +28,15 @@ import threading
 from queue import Queue
 from functools import wraps  # Fixing missing import
 import model  # Importing model components from model.py
-from pineconedb import save_embeddings_to_pinecone, fetch_embeddings
+from pineconedb import save_embeddings_to_pinecone
 from torch.utils.tensorboard import SummaryWriter
 from rouge_score import rouge_scorer
 from nltk.translate.bleu_score import sentence_bleu
 from collections import defaultdict
+from torch.optim import AdamW
+from collections import OrderedDict
+import pickle
+import shutil
 
 
 # Load environment variables for Pinecone API key
@@ -49,11 +53,36 @@ class ConfigManager:
             return yaml.safe_load(f)
 
     def _validate_config(self):
+        """Validate the loaded configuration file for required sections and types."""
+        # Required sections
         required_sections = ['model', 'data', 'tokenizer', 'logging', 'checkpointing', 'training']
         for section in required_sections:
             if section not in self.config:
                 raise ValueError(f"Missing required configuration section: {section}")
 
+        # Type validation for specific configuration values
+        required_types = {
+            'model.d_model': int,
+            'model.src_seq_len': int,
+            'training.learning_rate': float,
+        }
+        
+        for path, expected_type in required_types.items():
+            value = self._get_nested_value(path)
+            if not isinstance(value, expected_type):
+                raise ValueError(f"Invalid type for {path}: expected {expected_type}, got {type(value).__name__}")
+
+    def _get_nested_value(self, path: str):
+        """Get a nested value from the configuration dictionary using dot notation."""
+        keys = path.split('.')
+        value = self.config
+        for key in keys:
+            if key in value:
+                value = value[key]
+            else:
+                raise ValueError(f"Missing key '{key}' in configuration path '{path}'")
+        return value
+    
 def setup_logging(config: Dict[str, Any]):
     log_dir = config['logging']['save_dir']
     os.makedirs(log_dir, exist_ok=True)
@@ -268,6 +297,331 @@ class AsyncPrefetchDataLoader:
         if hasattr(self, 'prefetch_thread'):
             self.prefetch_thread.join()
 
+class MemoryManager:
+    @staticmethod
+    def clean_memory(aggressive: bool = False):
+        """
+        Clean up memory across CPU and GPU.
+
+        Args:
+            aggressive (bool): If True, attempts a more aggressive GPU memory clean-up.
+        """
+        # Clean up Python garbage collection
+        gc.collect()
+        # Clean up GPU memory
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            if aggressive:
+                torch.cuda.ipc_collect()
+        logging.info("Memory cleaned up successfully.")
+
+    @staticmethod
+    def log_memory_usage():
+        """
+        Log the current and peak memory usage on the GPU.
+        """
+        if torch.cuda.is_available():
+            allocated = torch.cuda.memory_allocated() / (1024 ** 3)  # Convert to GB
+            max_allocated = torch.cuda.max_memory_allocated() / (1024 ** 3)  # Peak allocated
+            reserved = torch.cuda.memory_reserved() / (1024 ** 3)  # Cached memory
+            logging.info(
+                f"GPU Memory Usage: Allocated: {allocated:.2f} GB, "
+                f"Max Allocated: {max_allocated:.2f} GB, Reserved: {reserved:.2f} GB"
+            )
+        else:
+            logging.info("No GPU available to log memory usage.")
+
+    @staticmethod
+    def get_memory_threshold(threshold_ratio: float = 0.85) -> Optional[float]:
+        """
+        Get memory threshold for triggering alerts.
+
+        Args:
+            threshold_ratio (float): Percentage threshold of total GPU memory to trigger alerts.
+
+        Returns:
+            float: Threshold value for GPU memory usage.
+        """
+        if torch.cuda.is_available():
+            total_memory = torch.cuda.get_device_properties(0).total_memory
+            return threshold_ratio * total_memory
+        return None
+
+    @staticmethod
+    def monitor_memory_usage(threshold_ratio: float = 0.85) -> None:
+        """
+        Check and log whether current GPU memory usage exceeds a given threshold.
+
+        Args:
+            threshold_ratio (float): Percentage threshold of total GPU memory to trigger alerts.
+        """
+        if torch.cuda.is_available():
+            threshold = MemoryManager.get_memory_threshold(threshold_ratio)
+            if torch.cuda.memory_allocated() > threshold:
+                logging.warning(f"Memory usage exceeds {threshold_ratio * 100:.0f}% of GPU capacity!")
+                MemoryManager.clean_memory(aggressive=True)
+
+    @staticmethod
+    def monitor_memory(func):
+        """
+        Decorator to log memory usage before and after function execution.
+
+        Args:
+            func (callable): The function to be wrapped.
+
+        Returns:
+            callable: Wrapped function that logs memory usage.
+        """
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
+            MemoryManager.log_memory_usage()  # Log before execution
+            
+            try:
+                result = func(*args, **kwargs)
+            except RuntimeError as e:
+                if "out of memory" in str(e):
+                    logging.error("Out of memory error. Cleaning memory...")
+                    MemoryManager.clean_memory(aggressive=True)
+                    raise e
+                else:
+                    raise e
+            
+            MemoryManager.log_memory_usage()  # Log after execution
+            return result
+        return wrapper
+
+    @staticmethod
+    def handle_oom(func):
+        """
+        Decorator to handle out-of-memory errors by cleaning memory and retrying the operation.
+
+        Args:
+            func (callable): The function to be wrapped.
+
+        Returns:
+            callable: Wrapped function that retries execution after OOM error.
+        """
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except RuntimeError as e:
+                if "out of memory" in str(e):
+                    logging.error("Out of memory error detected. Cleaning memory and attempting recovery...")
+                    MemoryManager.clean_memory(aggressive=True)
+                    # Optionally, clear optimizer gradients if passed
+                    optimizer = kwargs.get('optimizer')
+                    if optimizer:
+                        optimizer.zero_grad()
+                    return None  # Allow retry logic in training loop
+                raise e
+        return wrapper
+
+    @staticmethod
+    def log_cpu_memory_usage():
+        """
+        Log the current memory usage for the CPU.
+        """
+        import psutil
+
+        process = psutil.Process()
+        memory_info = process.memory_info()
+        rss = memory_info.rss / (1024 ** 2)  # Resident Set Size in MB
+        vms = memory_info.vms / (1024 ** 2)  # Virtual Memory Size in MB
+
+        logging.info(f"CPU Memory Usage: RSS: {rss:.2f} MB, VMS: {vms:.2f} MB")
+
+    @staticmethod
+    def monitor_memory_decorator(func):
+        """
+        Decorator to log both CPU and GPU memory usage before and after a function's execution.
+
+        Args:
+            func (callable): The function to be wrapped.
+
+        Returns:
+            callable: Wrapped function that logs CPU and GPU memory usage.
+        """
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            logging.info("Monitoring memory before execution...")
+            MemoryManager.log_cpu_memory_usage()
+            MemoryManager.log_memory_usage()  # Log GPU memory
+            
+            try:
+                result = func(*args, **kwargs)
+            except RuntimeError as e:
+                if "out of memory" in str(e):
+                    logging.error("Out of memory error detected during function execution. Attempting recovery...")
+                    MemoryManager.clean_memory(aggressive=True)
+                    raise e
+                else:
+                    raise e
+            
+            logging.info("Monitoring memory after execution...")
+            MemoryManager.log_cpu_memory_usage()
+            MemoryManager.log_memory_usage()  # Log GPU memory
+            return result
+        return wrapper
+
+class CheckpointManager:
+    def __init__(self, save_dir: str, max_checkpoints: int = 3):
+        """
+        Manages saving and cleaning up model checkpoints.
+
+        Args:
+            save_dir (str): Directory to save checkpoints.
+            max_checkpoints (int): Maximum number of checkpoints to retain.
+        """
+        self.save_dir = Path(save_dir)
+        self.save_dir.mkdir(parents=True, exist_ok=True)
+        self.max_checkpoints = max_checkpoints
+        # Initialize checkpoints from existing files
+        self.checkpoints = sorted(self.save_dir.glob("*.pt"), key=os.path.getmtime)
+
+    def save_checkpoint(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer, epoch: int, loss: float, metrics: Dict[str, float], best: bool = False) -> None:
+        """
+        Saves a checkpoint and manages older ones.
+
+        Args:
+            model (torch.nn.Module): The model to save.
+            optimizer (torch.optim.Optimizer): Optimizer to save.
+            epoch (int): The epoch number.
+            loss (float): Loss value.
+            metrics (Dict[str, float]): Additional metrics to save.
+            best (bool): Whether this is the best checkpoint.
+        """
+        checkpoint_name = f"checkpoint_epoch_{epoch}.pt" if not best else f"best_checkpoint.pt"
+        checkpoint_path = self.save_dir / checkpoint_name
+
+        checkpoint_data = {
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': loss,
+            'metrics': metrics,
+            'timestamp': datetime.now().isoformat()
+        }
+
+        try:
+            # Check available disk space before saving
+            if shutil.disk_usage(self.save_dir).free < 500 * 1024 * 1024:  # Less than 500MB
+                logging.warning("Low disk space. Checkpoint might fail to save.")
+
+            torch.save(checkpoint_data, checkpoint_path)
+            if not best:
+                self.checkpoints.append(checkpoint_path)
+            logging.info(f"Saved checkpoint: {checkpoint_path}")
+
+            # Remove old checkpoints if exceeding the limit
+            self._cleanup_old_checkpoints()
+
+        except Exception as e:
+            logging.error(f"Failed to save checkpoint: {e}")
+            raise
+
+    def _cleanup_old_checkpoints(self) -> None:
+        """
+        Removes the oldest checkpoints if the total exceeds `max_checkpoints`.
+        """
+        while len(self.checkpoints) > self.max_checkpoints:
+            oldest_checkpoint = self.checkpoints.pop(0)
+            try:
+                oldest_checkpoint.unlink()
+                logging.info(f"Removed old checkpoint: {oldest_checkpoint}")
+            except Exception as e:
+                logging.warning(f"Failed to remove checkpoint {oldest_checkpoint}: {e}")
+
+    def load_latest_checkpoint(self, model: torch.nn.Module, optimizer: Optional[torch.optim.Optimizer] = None, map_location: Optional[Any] = None) -> Tuple[Optional[int], Optional[Dict[str, float]]]:
+        """
+        Loads the latest checkpoint.
+
+        Args:
+            model (torch.nn.Module): The model to load the state dict into.
+            optimizer (torch.optim.Optimizer, optional): The optimizer to load the state dict into.
+            map_location (optional): Map location for loading checkpoints (useful for multi-GPU or CPU).
+
+        Returns:
+            Tuple[int, Dict[str, float]]: The epoch and metrics from the checkpoint.
+        """
+        if not self.checkpoints:
+            logging.warning("No checkpoints available to load.")
+            return None, None
+
+        latest_checkpoint = self.checkpoints[-1]
+        logging.info(f"Loading checkpoint: {latest_checkpoint}")
+
+        try:
+            checkpoint_data = torch.load(latest_checkpoint, map_location=map_location)
+            model.load_state_dict(checkpoint_data['model_state_dict'])
+            if optimizer:
+                optimizer.load_state_dict(checkpoint_data['optimizer_state_dict'])
+            return checkpoint_data.get('epoch', 0), checkpoint_data.get('metrics', {})
+        except Exception as e:
+            logging.error(f"Failed to load checkpoint: {e}")
+            raise
+
+    def load_checkpoint_by_path(self, checkpoint_path: str, model: torch.nn.Module, optimizer: Optional[torch.optim.Optimizer] = None, map_location: Optional[Any] = None) -> Tuple[Optional[int], Optional[Dict[str, float]]]:
+        """
+        Load a checkpoint from a specified file path.
+
+        Args:
+            checkpoint_path (str): Path to the checkpoint file.
+            model (torch.nn.Module): The model to load the state dict into.
+            optimizer (torch.optim.Optimizer, optional): The optimizer to load the state dict into.
+            map_location (optional): Map location for loading checkpoints (useful for multi-GPU or CPU).
+
+        Returns:
+            Tuple[int, Dict[str, float]]: The epoch and metrics from the checkpoint.
+        """
+        checkpoint_path = Path(checkpoint_path)
+        if not checkpoint_path.exists():
+            logging.error(f"Checkpoint path does not exist: {checkpoint_path}")
+            return None, None
+
+        logging.info(f"Loading checkpoint from specified path: {checkpoint_path}")
+
+        try:
+            checkpoint_data = torch.load(checkpoint_path, map_location=map_location)
+            model.load_state_dict(checkpoint_data['model_state_dict'])
+            if optimizer:
+                optimizer.load_state_dict(checkpoint_data['optimizer_state_dict'])
+            return checkpoint_data.get('epoch', 0), checkpoint_data.get('metrics', {})
+        except Exception as e:
+            logging.error(f"Failed to load checkpoint from path: {e}")
+            raise
+
+    def load_best_checkpoint(self, model: torch.nn.Module, optimizer: Optional[torch.optim.Optimizer] = None, map_location: Optional[Any] = None) -> Tuple[Optional[int], Optional[Dict[str, float]]]:
+        """
+        Loads the best checkpoint (if available).
+
+        Args:
+            model (torch.nn.Module): The model to load the state dict into.
+            optimizer (torch.optim.Optimizer, optional): The optimizer to load the state dict into.
+            map_location (optional): Map location for loading checkpoints (useful for multi-GPU or CPU).
+
+        Returns:
+            Tuple[int, Dict[str, float]]: The epoch and metrics from the checkpoint.
+        """
+        best_checkpoint_path = self.save_dir / "best_checkpoint.pt"
+        if not best_checkpoint_path.exists():
+            logging.warning("Best checkpoint does not exist.")
+            return None, None
+
+        logging.info(f"Loading best checkpoint from: {best_checkpoint_path}")
+
+        try:
+            checkpoint_data = torch.load(best_checkpoint_path, map_location=map_location)
+            model.load_state_dict(checkpoint_data['model_state_dict'])
+            if optimizer:
+                optimizer.load_state_dict(checkpoint_data['optimizer_state_dict'])
+            return checkpoint_data.get('epoch', 0), checkpoint_data.get('metrics', {})
+        except Exception as e:
+            logging.error(f"Failed to load best checkpoint: {e}")
+            raise
+
 # Model Manager for handling model initialization
 class ModelManager:
     def __init__(self, config: Dict[str, Any], device: torch.device):
@@ -384,135 +738,6 @@ def train_model(
                     break
 
     writer.close()
-
-# Memory Management Class
-class MemoryManager:
-    @staticmethod
-    def clean_memory():
-        """Clean up memory across CPU and GPU."""
-        gc.collect()  # Trigger garbage collection
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()  # Clear CUDA cache
-            torch.cuda.synchronize()  # Ensure all operations are complete
-
-    @staticmethod
-    def log_memory_usage():
-        """Log the current and peak memory usage on the GPU."""
-        if torch.cuda.is_available():
-            allocated = torch.cuda.memory_allocated() / 1024 ** 3  # Convert to GB
-            max_allocated = torch.cuda.max_memory_allocated() / 1024 ** 3  # Peak allocated
-            reserved = torch.cuda.memory_reserved() / 1024 ** 3  # Cached memory
-            logging.info(
-                f"GPU Memory Usage: Allocated: {allocated:.2f} GB, "
-                f"Max Allocated: {max_allocated:.2f} GB, Reserved: {reserved:.2f} GB"
-            )
-        else:
-            logging.info("No GPU available to log memory usage.")
-
-    @staticmethod
-    def monitor_memory(func):
-        """Decorator to log memory usage before and after function execution."""
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            if torch.cuda.is_available():
-                torch.cuda.reset_peak_memory_stats()
-            MemoryManager.log_memory_usage()
-            
-            result = func(*args, **kwargs)
-            
-            MemoryManager.log_memory_usage()
-            return result
-        return wrapper
-
-# Enhanced Checkpoint Management
-class CheckpointManager:
-    def __init__(self, save_dir: str, max_checkpoints: int = 3):
-        """
-        Manages saving and cleaning up model checkpoints.
-
-        Args:
-            save_dir (str): Directory to save checkpoints.
-            max_checkpoints (int): Maximum number of checkpoints to retain.
-        """
-        self.save_dir = Path(save_dir)
-        self.save_dir.mkdir(parents=True, exist_ok=True)
-        self.max_checkpoints = max_checkpoints
-        # Initialize checkpoints from existing files
-        self.checkpoints = sorted(self.save_dir.glob("*.pt"), key=os.path.getmtime)
-
-    def save_checkpoint(self, model: nn.Module, optimizer: torch.optim.Optimizer, epoch: int, loss: float, metrics: Dict[str, float]) -> None:
-        """
-        Saves a checkpoint and manages older ones.
-
-        Args:
-            model (nn.Module): The model to save.
-            optimizer (torch.optim.Optimizer): Optimizer to save.
-            epoch (int): The epoch number.
-            loss (float): Loss value.
-            metrics (Dict[str, float]): Additional metrics to save.
-        """
-        checkpoint_path = self.save_dir / f"checkpoint_epoch_{epoch}.pt"
-        checkpoint_data = {
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': loss,
-            'metrics': metrics,
-            'timestamp': datetime.now().isoformat()
-        }
-
-        try:
-            torch.save(checkpoint_data, checkpoint_path)
-            self.checkpoints.append(checkpoint_path)
-            logging.info(f"Saved checkpoint: {checkpoint_path}")
-
-            # Remove old checkpoints if exceeding the limit
-            self._cleanup_old_checkpoints()
-
-        except Exception as e:
-            logging.error(f"Failed to save checkpoint: {e}")
-            raise
-
-    def _cleanup_old_checkpoints(self) -> None:
-        """
-        Removes the oldest checkpoints if the total exceeds `max_checkpoints`.
-        """
-        while len(self.checkpoints) > self.max_checkpoints:
-            oldest_checkpoint = self.checkpoints.pop(0)
-            try:
-                oldest_checkpoint.unlink()
-                logging.info(f"Removed old checkpoint: {oldest_checkpoint}")
-            except Exception as e:
-                logging.warning(f"Failed to remove checkpoint {oldest_checkpoint}: {e}")
-
-    def load_latest_checkpoint(self, model: nn.Module, optimizer: Optional[torch.optim.Optimizer] = None):
-        """
-        Loads the latest checkpoint.
-
-        Args:
-            model (nn.Module): The model to load the state dict into.
-            optimizer (torch.optim.Optimizer, optional): The optimizer to load the state dict into.
-
-        Returns:
-            Tuple[int, Dict[str, float]]: The epoch and metrics from the checkpoint.
-        """
-        if not self.checkpoints:
-            logging.warning("No checkpoints available to load.")
-            return None, None
-
-        latest_checkpoint = self.checkpoints[-1]
-        logging.info(f"Loading checkpoint: {latest_checkpoint}")
-
-        try:
-            checkpoint_data = torch.load(latest_checkpoint)
-            model.load_state_dict(checkpoint_data['model_state_dict'])
-            if optimizer:
-                optimizer.load_state_dict(checkpoint_data['optimizer_state_dict'])
-            return checkpoint_data.get('epoch', 0), checkpoint_data.get('metrics', {})
-        except Exception as e:
-            logging.error(f"Failed to load checkpoint: {e}")
-            raise
-
 @dataclass
 class TrainingConfig:
     epochs: int
@@ -685,13 +910,18 @@ class EmbeddingGenerator:
             logging.error(f"Error saving embeddings to Pinecone: {e}")
             raise
 
-    def save_embeddings_for_model(self, save_path: str = "pretrained_embeddings.pt"):
+    def save_embeddings_for_model(self, version: str = "v1", save_path: str = None):
         """
         Save generated embeddings to a file to be loaded into the model's embedding layer.
 
         Args:
-            save_path (str): The path where the embeddings should be saved.
+            version (str): The version of the embeddings.
+            save_path (str): The path where the embeddings should be saved. If not provided, 
+                             it will be saved with a default versioned name.
         """
+        if not save_path:
+            save_path = f"luminalm_embeddings_{version}.pt"
+        
         logging.info(f"Saving pre-trained embeddings to {save_path}")
 
         # Assuming that embeddings are to be saved as the full embedding matrix
@@ -712,7 +942,7 @@ def main() -> None:
         wandb.init(project="transformer-training", config="config.yaml")
         logging.info("Initialized wandb for experiment tracking")
 
-        # Enhanced argument parsing
+        # Parse arguments
         args = parse_arguments()
 
         # Initialize configuration and logging
@@ -720,8 +950,10 @@ def main() -> None:
         config = config_manager.config
         setup_logging(config)
 
-        # Initialize training components
+        # Setup device
         device = setup_device()
+
+        # Initialize model and tokenizer
         model_manager = ModelManager(config, device)
         model, tokenizer = model_manager.initialize_model()
 
@@ -729,13 +961,12 @@ def main() -> None:
         if args.pretrained_embeddings:
             load_pretrained_embeddings(model, args.pretrained_embeddings)
 
+        # Setup DataManager and load datasets
         data_manager = DataManager(config, device)
         data_manager.tokenizer = tokenizer
-
-        # Load and process datasets
         sequences = load_and_process_data(data_manager, args)
 
-        # Training setup
+        # Setup DataLoader, optimizer, and scheduler
         train_loader = create_data_loader(sequences, config, device)
         optimizer, scheduler = setup_optimizer_and_scheduler(model, config)
 
@@ -757,7 +988,7 @@ def main() -> None:
         wandb.finish()
         MemoryManager.clean_memory(aggressive=True)
 
-
+# Argument Parsing
 def parse_arguments() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
@@ -767,17 +998,16 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument('--config', type=str, default='config.yaml', help='Path to config file')
     parser.add_argument('--checkpoint', type=str, help='Path to checkpoint to resume training')
     parser.add_argument('--local_data_dir', type=str, help='Path to local data directory')
-    parser.add_argument('--pretrained_embeddings', type=str, help='Path to pre-trained embeddings file')
     return parser.parse_args()
 
-
+# Device Setup
 def setup_device() -> torch.device:
     """Setup the device (CPU or GPU) to be used for training."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logging.info(f"Using device: {device}")
     return device
 
-
+# Load and Process Data
 def load_and_process_data(data_manager: DataManager, args: argparse.Namespace) -> List[List[int]]:
     """Load and process data from various sources."""
     logging.info("Loading datasets...")
@@ -798,14 +1028,14 @@ def load_and_process_data(data_manager: DataManager, args: argparse.Namespace) -
         logging.error(f"Error during data loading and processing: {str(e)}")
         raise
 
-
+# Create DataLoader
 def create_data_loader(sequences: List[List[int]], config: Dict[str, Any], device: torch.device) -> DataLoader:
     """Create the DataLoader for training."""
     dataset = AsyncPrefetchDataLoader(DataLoader(sequences, batch_size=config['model']['batch_size']), device)
     logging.info("DataLoader created successfully")
     return dataset
 
-
+# Setup Optimizer and Scheduler
 def setup_optimizer_and_scheduler(model: nn.Module, config: Dict[str, Any]) -> Tuple[torch.optim.Optimizer, CosineAnnealingLR]:
     """Setup optimizer and learning rate scheduler."""
     optimizer = AdamW(
@@ -817,7 +1047,7 @@ def setup_optimizer_and_scheduler(model: nn.Module, config: Dict[str, Any]) -> T
     logging.info("Optimizer and scheduler initialized")
     return optimizer, scheduler
 
-
+# Training Loop
 def train_model(
     model: nn.Module,
     train_loader: DataLoader,
@@ -856,7 +1086,7 @@ def train_model(
             logging.info("Early stopping triggered.")
             break
 
-
+# Generate and Save Embeddings
 def generate_embeddings_and_save(model: nn.Module, sequences: List[List[int]], config: Dict[str, Any], device: torch.device) -> None:
     """Generate and save embeddings using the trained model."""
     logging.info("Generating and saving embeddings to Pinecone...")
@@ -864,7 +1094,7 @@ def generate_embeddings_and_save(model: nn.Module, sequences: List[List[int]], c
     embedding_generator.save_embeddings_to_pinecone(sequences)
     logging.info("Embeddings saved successfully")
 
-
+# Load Pre-trained Embeddings
 def load_pretrained_embeddings(model: nn.Module, embeddings_path: str):
     """Load pre-trained embeddings into the model's embedding layer."""
     try:
@@ -878,6 +1108,7 @@ def load_pretrained_embeddings(model: nn.Module, embeddings_path: str):
         logging.error(f"Failed to load pre-trained embeddings: {e}")
         raise
 
+# Entry Point
 if __name__ == "__main__":
     main()
 

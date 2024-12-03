@@ -7,8 +7,8 @@ model:
   patience: 3               # Early stopping patience for validation metrics
 
 tokenizer:
-  save_path: "C:/Users/ASUS/Desktop/LuminaLM/embeddings/tokenizer.json"  # Path to save tokenizer
-  load_path: "C:/Users/ASUS/Desktop/LuminaLM/embeddings/tokenizer.json"  # Path to load tokenizer
+  save_path: "./embeddings/tokenizer.json"  # Path to save tokenizer
+  load_path: "./embeddings/tokenizer.json"  # Path to load tokenizer
 
 data:
   train_split: 0.8          # Fraction of data used for training
@@ -28,16 +28,16 @@ training:
 
 logging:
   level: 'INFO'             # Logging level: INFO, DEBUG, WARNING, etc.
-  save_dir: "logs"          # Directory to save logs
-  metrics_file: "metrics.json"  # File to save metrics for analysis
+  save_dir: "./logs"        # Directory to save logs
+  metrics_file: "./logs/metrics.json"  # File to save metrics for analysis
 
 checkpointing:
-  save_dir: "checkpoints"   # Directory to save model checkpoints
+  save_dir: "./checkpoints" # Directory to save model checkpoints
   save_frequency: 1         # Save checkpoints every N epochs
   keep_best_n: 3            # Keep only the top N best-performing checkpoints
 
 visualization:
-  plot_dir: "plots"         # Directory to save visualizations like training curves
+  plot_dir: "./plots"       # Directory to save visualizations like training curves
   sample_size: 1000         # Sample size for visualization plots
   embedding_dims: 3         # Dimensionality for embedding visualizations (e.g., t-SNE)
 
