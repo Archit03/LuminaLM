@@ -1,0 +1,47 @@
+# Model Configuration
+model:
+  n_embd: 512
+  n_head: 8
+  n_encoder_layers: 6
+  n_decoder_layers: 6
+  block_size: 128
+  vocab_size: 60000
+  embd_pdrop: 0.1
+  resid_pdrop: 0.1
+  attn_pdrop: 0.1
+  use_checkpoint: True
+  layer_norm_epsilon: 1e-5
+  initializer_range: 0.02
+  pad_token_id: 0
+  bos_token_id: 1
+  eos_token_id: 2
+  max_position_embeddings: 128
+  shared_embeddings: True
+  tie_word_embeddings: True
+  use_cache: True
+  use_rotary_embeddings: True
+  fp16: False
+  max_grad_norm: 1.0
+
+# Training Configuration
+training:
+  batch_size: 16
+  num_epochs: 10
+  learning_rate: 5e-5
+  weight_decay: 0.01
+  warmup_steps: 1000
+  max_grad_norm: 1.0
+  early_stopping_patience: 3
+
+# Logging Configuration
+logging:
+  tensorboard_log_dir: "logs/tensorboard"
+
+# Dataset Configuration
+datasets:
+  squad:
+    splits: ["train", "validation"]
+  trivia_qa:
+    splits: ["train"]
+  nq_open:
+    splits: ["train"]
