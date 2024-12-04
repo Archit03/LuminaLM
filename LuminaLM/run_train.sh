@@ -12,7 +12,7 @@ if ! command -v $PYTHON &> /dev/null; then
 fi
 
 # Path to the config file
-CONFIG_PATH="configs/config.yaml"
+CONFIG_PATH="config.yaml"
 
 # Check if the configuration file exists
 if [ ! -f "$CONFIG_PATH" ]; then
