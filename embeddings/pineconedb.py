@@ -6,7 +6,6 @@ import torch
 
 # Load environment variables from api.env
 load_dotenv("api.env")
-
 # Initialize Pinecone client with API key
 api_key = os.getenv("api_key")
 pc = Pinecone(api_key=api_key, environment="us-east-1")

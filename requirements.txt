@@ -16,4 +16,6 @@ python-dotenv>=1.0.0    # Manage environment variables easily
 nltk>=3.8.0             # For BLEU scoring and other NLP tasks
 rouge-score>=0.1.2      # For ROUGE metric evaluation
 watchdog==2.1.5
+wandb
+tensorboard
 

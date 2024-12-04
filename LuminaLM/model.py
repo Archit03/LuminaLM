@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import json
 import math
 from torch.utils.checkpoint import checkpoint
-from torch.amp import autocast
+from torch.cuda.amp import autocast
 
 # Set up logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -40,6 +40,7 @@ class LuminaLMConfig:
     use_rotary_embeddings: bool = True
     fp16: bool = False
     max_grad_norm: float = 1.0
+    advanced_attention: bool = False  # Support for advanced attention mechanisms
 
     @classmethod
     def from_json(cls, json_file: str) -> 'LuminaLMConfig':
@@ -76,6 +77,7 @@ class LuminaLMConfig:
         assert 0.0 <= self.attn_pdrop <= 1.0, "attn_pdrop must be between 0 and 1"
         logger.info("Configuration parameters are valid.")
 
+# Rotary Embeddings Helper Functions
 def rotate_half(x: torch.Tensor) -> torch.Tensor:
     """Rotate half of the dimensions of the tensor for rotary embeddings."""
     x1 = x[..., :x.shape[-1] // 2]
@@ -125,6 +127,7 @@ class RotaryEmbedding(nn.Module):
             raise ValueError(f"Requested sequence length {seq_len} exceeds max cached length {self.max_seq_len_cached}.")
         return self.cos_cached[:, :, :seq_len, :].to(device), self.sin_cached[:, :, :seq_len, :].to(device)
 
+# Position Embeddings Layer
 class PositionEmbeddings(nn.Module):
     """Learned positional embeddings for the model."""
     def __init__(self, config: LuminaLMConfig):
@@ -144,6 +147,7 @@ class PositionEmbeddings(nn.Module):
         """
         return self.dropout(self.embeddings(position_ids))
 
+# Flash Attention Layer with Rotary Embedding Support
 class FlashAttention(nn.Module):
     """FlashAttention with support for rotary embeddings for efficient memory usage."""
     def __init__(self, config: LuminaLMConfig):
@@ -161,7 +165,14 @@ class FlashAttention(nn.Module):
         if config.use_rotary_embeddings:
             self.rotary_emb = RotaryEmbedding(self.head_dim, config.max_position_embeddings)
 
-    def forward(self, query: torch.Tensor, key: torch.Tensor, value: torch.Tensor, mask: Optional[torch.Tensor] = None, position_ids: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(
+        self, 
+        query: torch.Tensor, 
+        key: torch.Tensor, 
+        value: torch.Tensor, 
+        mask: Optional[torch.Tensor] = None, 
+        position_ids: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         batch_size, seq_len, _ = query.size()
 
         # Input validation for tensor types and shapes
@@ -198,6 +209,8 @@ class FlashAttention(nn.Module):
         output = self.out_proj(context)
 
         return output
+
+# Feed Forward Layer of Transformer
 class FeedForward(nn.Module):
     """Feed Forward Layer of the Transformer."""
     def __init__(self, config: LuminaLMConfig):
@@ -224,6 +237,7 @@ class FeedForward(nn.Module):
             x = self.dropout(x)
         return x
 
+# Encoder Block
 class EncoderBlock(nn.Module):
     """Encoder block consisting of multi-head attention and feed-forward layers."""
     def __init__(self, config: LuminaLMConfig):
@@ -234,7 +248,12 @@ class EncoderBlock(nn.Module):
         self.ln2 = nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
         self.use_checkpoint = config.use_checkpoint
 
-    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None, position_ids: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(
+        self, 
+        x: torch.Tensor, 
+        mask: Optional[torch.Tensor] = None, 
+        position_ids: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         """
         Forward pass for encoder block.
 
@@ -257,6 +276,7 @@ class EncoderBlock(nn.Module):
             return checkpoint(_forward, x)
         return _forward(x)
 
+# Decoder Block
 class DecoderBlock(nn.Module):
     """Decoder block consisting of self-attention, cross-attention, and feed-forward layers."""
     def __init__(self, config: LuminaLMConfig):
@@ -308,6 +328,7 @@ class DecoderBlock(nn.Module):
             return checkpoint(_forward, x)
         return _forward(x)
 
+# LuminaLM Model
 class LuminaLM(nn.Module):
     """Encoder-Decoder Transformer model: LuminaLM."""
     def __init__(self, config: LuminaLMConfig):
@@ -339,12 +360,7 @@ class LuminaLM(nn.Module):
         self.apply(self._init_weights)
 
     def _init_weights(self, module: nn.Module) -> None:
-        """
-        Custom weight initialization with variance scaling based on layer depth.
-
-        Args:
-            module (nn.Module): A model module to apply weight initialization.
-        """
+        """Custom weight initialization with variance scaling based on layer depth."""
         if isinstance(module, (nn.Linear, nn.Embedding)):
             layer_depth = self.get_depth(module)
             std_dev = self.config.initializer_range / math.sqrt(layer_depth + 1)
@@ -356,56 +372,10 @@ class LuminaLM(nn.Module):
             module.weight.data.fill_(1.0)
 
     def get_depth(self, module: nn.Module) -> int:
-        """
-        Get the depth of a module within the network.
-
-        Args:
-            module (nn.Module): Module whose depth is to be determined.
-
-        Returns:
-            int: Depth of the module within the network.
-        """
+        """Get the depth of a module within the network."""
         if isinstance(module, (EncoderBlock, DecoderBlock)):
             return 1
         return 0
-
-    def save_pretrained(self, save_path: str) -> None:
-        """
-        Save the model weights and configuration.
-
-        Args:
-            save_path (str): Directory path where model and config will be saved.
-        """
-        try:
-            os.makedirs(save_path, exist_ok=True)
-            torch.save(self.state_dict(), os.path.join(save_path, "LuminaLM.pt"))
-            self.config.to_json(os.path.join(save_path, "config.json"))
-            logger.info(f"Model and config saved to '{save_path}'.")
-        except IOError as e:
-            logger.error(f"Failed to save the model to '{save_path}': {e}")
-            raise
-
-    @classmethod
-    def from_pretrained(cls, load_path: str) -> 'LuminaLM':
-        """
-        Load the model weights and configuration from a pretrained checkpoint.
-
-        Args:
-            load_path (str): Path to the directory containing model weights and config.
-
-        Returns:
-            LuminaLM: The loaded model instance.
-        """
-        try:
-            config = LuminaLMConfig.from_json(os.path.join(load_path, "config.json"))
-            model = cls(config)
-            state_dict = torch.load(os.path.join(load_path, "LuminaLM.pt"))
-            model.load_state_dict(state_dict)
-            logger.info(f"Model loaded from '{load_path}'.")
-            return model
-        except (IOError, KeyError) as e:
-            logger.error(f"Failed to load the model from '{load_path}': {e}")
-            raise
 
     def forward(
         self,
@@ -414,18 +384,7 @@ class LuminaLM(nn.Module):
         attention_mask: Optional[torch.Tensor] = None,
         decoder_attention_mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        """
-        Forward pass of the LuminaLM model.
-
-        Args:
-            input_ids (torch.Tensor): Input tensor for encoder (batch_size, seq_len).
-            decoder_input_ids (torch.Tensor): Input tensor for decoder (batch_size, seq_len).
-            attention_mask (Optional[torch.Tensor]): Mask tensor for encoder.
-            decoder_attention_mask (Optional[torch.Tensor]): Mask tensor for decoder.
-
-        Returns:
-            torch.Tensor: Model output logits of shape (batch_size, seq_len, vocab_size).
-        """
+        """Forward pass of the LuminaLM model."""
         device = input_ids.device
 
         # Input Validation
@@ -454,3 +413,65 @@ class LuminaLM(nn.Module):
         logits = self.lm_head(decoder_outputs)
 
         return logits
+
+    def generate(
+        self,
+        input_ids: torch.Tensor,
+        max_length: int,
+        temperature: float = 1.0,
+        top_k: Optional[int] = None,
+        top_p: Optional[float] = None,
+        early_stopping: bool = True,
+    ) -> torch.Tensor:
+        """Generate text from the model given an input prompt."""
+        if not isinstance(input_ids, torch.Tensor):
+            raise TypeError("Input tensor must be of type torch.Tensor.")
+        if max_length <= 0:
+            raise ValueError("max_length must be a positive integer.")
+
+        batch_size = input_ids.size(0)
+        generated_tokens = input_ids
+
+        for _ in range(max_length):
+            logits = self.forward(input_ids=generated_tokens, decoder_input_ids=generated_tokens)
+
+            # Apply temperature
+            logits = logits[:, -1, :] / temperature
+
+            # Top-K and top-p filtering
+            if top_k is not None:
+                logits = self.top_k_filtering(logits, top_k)
+            if top_p is not None:
+                logits = self.top_p_filtering(logits, top_p)
+
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+
+            generated_tokens = torch.cat([generated_tokens, next_token], dim=1)
+
+            if early_stopping and (next_token == self.config.eos_token_id).all():
+                break
+
+        return generated_tokens
+
+    @staticmethod
+    def top_k_filtering(logits: torch.Tensor, top_k: int) -> torch.Tensor:
+        """Filter logits using top-K filtering."""
+        indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
+        logits[indices_to_remove] = float('-inf')
+        return logits
+
+    @staticmethod
+    def top_p_filtering(logits: torch.Tensor, top_p: float) -> torch.Tensor:
+        """Filter logits using top-p (nucleus) sampling."""
+        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+        cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+        sorted_indices_to_remove = cumulative_probs > top_p
+        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+        sorted_indices_to_remove[..., 0] = 0
+
+        indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+        logits[indices_to_remove] = float('-inf')
+        return logits
+
