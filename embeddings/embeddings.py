@@ -13,7 +13,7 @@ import torch.nn.utils.rnn as rnn_utils
 from torch.utils.data import DataLoader, IterableDataset
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.amp import autocast, GradScaler
-from tokenizers import Tokenizer
+from tokens.tokenizer import Tokenizer
 from datetime import datetime
 from tqdm.auto import tqdm
 from multiprocessing import Pool
@@ -38,6 +38,8 @@ from collections import OrderedDict
 import pickle
 import shutil
 
+
+## Remember to fix the tokenizer path, update it. 
 
 # Load environment variables for Pinecone API key
 load_dotenv('api.env')
