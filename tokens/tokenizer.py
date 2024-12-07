@@ -1,17 +1,23 @@
 import logging
 import os
 import json
+import mimetypes
+import hashlib  # Added for sanitizing filenames
+import multiprocessing  # Added for parallel processing
 import traceback
-from typing import List, Dict, Any, Optional, Tuple
+from pathlib import Path
+from typing import List, Dict, Any, Optional, Tuple, Union, Set
+from concurrent.futures import ProcessPoolExecutor, as_completed  # For parallel dataset processing
+from itertools import islice  # For efficient chunking of file lines or JSON objects
+from tqdm import tqdm  # For progress bars
 
 import torch
 from torch import Tensor
-from datasets import load_dataset
+from datasets import load_dataset  # For loading HuggingFace datasets
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.pre_tokenizers import ByteLevel
 from tokenizers.trainers import BpeTrainer
-
 # Set up logging
 LOG_FILE = "medical_tokenization.log"
 logging.basicConfig(
@@ -303,89 +309,211 @@ class MedicalTokenizer:
         """
         return self.strategy.hybrid_encode(texts, task_type=task_type, **kwargs)
 
+class FileValidator:
+    """Validates and sanitizes file uploads."""
+    
+    ALLOWED_EXTENSIONS: Set[str] = {'.txt', '.csv', '.json', '.jsonl', '.text'}
+    MAX_FILE_SIZE: int = 100 * 1024 * 1024  # 100MB
+    ALLOWED_MIMETYPES: Set[str] = {
+        'text/plain', 'text/csv', 'application/json',
+        'application/x-json', 'text/json'
+    }
+
+    @classmethod
+    def validate_file(cls, file_path: Union[str, Path]) -> Tuple[bool, str]:
+        """
+        Validate a file for processing.
+        
+        :param file_path: Path to the file
+        :return: Tuple of (is_valid, error_message)
+        """
+        file_path = Path(file_path)
+        
+        try:
+            if not file_path.exists():
+                return False, "File does not exist"
+
+            if not file_path.is_file():
+                return False, "Path is not a file"
+
+            if file_path.suffix.lower() not in cls.ALLOWED_EXTENSIONS:
+                return False, f"Unsupported file extension. Allowed: {cls.ALLOWED_EXTENSIONS}"
+
+            mime_type, _ = mimetypes.guess_type(str(file_path))
+            if mime_type not in cls.ALLOWED_MIMETYPES:
+                return False, f"Invalid file type: {mime_type}"
+
+            if file_path.stat().st_size > cls.MAX_FILE_SIZE:
+                return False, f"File too large. Maximum size: {cls.MAX_FILE_SIZE/1024/1024}MB"
+
+            return True, ""
+        except Exception as e:
+            return False, f"Validation error: {str(e)}"
+
+    @staticmethod
+    def sanitize_filename(filename: str) -> str:
+        """
+        Sanitize a filename for safe storage.
+        
+        :param filename: Original filename
+        :return: Sanitized filename
+        """
+        # Create a hash of the original filename
+        filename_hash = hashlib.md5(filename.encode()).hexdigest()[:8]
+        # Get the extension
+        ext = Path(filename).suffix
+        # Create a safe filename
+        safe_name = f"file_{filename_hash}{ext}"
+        return safe_name
+
 class DatasetProcessor:
-    """Class to process and prepare datasets for tokenizer training."""
+    """Enhanced dataset processor with parallel processing and better error handling."""
 
     def __init__(self, datasets: List[Dict[str, Any]], local_data_path: str):
         self.datasets = datasets
-        self.local_data_path = local_data_path
+        self.local_data_path = Path(local_data_path)
         self.processed_files = []
+        self.file_validator = FileValidator()
+        self.num_workers = max(1, multiprocessing.cpu_count() - 1)
 
-    def process(self) -> List[str]:
-        """Process all datasets and return a list of file paths."""
-        logging.info("Starting dataset processing...")
-        os.makedirs(self.local_data_path, exist_ok=True)
+    def process_chunk(self, chunk: List[Any]) -> List[str]:
+        """Process a chunk of data in parallel."""
+        processed_texts = []
+        for item in chunk:
+            text = self.extract_text(item)
+            if text.strip():
+                processed_texts.append(text)
+        return processed_texts
+
+    def parallel_process_dataset(self, dataset, chunk_size: int = 1000) -> List[str]:
+        """
+        Process dataset in parallel chunks.
         
-        total_datasets = sum(len(d.get('configs', [None])) for d in self.datasets)
-        processed = 0
-        
-        for dataset_info in self.datasets:
-            dataset_name = dataset_info.get('name')
-            configs = dataset_info.get('configs', [None])
-            trust_remote_code = dataset_info.get('trust_remote_code', False)
+        :param dataset: Dataset to process
+        :param chunk_size: Size of chunks for parallel processing
+        :return: List of processed texts
+        """
+        chunks = [dataset[i:i + chunk_size] for i in range(0, len(dataset), chunk_size)]
+        processed_texts = []
+
+        with ProcessPoolExecutor(max_workers=self.num_workers) as executor:
+            futures = [executor.submit(self.process_chunk, chunk) for chunk in chunks]
             
-            for config in configs:
-                processed += 1
-                logging.info(f"Processing dataset {processed}/{total_datasets}: {dataset_name}, config: {config}")
-                try:
-                    dataset = load_dataset(
-                        dataset_name,
-                        config,
-                        split='train',
-                        cache_dir=self.local_data_path,
-                        download_mode='reuse_dataset_if_exists',
-                        # Removed ignore_verifications=True
+            with tqdm(total=len(chunks), desc="Processing chunks") as pbar:
+                for future in as_completed(futures):
+                    try:
+                        processed_texts.extend(future.result())
+                        pbar.update(1)
+                    except Exception as e:
+                        logging.error(f"Error processing chunk: {str(e)}")
+
+        return processed_texts
+
+    def process_file(self, file_path: Union[str, Path]) -> Optional[str]:
+        """Enhanced file processing with validation and error handling."""
+        file_path = Path(file_path)
+        
+        # Validate file
+        is_valid, error_msg = self.file_validator.validate_file(file_path)
+        if not is_valid:
+            logging.error(f"File validation failed: {error_msg}")
+            return None
+
+        # Create safe output filename
+        safe_filename = self.file_validator.sanitize_filename(file_path.name)
+        output_file = self.local_data_path / f"processed_{safe_filename}"
+
+        try:
+            ext = file_path.suffix.lower()
+            
+            if ext == '.csv':
+                return self._process_csv_file(file_path, output_file)
+            elif ext in {'.json', '.jsonl'}:
+                return self._process_json_file(file_path, output_file)
+            elif ext in {'.txt', '.text'}:
+                return self._process_text_file(file_path, output_file)
+            else:
+                logging.warning(f"Unsupported file format: {ext}")
+                return None
+
+        except Exception as e:
+            logging.error(f"Error processing file {file_path}: {str(e)}")
+            if output_file.exists():
+                output_file.unlink()  # Clean up partial file
+            return None
+
+    def _process_csv_file(self, input_path: Path, output_path: Path) -> Optional[str]:
+        """Process CSV files with chunking for large files."""
+        try:
+            import pandas as pd
+            chunk_size = 10000  # Adjust based on available memory
+            
+            with open(output_path, 'w', encoding='utf-8') as f:
+                for chunk in pd.read_csv(input_path, chunksize=chunk_size):
+                    processed_texts = self.parallel_process_dataset(
+                        chunk.to_dict('records'),
+                        chunk_size=1000
                     )
-                except TypeError as te:
-                    logging.warning(f"'ignore_verifications' parameter is not supported for dataset {dataset_name} with config {config}. Proceeding without it.")
-                    dataset = load_dataset(
-                        dataset_name,
-                        config,
-                        split='train',
-                        cache_dir=self.local_data_path,
-                        download_mode='reuse_dataset_if_exists',
-                        trust_remote_code=trust_remote_code
-                    )
-                file_path = self.save_dataset_to_file(dataset, dataset_name, config)
-                self.processed_files.append(file_path)
-        logging.info("Dataset processing completed.")
-        return self.processed_files
+                    for text in processed_texts:
+                        f.write(f"{text}\n")
+            
+            return str(output_path)
+        except Exception as e:
+            logging.error(f"Error processing CSV file: {str(e)}")
+            return None
 
-    def save_dataset_to_file(self, dataset, dataset_name, config) -> str:
-        """
-        Save the dataset to a text file for tokenizer training.
+    def _process_json_file(self, input_path: Path, output_path: Path) -> Optional[str]:
+        """Process JSON files with streaming for large files."""
+        try:
+            import json
+            from itertools import islice
 
-        :param dataset: The dataset to save
-        :param dataset_name: Name of the dataset
-        :param config: Configuration of the dataset
-        :return: Path to the saved file
-        """
-        file_name = f"{dataset_name}_{config}_train.txt" if config else f"{dataset_name}_train.txt"
-        file_path = os.path.join(self.local_data_path, file_name)
-        with open(file_path, 'w', encoding='utf-8') as f:
-            for item in dataset:
-                text = self.extract_text(item)
-                if text:
-                    f.write(text + '\n')
-        logging.info(f"Saved dataset to {file_path}")
-        return file_path
+            def json_stream(file_obj):
+                """Stream JSON objects for memory efficiency."""
+                buffer = []
+                for line in file_obj:
+                    buffer.append(line)
+                    if line.strip().endswith('}') or line.strip().endswith(']'):
+                        try:
+                            yield json.loads(''.join(buffer))
+                            buffer = []
+                        except json.JSONDecodeError:
+                            continue
 
-    @staticmethod
-    def extract_text(item) -> str:
-        """
-        Extract text data from a dataset item.
+            with open(input_path, 'r', encoding='utf-8') as f_in:
+                with open(output_path, 'w', encoding='utf-8') as f_out:
+                    # Process in chunks of 1000 objects
+                    while True:
+                        chunk = list(islice(json_stream(f_in), 1000))
+                        if not chunk:
+                            break
+                        processed_texts = self.parallel_process_dataset(chunk)
+                        for text in processed_texts:
+                            f_out.write(f"{text}\n")
 
-        :param item: A single data item from the dataset
-        :return: Extracted text
-        """
-        if 'text' in item:
-            return item['text']
-        elif 'question' in item and 'context' in item:
-            return item['question'] + ' ' + item['context']
-        elif 'abstract' in item:
-            return item['abstract']
-        else:
-            return ''
+            return str(output_path)
+        except Exception as e:
+            logging.error(f"Error processing JSON file: {str(e)}")
+            return None
+
+    def _process_text_file(self, input_path: Path, output_path: Path) -> Optional[str]:
+        """Process text files with buffered reading."""
+        try:
+            chunk_size = 10000  # lines per chunk
+            with open(input_path, 'r', encoding='utf-8') as f_in:
+                with open(output_path, 'w', encoding='utf-8') as f_out:
+                    while True:
+                        lines = list(islice(f_in, chunk_size))
+                        if not lines:
+                            break
+                        processed_texts = self.parallel_process_dataset(lines)
+                        for text in processed_texts:
+                            f_out.write(f"{text}\n")
+
+            return str(output_path)
+        except Exception as e:
+            logging.error(f"Error processing text file: {str(e)}")
+            return None
 
 def main():
     """Main execution for medical tokenizer training."""
