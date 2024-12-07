@@ -39,8 +39,6 @@ import pickle
 import shutil
 
 
-## Remember to fix the tokenizer path, update it. 
-
 # Load environment variables for Pinecone API key
 load_dotenv('api.env')
 
@@ -119,29 +117,34 @@ class ModelManager:
     def __init__(self, config: Dict[str, Any], device: torch.device):
         self.config = config
         self.device = device
+        self.checkpoint_dir = Path(config['checkpointing']['save_dir'])
+        self.checkpoint_dir.mkdir(exist_ok=True)
+        self.scaler = GradScaler()
 
     def initialize_model(self) -> Tuple[nn.Module, Tokenizer]:
-        """Initialize the Transformer model and tokenizer."""
+        """Initialize model and tokenizer with enhanced error handling"""
         try:
-            tokenizer_path = self.config['tokenizer']['load_path']
+            tokenizer_path = os.getenv('TOKENIZER_PATH', self.config['tokenizer']['load_path'])
+            if not os.path.exists(tokenizer_path):
+                raise FileNotFoundError(f"Tokenizer file not found at: {tokenizer_path}")
+                
             tokenizer = Tokenizer.from_file(tokenizer_path)
             logging.info(f"Tokenizer loaded from {tokenizer_path}")
-
-            # Initialize the Transformer model using the build function from model.py
+            
             src_vocab_size = tokenizer.get_vocab_size()
-            tgt_vocab_size = src_vocab_size  # Assuming src and tgt vocab sizes are the same
-            transformer = model.build_unified_transformer(
+            model = torch.jit.script(model.build_unified_transformer(
                 src_vocab_size=src_vocab_size,
-                tgt_vocab_size=tgt_vocab_size,
+                tgt_vocab_size=src_vocab_size,
                 src_seq_len=self.config['model']['src_seq_len'],
-                tgt_seq_len=self.config['model']['tgt_seq_len'],
+                tgt_seq_len=self.config['model']['src_seq_len'],
                 d_model=self.config['model']['d_model']
-            ).to(self.device)
+            )).to(self.device)
 
-            return transformer, tokenizer
+            return model, tokenizer
         except Exception as e:
             logging.error(f"Error initializing model: {e}")
             raise
+
 # Security Utilities
 class SecurityUtils:
     @staticmethod
@@ -251,6 +254,9 @@ class DataManager:
         return [item for sublist in results for item in sublist]
 
     def _process_chunk(self, texts: List[str]) -> List[List[int]]:
+        if self.tokenizer is None:
+            raise ValueError("Tokenizer not initialized. Please set tokenizer before processing data.")
+            
         processed = []
         for text in texts:
             try:
@@ -622,35 +628,6 @@ class CheckpointManager:
             return checkpoint_data.get('epoch', 0), checkpoint_data.get('metrics', {})
         except Exception as e:
             logging.error(f"Failed to load best checkpoint: {e}")
-            raise
-
-# Model Manager for handling model initialization
-class ModelManager:
-    def __init__(self, config: Dict[str, Any], device: torch.device):
-        self.config = config
-        self.device = device
-        self.checkpoint_dir = Path(config['checkpointing']['save_dir'])
-        self.checkpoint_dir.mkdir(exist_ok=True)
-        self.scaler = GradScaler()
-
-    def initialize_model(self) -> Tuple[nn.Module, Tokenizer]:
-        """Initialize model and tokenizer with enhanced error handling"""
-        try:
-            tokenizer = Tokenizer.from_file(self.config['tokenizer']['load_path'])
-            logging.info(f"Tokenizer loaded from {self.config['tokenizer']['load_path']}")
-            
-            src_vocab_size = tokenizer.get_vocab_size()
-            model = torch.jit.script(model.build_unified_transformer(
-                src_vocab_size=src_vocab_size,
-                tgt_vocab_size=src_vocab_size,
-                src_seq_len=self.config['model']['src_seq_len'],
-                tgt_seq_len=self.config['model']['src_seq_len'],
-                d_model=self.config['model']['d_model']
-            )).to(self.device)
-
-            return model, tokenizer
-        except Exception as e:
-            logging.error(f"Error initializing model: {e}")
             raise
 
 def handle_oom(func):

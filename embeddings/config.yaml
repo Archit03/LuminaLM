@@ -1,56 +1,68 @@
 model:
-  d_model: 512              # Dimensionality of model embeddings
-  src_seq_len: 512          # Maximum sequence length for source inputs
-  batch_size: 32            # Initial batch size for training
-  epochs: 5                 # Total number of epochs for training
-  patience: 3               # Early stopping patience for validation metrics
+  d_model: 512
+  src_seq_len: 512
+  batch_size: 32
+  epochs: 5
 
 tokenizer:
-  save_path: "C:/Users/ASUS/Desktop/LuminaLM/embeddings/Medical_tokenizer.json"  # Path to save tokenizer
-  load_path: "C:/Users/ASUS/Desktop/LuminaLM/embeddings/Medical_tokenizer.json"  # Path to load tokenizer
+  save_path: "./tokens/Medical_tokenizer.json"
+  load_path: "./tokens/Medical_tokenizer.json"
+  vocab_size: 60000
+  special_tokens: ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"]
 
 data:
-  train_split: 0.8          # Fraction of data used for training
-  val_split: 0.1            # Fraction of data used for validation
-  test_split: 0.1           # Fraction of data used for testing
-  max_samples: 100000       # Maximum number of samples to load
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
+  max_samples: 100000
+  shuffle_seed: 42
+  num_workers: 4
 
 training:
-  learning_rate: 0.00005      # Learning rate for the optimizer (THIS IS THE MISSING KEY)
-  use_mixed_precision: true # Use mixed precision for faster training and reduced memory usage
-  gradient_accumulation_steps: 4  # Number of steps to accumulate gradients
-  max_grad_norm: 1.0        # Maximum norm for gradient clipping
-  warmup_steps: 1000        # Number of warmup steps for learning rate scheduler
-  weight_decay: 0.01        # Weight decay for regularization
-  dropout: 0.1              # Dropout rate for model regularization
-  validation_steps: 500     # Number of steps between validation checks
-  gradient_noise_std: 0.0   # Add noise to gradients for robustness; set >0 to enable
-  patience: 3               # Early stopping patience for validation metrics
+  learning_rate: 5.0e-5
+  use_mixed_precision: true
+  gradient_accumulation_steps: 4
+  max_grad_norm: 1.0
+  warmup_steps: 1000
+  weight_decay: 0.01
+  dropout: 0.1
+  validation_steps: 500
+  gradient_noise_std: 0.0
+  patience: 3
+  scheduler: "linear"
+  optimizer: "adamw"
 
 logging:
-  level: 'INFO'             # Logging level: INFO, DEBUG, WARNING, etc.
-  save_dir: "logs"          # Directory to save logs
-  metrics_file: "metrics.json"  # File to save metrics for analysis
+  level: "INFO"
+  save_dir: "logs"
+  metrics_file: "metrics.json"
+  log_frequency: 100
 
 checkpointing:
-  save_dir: "checkpoints"   # Directory to save model checkpoints
-  save_frequency: 1         # Save checkpoints every N epochs
-  keep_best_n: 3            # Keep only the top N best-performing checkpoints
+  save_dir: "checkpoints"
+  save_frequency: 1
+  keep_best_n: 3
+  metric_for_best: "val_loss"
 
 visualization:
-  plot_dir: "plots"         # Directory to save visualizations like training curves
-  sample_size: 1000         # Sample size for visualization plots
-  embedding_dims: 3         # Dimensionality for embedding visualizations (e.g., t-SNE)
+  plot_dir: "plots"
+  sample_size: 1000
+  embedding_dims: 3
+  plot_frequency: 500
 
 distributed:
-  backend: "nccl"           # Backend for distributed training; options are nccl, gloo, etc.
-  world_size: -1            # Auto-detect world size; set manually for multi-node setups
-  init_method: "env://"     # Initialization method for distributed training
+  backend: "nccl"
+  world_size: -1
+  init_method: "env://"
+  find_unused_parameters: false
 
 pinecone:
-  api_key: null             # API key for Pinecone; will be loaded from environment variable
-  environment: "us-east-1"  # Pinecone environment region
-  index_name: "luminalm-embeddings"  # Name of the Pinecone index for storing embeddings
+  api_key: null
+  environment: "us-east-1"
+  index_name: "luminalm-embeddings"
+  dimension: 512
+  metric: "cosine"
 
 device:
-  type: 'auto'              # Options: 'auto', 'gpu', 'cpu'. Auto-detect GPU or fallback to CPU.
+  type: "auto"
+  precision: "float32"
