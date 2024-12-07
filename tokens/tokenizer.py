@@ -301,19 +301,21 @@ class DatasetProcessor:
         self.processed_files = []
 
     def process(self) -> List[str]:
-        """
-        Process all datasets and return a list of file paths containing the processed data.
-
-        :return: List of file paths
-        """
+        """Process all datasets and return a list of file paths."""
         logging.info("Starting dataset processing...")
         os.makedirs(self.local_data_path, exist_ok=True)
+        
+        total_datasets = sum(len(d.get('configs', [None])) for d in self.datasets)
+        processed = 0
+        
         for dataset_info in self.datasets:
             dataset_name = dataset_info.get('name')
             configs = dataset_info.get('configs', [None])
             trust_remote_code = dataset_info.get('trust_remote_code', False)
+            
             for config in configs:
-                logging.info(f"Processing dataset: {dataset_name}, config: {config}")
+                processed += 1
+                logging.info(f"Processing dataset {processed}/{total_datasets}: {dataset_name}, config: {config}")
                 try:
                     dataset = load_dataset(
                         dataset_name,
