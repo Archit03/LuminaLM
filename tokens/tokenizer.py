@@ -20,6 +20,9 @@ from tokenizers.models import BPE
 from tokenizers.pre_tokenizers import ByteLevel
 from tokenizers.trainers import BpeTrainer
 import pandas as pd
+from PIL import Image
+import io
+from transformers import ViTImageProcessor, CLIPProcessor
 
 ###############################################################################
 # Configuration
@@ -34,11 +37,14 @@ class Config:
         vocab_size: int = 60000,
         min_frequency: int = 2,
         max_file_size_mb: int = 100,
-        allowed_extensions: Set[str] = {'.txt', '.csv', '.json', '.jsonl', '.text'},
+        allowed_extensions: Set[str] = {'.txt', '.csv', '.json', '.jsonl', '.text', 
+                                      '.jpg', '.jpeg', '.png', '.webp'},
         allowed_mimetypes: Set[str] = {
             'text/plain', 'text/csv', 'application/json',
-            'application/x-json', 'text/json'
+            'application/x-json', 'text/json',
+            'image/jpeg', 'image/png', 'image/webp'
         },
+        image_processor: str = 'google/vit-base-patch16-224',
         chunk_size: int = 1000,
         processing_workers: int = max(1, multiprocessing.cpu_count() - 1),
         log_file: str = "medical_tokenization.log"
@@ -52,6 +58,7 @@ class Config:
         self.chunk_size = chunk_size
         self.processing_workers = processing_workers
         self.log_file = log_file
+        self.image_processor = image_processor
 
 
 ###############################################################################
@@ -382,6 +389,8 @@ class DatasetProcessor:
             max_file_size=config.max_file_size
         )
         self.config.local_data_path.mkdir(parents=True, exist_ok=True)
+        self.image_processor = ViTImageProcessor.from_pretrained(config.image_processor)
+        self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
     def process(self) -> List[str]:
         """
@@ -459,7 +468,7 @@ class DatasetProcessor:
 
     def _process_local_file(self, file_path: Union[str, Path]) -> Optional[str]:
         """
-        Process a single local file (CSV, JSONL, TXT) and return output path.
+        Process a single local file (CSV, JSONL, TXT, or image) and return output path.
         """
         file_path = Path(file_path)
         is_valid, error_msg = self.file_validator.validate_file(file_path)
@@ -472,7 +481,10 @@ class DatasetProcessor:
 
         try:
             ext = file_path.suffix.lower()
-            if ext == '.csv':
+            # Add image processing logic
+            if ext in {'.jpg', '.jpeg', '.png', '.webp'}:
+                return self._process_image_file(file_path, output_file.with_suffix('.json'))
+            elif ext == '.csv':
                 return self._process_csv_file(file_path, output_file)
             elif ext == '.jsonl':
                 return self._process_jsonl_file(file_path, output_file)
@@ -583,6 +595,40 @@ class DatasetProcessor:
             return str(output_path)
         except Exception as e:
             logging.error(f"Error processing text file {input_path}: {str(e)}")
+            return None
+
+    def _process_image_file(self, input_path: Path, output_path: Path) -> Optional[str]:
+        """
+        Process image files by extracting features and converting to text representation.
+        """
+        try:
+            # Load and process image
+            image = Image.open(input_path).convert('RGB')
+            
+            # Get ViT features
+            vit_inputs = self.image_processor(image, return_tensors="pt")
+            vit_features = vit_inputs['pixel_values'].squeeze(0)
+            
+            # Get CLIP text features for zero-shot classification
+            clip_inputs = self.clip_processor(images=image, return_tensors="pt", padding=True)
+            clip_features = clip_inputs['pixel_values'].squeeze(0)
+            
+            # Combine features and convert to string representation
+            combined_features = {
+                'vit_features': vit_features.tolist(),
+                'clip_features': clip_features.tolist(),
+                'image_size': image.size,
+                'mode': image.mode
+            }
+            
+            # Save features as JSON
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(combined_features, f)
+            
+            return str(output_path)
+            
+        except Exception as e:
+            logging.error(f"Error processing image file {input_path}: {str(e)}")
             return None
 
     def _parallel_process_texts(self, texts: List[str], chunk_size: int) -> List[str]:
