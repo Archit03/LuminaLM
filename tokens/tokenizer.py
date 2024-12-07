@@ -43,6 +43,11 @@ class TokenizationUtilities:
         :param max_length: Maximum sequence length
         :return: Padded input_ids and attention_masks
         """
+        # Get device from first tensor or default to CUDA if available
+        device = input_ids[0].device if input_ids else (
+            torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        )
+
         # Determine max length if not specified
         if max_length is None:
             max_length = max(len(ids) for ids in input_ids)
@@ -79,7 +84,9 @@ class TokenizationUtilities:
                 ])
             padded_attention_masks.append(padded_mask)
 
-        return torch.stack(padded_input_ids), torch.stack(padded_attention_masks)
+        # Move final tensors to appropriate device
+        return (torch.stack(padded_input_ids).to(device), 
+                torch.stack(padded_attention_masks).to(device))
 
     @staticmethod
     def create_segment_ids(
@@ -95,7 +102,9 @@ class TokenizationUtilities:
         :param cls_token_id: ID of the classification token
         :return: Tensor of segment IDs
         """
-        segment_ids = torch.zeros_like(input_ids)
+        # Create segment IDs on same device as input
+        device = input_ids.device
+        segment_ids = torch.zeros_like(input_ids).to(device)
         for i, seq in enumerate(input_ids):
             # Find separator and CLS token positions
             sep_positions = (seq == separator_token_id).nonzero(as_tuple=True)[0]
@@ -126,6 +135,7 @@ class TokenizationUtilities:
         :param vocab_size: Vocabulary size for random token replacement
         :return: Masked input_ids, masked labels, and masking indicator
         """
+        device = input_ids.device
         if special_token_ids is None:
             special_token_ids = []
 
@@ -139,7 +149,7 @@ class TokenizationUtilities:
             maskable_positions &= (input_ids != special_id)
 
         # Randomly decide which tokens to mask
-        probabilities = torch.full(input_ids.shape, mask_probability)
+        probabilities = torch.full(input_ids.shape, mask_probability).to(device)
         mask_probabilities = torch.bernoulli(probabilities).bool() & maskable_positions
 
         # Apply masking
@@ -165,6 +175,7 @@ class HybridTokenizationStrategy:
     def __init__(self, tokenizer: Tokenizer):
         self.tokenizer = tokenizer
         self.utilities = TokenizationUtilities()
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     def autoregressive_encode(
         self,
@@ -179,9 +190,9 @@ class HybridTokenizationStrategy:
 
         for encoding in encodings:
             ids = encoding.ids[:max_length] if truncation else encoding.ids
-            input_ids.append(torch.tensor(ids))
+            input_ids.append(torch.tensor(ids, device=self.device))
             seq_len = len(ids)
-            mask = torch.ones(seq_len, dtype=torch.long)
+            mask = torch.ones(seq_len, dtype=torch.long, device=self.device)
             attention_masks.append(mask)
 
         # Apply dynamic padding if required
@@ -224,8 +235,8 @@ class HybridTokenizationStrategy:
 
         for encoding in encodings:
             ids = encoding.ids[:max_length] if truncation else encoding.ids
-            input_ids.append(torch.tensor(ids))
-            mask = torch.ones(len(ids), dtype=torch.long)
+            input_ids.append(torch.tensor(ids, device=self.device))
+            mask = torch.ones(len(ids), dtype=torch.long, device=self.device)
             attention_masks.append(mask)
 
         # Apply dynamic padding if required
