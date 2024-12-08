@@ -1,6 +1,7 @@
 import logging
 import torch
 import traceback
+import os
 from tokenizers import Tokenizer
 from tokenizer import (
     TokenizationUtilities,
@@ -22,33 +23,54 @@ def main():
         # Load the trained tokenizer
         tokenizer_path = "Medical_tokenizer.json"
         logging.info(f"Loading tokenizer from {tokenizer_path}")
+        
+        # Add file existence check
+        if not os.path.exists(tokenizer_path):
+            raise FileNotFoundError(f"Tokenizer file not found at {tokenizer_path}")
+            
         tokenizer = Tokenizer.from_file(tokenizer_path)
         medical_tokenizer = MedicalTokenizer()
         medical_tokenizer.tokenizer = tokenizer
         medical_tokenizer.strategy = HybridTokenizationStrategy(tokenizer)
 
-        # Sample texts for validation
+        # Expanded sample texts with more diverse medical content
         sample_texts = [
             "Patient presents with severe chest pain.",
             "Medical history includes hypertension and diabetes.",
             "The patient was administered 5mg of medication Atorvastatin.",
-            "Symptoms include fever, cough, and shortness of breath."
+            "Symptoms include fever, cough, and shortness of breath.",
+            "Lab results: WBC 12.3, RBC 4.5, Platelets 250k",
+            "Patient reports allergies to penicillin and sulfa drugs",
+            "Post-operative recovery shows good wound healing"
         ]
 
-        # Perform autoregressive encoding
-        logging.info("Performing autoregressive encoding...")
+        # Add validation metrics
+        def validate_encoding(encoding, task_type):
+            logging.info(f"\nValidating {task_type} encoding:")
+            logging.info(f"Shape of input_ids: {encoding['input_ids'].shape}")
+            logging.info(f"Sequence lengths: {encoding['input_ids'].sum(dim=1)}")
+            logging.info(f"Attention mask statistics: {encoding['attention_mask'].float().mean():.2f} coverage")
+            
+            # Validate special tokens
+            special_token_count = sum(1 for id in encoding['input_ids'].flatten() 
+                                    if id in special_token_ids)
+            logging.info(f"Special tokens found: {special_token_count}")
+
+        # Perform and validate autoregressive encoding
+        logging.info("\nPerforming autoregressive encoding...")
         auto_encoding = medical_tokenizer.encode(sample_texts, task_type='auto')
-        logging.info(f"Autoregressive Encoding Output:\n{auto_encoding}")
+        validate_encoding(auto_encoding, 'autoregressive')
 
-        # Perform bidirectional encoding
-        logging.info("Performing bidirectional encoding...")
+        # Perform and validate bidirectional encoding
+        logging.info("\nPerforming bidirectional encoding...")
         bi_encoding = medical_tokenizer.encode(sample_texts, task_type='bi')
-        logging.info(f"Bidirectional Encoding Output:\n{bi_encoding}")
+        validate_encoding(bi_encoding, 'bidirectional')
 
-        # Generate masked language model inputs
-        logging.info("Generating masked language model inputs...")
+        # Enhanced MLM validation
+        logging.info("\nGenerating masked language model inputs...")
         utilities = TokenizationUtilities()
-        special_token_ids = [medical_tokenizer.tokenizer.token_to_id(token) for token in medical_tokenizer.special_tokens]
+        special_token_ids = [medical_tokenizer.tokenizer.token_to_id(token) 
+                            for token in medical_tokenizer.special_tokens]
 
         masked_inputs, labels, mask = utilities.generate_masked_lm_inputs(
             auto_encoding['input_ids'],
@@ -58,20 +80,20 @@ def main():
             vocab_size=medical_tokenizer.vocab_size
         )
 
-        logging.info(f"Masked Inputs:\n{masked_inputs}")
-        logging.info(f"Labels:\n{labels}")
-        logging.info(f"Mask:\n{mask}")
+        # Add detailed MLM statistics
+        total_tokens = mask.numel()
+        masked_tokens = mask.sum().item()
+        mask_percentage = (masked_tokens / total_tokens) * 100
 
-        # Validate that masked positions are consistent
+        logging.info(f"\nMLM Statistics:")
+        logging.info(f"Total tokens: {total_tokens}")
+        logging.info(f"Masked tokens: {masked_tokens}")
+        logging.info(f"Actual mask percentage: {mask_percentage:.2f}%")
+        
+        # Validate mask consistency
         mask_positions = mask.nonzero(as_tuple=True)
-        logging.info(f"Masked Positions: {mask_positions}")
-
-        # Ensure that labels are -100 for unmasked tokens
-        unmasked_labels = labels[~mask]
-        if torch.all(unmasked_labels == -100):
-            logging.info("Unmasked labels are correctly set to -100.")
-        else:
-            logging.warning("There are unmasked labels not set to -100.")
+        label_consistency = torch.all(labels[mask] != -100).item()
+        logging.info(f"Labels at masked positions are valid: {label_consistency}")
 
         logging.info("Validation completed successfully.")
 
