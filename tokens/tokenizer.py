@@ -11,7 +11,6 @@ from typing import List, Dict, Any, Optional, Tuple, Union, Set, Generator
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import islice
 from tqdm import tqdm
-
 import torch
 from torch import Tensor
 from datasets import load_dataset
@@ -422,24 +421,28 @@ class DatasetProcessor:
         """
         name = dataset_info["name"]
         configs = dataset_info.get("configs", [])
-        trust_remote_code = dataset_info.get("trust_remote_code", False)
-
         processed_files = []
-        if configs:
-            for config_name in configs:
-                ds = load_dataset(name, config_name, trust_remote_code=trust_remote_code)
+        
+        try:
+            if configs:
+                for config_name in configs:
+                    ds = load_dataset(name, config_name)
+                    for split in ds.keys():
+                        data = ds[split]
+                        processed = self._process_hf_split(data, f"{name}_{config_name}_{split}")
+                        if processed:
+                            processed_files.append(processed)
+            else:
+                ds = load_dataset(name)
                 for split in ds.keys():
                     data = ds[split]
-                    processed = self._process_hf_split(data, f"{name}_{config_name}_{split}")
+                    processed = self._process_hf_split(data, f"{name}_{split}")
                     if processed:
                         processed_files.append(processed)
-        else:
-            ds = load_dataset(name, trust_remote_code=trust_remote_code)
-            for split in ds.keys():
-                data = ds[split]
-                processed = self._process_hf_split(data, f"{name}_{split}")
-                if processed:
-                    processed_files.append(processed)
+
+        except Exception as e:
+            logging.error(f"Error processing dataset {name}: {str(e)}")
+            return []
 
         return processed_files
 
@@ -690,12 +693,17 @@ def main():
 
     setup_logging(args.log_file)
 
-    # Example dataset configuration
+    # Modified dataset configuration
     datasets = [
-        {"name": "openwebtext", "trust_remote_code": True},
-        {"name": "pubmed_qa", "configs": ["pqa_artificial", "pqa_labeled", "pqa_unlabeled"]},
-        # Uncomment and adapt as needed:
-        # {"path": "/path/to/localfile.txt"}
+        {
+            "name": "openwebtext",
+            "configs": None,  # No specific config needed
+        },
+        {
+            "name": "pubmed_qa",
+            "configs": ["pqa_artificial", "pqa_labeled", "pqa_unlabeled"]
+        },
+        # Add more datasets as needed
     ]
 
     config = Config(
