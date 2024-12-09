@@ -6,14 +6,9 @@ set -e
 # Define variables
 TOKENIZER_SCRIPT="tokenizer.py"
 VALIDATION_SCRIPT="token_validation.py"
-LOCAL_DATA_DIR="C:/Users/ASUS/Desktop/LuminaLM/Data"  # Corrected path with forward slashes
+LOCAL_DATA_DIR="/content/LuminaLM/Data"  # Linux-style path
 TOKENIZER_OUTPUT_PATH="./medical_tokenizer.json"
 VALIDATION_OUTPUT="./validation_results.txt"
-
-# Convert Windows-style path to WSL-compatible path if necessary
-if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null; then
-  LOCAL_DATA_DIR=$(wslpath "$LOCAL_DATA_DIR")
-fi
 
 # Check if the tokenizer script exists
 if [[ ! -f $TOKENIZER_SCRIPT ]]; then
@@ -29,7 +24,7 @@ fi
 
 # Run the tokenizer script
 echo "Running tokenizer script..."
-python3 $TOKENIZER_SCRIPT --local_data_path "$LOCAL_DATA_DIR" --output_path "$TOKENIZER_OUTPUT_PATH"
+python3 $TOKENIZER_SCRIPT --local_data_path="$LOCAL_DATA_DIR" --vocab_size=60000 --min_frequency=2 --log_file="medical_tokenization.log"
 
 # Check if the tokenizer output was created
 if [[ ! -f $TOKENIZER_OUTPUT_PATH ]]; then
