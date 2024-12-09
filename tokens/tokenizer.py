@@ -6,6 +6,7 @@ import mimetypes
 import hashlib
 import multiprocessing
 import traceback
+import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Union, Set, Generator
 from concurrent.futures import ProcessPoolExecutor, as_completed
