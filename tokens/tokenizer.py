@@ -49,6 +49,8 @@ class Config:
         log_file: str = "medical_tokenization.log"
     ):
         self.local_data_path = Path(local_data_path)
+        self.local_data_path.mkdir(parents=True, exist_ok=True)
+        (self.local_data_path / "tokens").mkdir(parents=True, exist_ok=True)
         self.vocab_size = vocab_size
         self.min_frequency = min_frequency
         self.max_file_size = max_file_size_mb * 1024 * 1024
@@ -313,10 +315,16 @@ class MedicalTokenizer:
         """
         Train the tokenizer on the given files and save it.
         """
-        logging.info("Starting tokenizer training...")
-        self.tokenizer.train(files, self.trainer)
-        self.tokenizer.save(save_path)
-        logging.info(f"Tokenizer saved to {save_path}")
+        save_path = Path(save_path)
+        try:
+            logging.info("Starting tokenizer training...")
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            self.tokenizer.train(files, self.trainer)
+            self.tokenizer.save(str(save_path))
+            logging.info(f"Tokenizer saved to {save_path}")
+        except Exception as e:
+            logging.error(f"Failed to train/save tokenizer: {e}")
+            raise
 
     def load(self, tokenizer_path: str):
         """
@@ -706,28 +714,37 @@ def main():
         # Add more datasets as needed
     ]
 
-    config = Config(
-        local_data_path=args.local_data_path,
-        vocab_size=args.vocab_size,
-        min_frequency=args.min_frequency,
-        log_file=args.log_file
-    )
-
-    dataset_processor = DatasetProcessor(datasets, config)
-    tokenizer = MedicalTokenizer(vocab_size=config.vocab_size, min_frequency=config.min_frequency)
-
     try:
+        # Create necessary directories
+        tokens_dir = Path(args.local_data_path) / "tokens"
+        tokens_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize components
+        config = Config(
+            local_data_path=args.local_data_path,
+            vocab_size=args.vocab_size,
+            min_frequency=args.min_frequency,
+            log_file=args.log_file
+        )
+
+        dataset_processor = DatasetProcessor(datasets, config)
+        tokenizer = MedicalTokenizer(vocab_size=config.vocab_size, min_frequency=config.min_frequency)
+
+        # Process and train
         logging.info("Starting dataset processing...")
         processed_files = dataset_processor.process()
-        logging.info("Dataset processing completed.")
+        if not processed_files:
+            raise ValueError("No files were successfully processed")
+        logging.info(f"Dataset processing completed. Processed {len(processed_files)} files.")
         
-        # Train tokenizer on processed data
-        tokenizer.train(processed_files, str(config.local_data_path / "Medical_tokenizer.json"))
+        tokenizer_path = tokens_dir / "Medical_tokenizer.json"
+        tokenizer.train(processed_files, str(tokenizer_path))
         logging.info("Tokenizer training completed successfully.")
 
     except Exception as e:
         logging.error(f"Error during processing: {e}")
         logging.error(traceback.format_exc())
+        sys.exit(1)
 
 
 if __name__ == "__main__":
