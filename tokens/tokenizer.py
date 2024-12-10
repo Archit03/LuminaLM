@@ -9,12 +9,12 @@ import traceback
 import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Union, Set, Generator
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from itertools import islice
 from tqdm import tqdm
 import torch
 from torch import Tensor
-from datasets import load_dataset
+from datasets import load_dataset, DatasetDict
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.pre_tokenizers import ByteLevel
@@ -23,6 +23,19 @@ import pandas as pd
 from PIL import Image
 import io
 from transformers import ViTImageProcessor, CLIPProcessor
+import re
+import psutil
+import shutil
+import tempfile
+import time
+from contextlib import contextmanager
+from functools import partial
+import gc
+import unittest
+from utils import with_retry, managed_temp_file, split_chunk
+import asyncio
+import random
+import yaml
 
 ###############################################################################
 # Configuration
@@ -45,8 +58,8 @@ class Config:
             'image/jpeg', 'image/png', 'image/webp'
         },
         image_processor: str = 'google/vit-base-patch16-224',
-        chunk_size: int = 1000,
-        processing_workers: int = max(1, multiprocessing.cpu_count() - 1),
+        chunk_size: int = 1000000,
+        processing_workers: int = max(32, multiprocessing.cpu_count() - 1),
         log_file: str = "medical_tokenization.log"
     ):
         self.local_data_path = Path(local_data_path)
@@ -72,6 +85,7 @@ def setup_logging(log_file: str):
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[logging.FileHandler(log_file), logging.StreamHandler()]
     )
+    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
 ###############################################################################
 # Tokenization Utilities
@@ -384,11 +398,10 @@ class FileValidator:
 ###############################################################################
 class DatasetProcessor:
     """
-    Processes datasets/files into text for tokenizer training, with parallelization and error handling.
+    Enhanced dataset processor with robust text extraction, incremental processing,
+    and sophisticated preprocessing capabilities.
     """
-    def __init__(self, 
-                 datasets: List[Dict[str, Any]], 
-                 config: Config):
+    def __init__(self, datasets: List[Dict[str, Any]], config: Config):
         self.datasets = datasets
         self.config = config
         self.file_validator = FileValidator(
@@ -399,6 +412,340 @@ class DatasetProcessor:
         self.config.local_data_path.mkdir(parents=True, exist_ok=True)
         self.image_processor = ViTImageProcessor.from_pretrained(config.image_processor)
         self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+        
+        # Initialize preprocessing tools
+        self.setup_preprocessing()
+        self.temp_dir = tempfile.mkdtemp(prefix="dataset_processor_")
+        self.retry_config = {
+            'max_attempts': 3,
+            'delay': 1,
+            'max_delay': 10,
+            'backoff': 2
+        }
+        
+        # Add memory monitoring
+        self.memory_threshold = 0.8  # 80% memory usage threshold
+        self.initial_chunk_size = self.config.chunk_size
+
+    def __del__(self):
+        """Cleanup temporary directory on object destruction"""
+        try:
+            if hasattr(self, 'temp_dir') and os.path.exists(self.temp_dir):
+                shutil.rmtree(self.temp_dir)
+        except Exception as e:
+            logging.error(f"Failed to cleanup temporary directory: {e}")
+
+    @contextmanager
+    def _managed_temp_file(self, suffix: str = '.txt') -> Generator[Path, None, None]:
+        """Context manager for temporary file handling"""
+        temp_path = Path(tempfile.mktemp(dir=self.temp_dir, suffix=suffix))
+        try:
+            yield temp_path
+        finally:
+            if temp_path.exists():
+                temp_path.unlink()
+
+    def _with_retry(self, func, *args, **kwargs):
+        """Retry mechanism for operations that might fail transiently"""
+        attempt = 0
+        last_exception = None
+        while attempt < self.retry_config['max_attempts']:
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                last_exception = e
+                attempt += 1
+                if attempt < self.retry_config['max_attempts']:
+                    delay = min(
+                        self.retry_config['delay'] * (self.retry_config['backoff'] ** (attempt - 1)),
+                        self.retry_config['max_delay']
+                    )
+                    logging.warning(f"Attempt {attempt} failed: {str(e)}. Retrying in {delay}s...")
+                    time.sleep(delay)
+        
+        logging.error(f"Operation failed after {attempt} attempts: {str(last_exception)}")
+        raise last_exception
+
+    def setup_preprocessing(self):
+        """Initialize text preprocessing tools and configurations."""
+        self.text_cleanup_patterns = {
+            'urls': r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',
+            'emails': r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+            'phone_numbers': r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b',
+            'extra_spaces': r'\s+',
+            'special_chars': r'[^\w\s]'
+        }
+        
+        self.dataset_specific_configs = {
+            'medical': {
+                'required_fields': ['diagnosis', 'symptoms', 'treatment'],
+                'text_fields': ['notes', 'description'],
+                'numeric_fields': ['age', 'dosage'],
+                'date_fields': ['visit_date', 'follow_up']
+            },
+            'general': {
+                'required_fields': ['text'],
+                'text_fields': ['content', 'description'],
+                'numeric_fields': [],
+                'date_fields': []
+            }
+        }
+
+    def extract_text(self, record: Any, dataset_type: str = 'general') -> str:
+        """
+        Enhanced text extraction with dataset-specific handling and validation.
+        """
+        try:
+            if isinstance(record, str):
+                return self.preprocess_text(record)
+            
+            if isinstance(record, dict):
+                config = self.dataset_specific_configs.get(dataset_type, 
+                                                        self.dataset_specific_configs['general'])
+                
+                # Extract and combine text from all relevant fields
+                text_parts = []
+                
+                # Process required fields
+                for field in config['required_fields']:
+                    if field in record:
+                        text_parts.append(str(record[field]))
+                    else:
+                        logging.warning(f"Required field '{field}' missing in record")
+                
+                # Process optional text fields
+                for field in config['text_fields']:
+                    if field in record:
+                        text_parts.append(str(record[field]))
+                
+                # Process numeric fields with context
+                for field in config['numeric_fields']:
+                    if field in record:
+                        text_parts.append(f"{field}: {record[field]}")
+                
+                # Process date fields with formatting
+                for field in config['date_fields']:
+                    if field in record:
+                        try:
+                            date_val = pd.to_datetime(record[field]).strftime('%Y-%m-%d')
+                            text_parts.append(f"{field}: {date_val}")
+                        except:
+                            logging.warning(f"Could not parse date in field '{field}'")
+                
+                combined_text = " ".join(text_parts)
+                return self.preprocess_text(combined_text)
+            
+            return ""
+            
+        except Exception as e:
+            logging.error(f"Error in text extraction: {str(e)}")
+            return ""
+
+    def preprocess_text(self, text: str) -> str:
+        """
+        Apply sophisticated text preprocessing.
+        """
+        try:
+            # Remove URLs
+            text = re.sub(self.text_cleanup_patterns['urls'], '', text)
+            
+            # Remove email addresses
+            text = re.sub(self.text_cleanup_patterns['emails'], '', text)
+            
+            # Remove phone numbers
+            text = re.sub(self.text_cleanup_patterns['phone_numbers'], '', text)
+            
+            # Basic cleaning
+            text = text.strip()
+            text = re.sub(self.text_cleanup_patterns['extra_spaces'], ' ', text)
+            
+            # Remove non-printable characters
+            text = ''.join(char for char in text if char.isprintable())
+            
+            # Normalize whitespace
+            text = ' '.join(text.split())
+            
+            return text
+            
+        except Exception as e:
+            logging.error(f"Error in text preprocessing: {str(e)}")
+            return text
+
+    def process_with_memory_management(self, texts: Generator[str, None, None]) -> Generator[str, None, None]:
+        """Memory-efficient text processing using generators"""
+        buffer_size = 1000
+        buffer = []
+        try:
+            for text in texts:
+                processed_text = self.preprocess_text(text)
+                if processed_text.strip():
+                    buffer.append(processed_text)
+                    if len(buffer) >= buffer_size:
+                        yield from buffer
+                        buffer.clear()
+                        gc.collect()  # Force garbage collection
+        except Exception as e:
+            logging.error(f"Error in text processing stream: {e}")
+        finally:
+            if buffer:
+                yield from buffer
+
+    @contextmanager
+    def _memory_guard(self, threshold: float = 0.9):
+        """
+        Context manager to monitor and manage memory usage.
+        
+        Args:
+            threshold: Memory usage threshold (0-1) to trigger cleanup
+        """
+        try:
+            yield
+        finally:
+            memory = psutil.virtual_memory()
+            if memory.percent > threshold * 100:
+                gc.collect()
+                torch.cuda.empty_cache() if torch.cuda.is_available() else None
+
+    def _get_optimal_chunk_size(self) -> int:
+        """
+        Dynamically calculate optimal chunk size based on system resources.
+        """
+        memory = psutil.virtual_memory()
+        cpu_count = multiprocessing.cpu_count()
+        
+        # Base size on available memory (assuming 8KB per text)
+        mem_based_size = max(1000, int(memory.available * 0.1 / 8192))
+        
+        # Adjust based on CPU cores
+        cpu_based_size = max(1000, self.initial_chunk_size // cpu_count)
+        
+        return min(mem_based_size, cpu_based_size, self.config.chunk_size)
+
+    def _get_optimal_workers(self) -> int:
+        """Dynamically adjust worker count based on system resources"""
+        cpu_count = multiprocessing.cpu_count()
+        memory = psutil.virtual_memory()
+        
+        # Reduce workers if memory usage is high
+        if memory.percent > self.memory_threshold * 100:
+            return max(1, cpu_count // 2)
+        return self.config.processing_workers
+
+    def _process_chunk(self, chunk: List[str], worker_id: int) -> List[str]:
+        """
+        Process a chunk of texts with improved error handling and memory management.
+        
+        Args:
+            chunk: List of texts to process
+            worker_id: ID of the worker processing this chunk
+            
+        Returns:
+            List[str]: List of processed texts
+        """
+        processed = []
+        try:
+            # Monitor memory usage
+            if psutil.virtual_memory().percent > self.memory_threshold * 100:
+                logging.warning(f"Worker {worker_id}: High memory usage detected")
+                gc.collect()
+            
+            for idx, text in enumerate(chunk):
+                try:
+                    if not isinstance(text, str):
+                        continue
+                        
+                    processed_text = self.preprocess_text(text)
+                    if processed_text.strip():
+                        processed.append(processed_text)
+                        
+                except Exception as e:
+                    logging.error(f"Worker {worker_id}: Error processing text at index {idx}: {e}")
+                    continue
+                
+        except Exception as e:
+            logging.error(f"Worker {worker_id}: Chunk processing error: {e}")
+            
+        finally:
+            # Clean up memory
+            chunk.clear()
+            gc.collect()
+            
+        return processed
+
+    def _process_generic_texts(
+        self,
+        texts: Generator[str, None, None],
+        output_path: Path,
+        chunk_size: Optional[int] = None,
+        timeout: int = 300
+    ) -> Optional[str]:
+        """
+        Process texts using a memory-efficient generator approach.
+        
+        Args:
+            texts: Generator yielding texts to process
+            output_path: Path to save processed texts
+            chunk_size: Optional custom chunk size (default: None, uses dynamic sizing)
+            timeout: Timeout in seconds for each worker (default: 300)
+        """
+        if chunk_size is None:
+            chunk_size = self._get_optimal_chunk_size()
+        
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                buffer = []
+                for text in texts:
+                    buffer.append(text)
+                    
+                    if len(buffer) >= chunk_size:
+                        try:
+                            workers = self._get_optimal_workers()
+                            with ProcessPoolExecutor(max_workers=workers) as executor:
+                                futures = []
+                                
+                                # Split buffer into sub-chunks
+                                for worker_id, sub_chunk in enumerate(split_chunk(buffer, workers)):
+                                    futures.append(
+                                        executor.submit(
+                                            self._with_retry,
+                                            self._process_chunk,
+                                            sub_chunk,
+                                            worker_id
+                                        )
+                                    )
+                                
+                                # Process results with timeout
+                                for future in as_completed(futures):
+                                    try:
+                                        result = future.result(timeout=timeout)
+                                        if result:
+                                            f.write('\n'.join(result) + '\n')
+                                            f.flush()
+                                    except TimeoutError:
+                                        logging.error(f"Worker timeout after {timeout} seconds")
+                                    except Exception as e:
+                                        logging.error(f"Error processing chunk: {e}")
+                    
+                        finally:
+                            buffer.clear()
+                            gc.collect()
+                
+                # Process remaining texts
+                if buffer:
+                    try:
+                        processed = self._process_chunk(buffer, worker_id=0)
+                        if processed:
+                            f.write('\n'.join(processed) + '\n')
+                    except Exception as e:
+                        logging.error(f"Error processing final chunk: {e}")
+            
+            return str(output_path)
+        
+        except Exception as e:
+            logging.error(f"Error in _process_generic_texts: {e}")
+            if output_path.exists():
+                output_path.unlink()
+            return None
 
     def process(self) -> List[str]:
         """
@@ -429,28 +776,23 @@ class DatasetProcessor:
         Process a Hugging Face dataset (download and iterate over splits).
         """
         name = dataset_info["name"]
-        configs = dataset_info.get("configs", [])
+        download_config = dataset_info.get("download_config", {})
         processed_files = []
         
         try:
-            if configs:
-                for config_name in configs:
-                    ds = load_dataset(name, config_name)
-                    for split in ds.keys():
-                        data = ds[split]
-                        processed = self._process_hf_split(data, f"{name}_{config_name}_{split}")
-                        if processed:
-                            processed_files.append(processed)
-            else:
-                ds = load_dataset(name)
-                for split in ds.keys():
-                    data = ds[split]
-                    processed = self._process_hf_split(data, f"{name}_{split}")
-                    if processed:
-                        processed_files.append(processed)
+            # Ensure cache_dir is set
+            cache_dir = download_config.get("cache_dir", "./hf_cache")
+            download_config["cache_dir"] = cache_dir
+
+            # Load dataset with streaming
+            dataset = load_dataset(name, **download_config)
+            processed = self._process_hf_split(dataset, f"{name}_train")
+            if processed:
+                processed_files.append(processed)
 
         except Exception as e:
             logging.error(f"Error processing dataset {name}: {str(e)}")
+            logging.error(traceback.format_exc())
             return []
 
         return processed_files
@@ -461,15 +803,34 @@ class DatasetProcessor:
         """
         output_file = self.config.local_data_path / f"processed_{prefix}.txt"
         try:
-            records = [self.extract_text(x) for x in hf_dataset]
-            records = [r for r in records if r.strip()]
+            # Process streaming dataset in batches
+            records = []
+            batch = []
+            skipped_count = 0
+            for x in hf_dataset:
+                text = self.extract_text(x)
+                if not text.strip():
+                    skipped_count += 1
+                    continue
+                if text.strip():
+                    batch.append(text)
+                    if len(batch) >= self.config.chunk_size:
+                        # Process the current batch
+                        processed_texts = self._parallel_process_texts(batch, self.config.chunk_size)
+                        records.extend(processed_texts)
+                        batch = []  # Reset batch
 
-            # Process in parallel chunks
-            processed_texts = self._parallel_process_texts(records, self.config.chunk_size)
+            # Process any remaining items
+            if batch:
+                processed_texts = self._parallel_process_texts(batch, self.config.chunk_size)
+                records.extend(processed_texts)
 
+            # Write all processed texts to file
             with open(output_file, 'w', encoding='utf-8') as f:
-                for text in processed_texts:
+                for text in records:
                     f.write(text + "\n")
+
+            logging.info(f"Skipped {skipped_count} invalid records.")
 
             return str(output_file)
         except Exception as e:
@@ -515,206 +876,258 @@ class DatasetProcessor:
             return None
 
     def _process_csv_file(self, input_path: Path, output_path: Path) -> Optional[str]:
-        """
-        Process CSV files in chunks.
-        """
+        """Process CSV files with improved memory management and error handling."""
         try:
-            chunk_size = 10000
-            with open(output_path, 'w', encoding='utf-8') as f:
-                for chunk in pd.read_csv(input_path, chunksize=chunk_size):
-                    records = chunk.to_dict('records')
-                    texts = [self.extract_text(r) for r in records if self.extract_text(r).strip()]
-                    processed_texts = self._parallel_process_texts(texts, self.config.chunk_size)
-                    for text in processed_texts:
-                        f.write(text + "\n")
-            return str(output_path)
+            # Calculate optimal chunk size based on available memory
+            total_memory = psutil.virtual_memory().total
+            chunk_size = min(self.config.chunk_size, 
+                            max(1000, int(total_memory * 0.1 / 8192)))  # Assuming 8KB per text
+            
+            texts = []
+            for chunk in pd.read_csv(input_path, chunksize=chunk_size):
+                try:
+                    # Process each record in the chunk
+                    chunk_texts = []
+                    for _, record in chunk.iterrows():
+                        try:
+                            text = self.extract_text(record.to_dict())
+                            if text.strip():
+                                chunk_texts.append(text)
+                        except Exception as e:
+                            logging.warning(f"Error processing record: {e}")
+                            continue
+                    
+                    # Process accumulated texts
+                    if chunk_texts:
+                        result = _process_generic_texts(
+                            chunk_texts,
+                            output_path.with_suffix(f'.part{len(texts)}'),
+                            self.config.chunk_size,
+                            self.config.processing_workers
+                        )
+                        if result:
+                            texts.append(result)
+                
+                except Exception as e:
+                    logging.error(f"Error processing chunk: {e}")
+                    continue
+            
+            # Merge all part files
+            if texts:
+                with open(output_path, 'w', encoding='utf-8') as outfile:
+                    for part_file in texts:
+                        try:
+                            with open(part_file, 'r', encoding='utf-8') as infile:
+                                shutil.copyfileobj(infile, outfile)
+                            os.remove(part_file)  # Clean up part file
+                        except Exception as e:
+                            logging.error(f"Error merging part file {part_file}: {e}")
+                
+                return str(output_path)
+            
+            return None
+            
         except Exception as e:
-            logging.error(f"Error processing CSV file {input_path}: {str(e)}")
+            logging.error(f"Error processing CSV file {input_path}: {e}")
             return None
 
     def _process_jsonl_file(self, input_path: Path, output_path: Path) -> Optional[str]:
-        """
-        Process JSONL files line-by-line.
-        """
+        """Process JSONL files using the generic text processor."""
         try:
-            with open(input_path, 'r', encoding='utf-8') as f_in:
-                lines = []
-                for line in f_in:
-                    line = line.strip()
-                    if not line:
+            texts = []
+            with open(input_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if not line.strip():
                         continue
                     try:
                         obj = json.loads(line)
                         text = self.extract_text(obj)
                         if text.strip():
-                            lines.append(text)
+                            texts.append(text)
+                            
+                        # Process in chunks to manage memory
+                        if len(texts) >= self.config.chunk_size:
+                            return _process_generic_texts(
+                                texts,
+                                output_path,
+                                self.config.chunk_size,
+                                self.config.processing_workers
+                            )
                     except json.JSONDecodeError:
+                        logging.warning(f"Skipping invalid JSON line in {input_path}")
                         continue
-
-            # Process in parallel
-            processed_texts = self._parallel_process_texts(lines, self.config.chunk_size)
-
-            with open(output_path, 'w', encoding='utf-8') as f_out:
-                for text in processed_texts:
-                    f_out.write(text + "\n")
-
-            return str(output_path)
+                    
+            # Process any remaining texts
+            if texts:
+                return _process_generic_texts(
+                    texts,
+                    output_path,
+                    self.config.chunk_size,
+                    self.config.processing_workers
+                )
+            return None
+            
         except Exception as e:
             logging.error(f"Error processing JSONL file {input_path}: {str(e)}")
             return None
 
     def _process_json_file(self, input_path: Path, output_path: Path) -> Optional[str]:
-        """
-        Process a .json file. Assuming it's a JSON array of objects.
-        """
+        """Process JSON files using the generic text processor."""
         try:
-            with open(input_path, 'r', encoding='utf-8') as f_in:
-                data = json.load(f_in)
-                # data should be a list of objects
-                if not isinstance(data, list):
-                    logging.error(f"JSON file {input_path} does not contain a list of objects.")
-                    return None
-                texts = [self.extract_text(item) for item in data if self.extract_text(item).strip()]
-
-            processed_texts = self._parallel_process_texts(texts, self.config.chunk_size)
-            with open(output_path, 'w', encoding='utf-8') as f_out:
-                for text in processed_texts:
-                    f_out.write(text + "\n")
-
-            return str(output_path)
+            with open(input_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                
+            if not isinstance(data, list):
+                logging.error(f"JSON file {input_path} must contain a list of objects")
+                return None
+            
+            texts = [self.extract_text(item) for item in data]
+            texts = [text for text in texts if text.strip()]
+            
+            if not texts:
+                logging.warning(f"No valid texts found in {input_path}")
+                return None
+            
+            return _process_generic_texts(
+                texts,
+                output_path,
+                self.config.chunk_size,
+                self.config.processing_workers
+            )
+            
         except Exception as e:
             logging.error(f"Error processing JSON file {input_path}: {str(e)}")
             return None
 
     def _process_text_file(self, input_path: Path, output_path: Path) -> Optional[str]:
-        """
-        Process text files line-by-line.
-        """
+        """Process text files using the generic text processor."""
         try:
-            chunk_size = 10000
-            lines = []
-            with open(input_path, 'r', encoding='utf-8') as f_in:
-                for line in f_in:
+            texts = []
+            with open(input_path, 'r', encoding='utf-8') as f:
+                for line in f:
                     text = line.strip()
                     if text:
-                        lines.append(text)
-
-            # Process in parallel
-            processed_texts = self._parallel_process_texts(lines, self.config.chunk_size)
-            with open(output_path, 'w', encoding='utf-8') as f_out:
-                for text in processed_texts:
-                    f_out.write(text + "\n")
-            return str(output_path)
+                        texts.append(text)
+                        
+                    # Process in chunks to manage memory
+                    if len(texts) >= self.config.chunk_size:
+                        return _process_generic_texts(
+                            texts,
+                            output_path,
+                            self.config.chunk_size,
+                            self.config.processing_workers
+                        )
+                    
+            # Process any remaining texts
+            if texts:
+                return _process_generic_texts(
+                    texts,
+                    output_path,
+                    self.config.chunk_size,
+                    self.config.processing_workers
+                )
+            return None
+            
         except Exception as e:
             logging.error(f"Error processing text file {input_path}: {str(e)}")
             return None
 
-    def _process_image_file(self, input_path: Path, output_path: Path) -> Optional[str]:
+    def _process_image_file(self, input_path: Path, output_path: Path, model_type: str = 'ViT') -> Optional[str]:
         """
         Process image files by extracting features and converting to text representation.
         """
         try:
-            # Load and process image
             image = Image.open(input_path).convert('RGB')
-            
-            # Get ViT features
-            vit_inputs = self.image_processor(image, return_tensors="pt")
-            vit_features = vit_inputs['pixel_values'].squeeze(0)
-            
-            # Get CLIP text features for zero-shot classification
-            clip_inputs = self.clip_processor(images=image, return_tensors="pt", padding=True)
-            clip_features = clip_inputs['pixel_values'].squeeze(0)
-            
-            # Combine features and convert to string representation
-            combined_features = {
-                'vit_features': vit_features.tolist(),
-                'clip_features': clip_features.tolist(),
-                'image_size': image.size,
-                'mode': image.mode
-            }
-            
-            # Save features as JSON
-            with open(output_path, 'w', encoding='utf-8') as f:
-                json.dump(combined_features, f)
-            
-            return str(output_path)
-            
+            if model_type == 'ViT':
+                inputs = self.image_processor(image, return_tensors="pt")
+            elif model_type == 'CLIP':
+                inputs = self.clip_processor(images=image, return_tensors="pt", padding=True)
+            # Further processing based on model_type
         except Exception as e:
             logging.error(f"Error processing image file {input_path}: {str(e)}")
             return None
 
     def _parallel_process_texts(self, texts: List[str], chunk_size: int) -> List[str]:
         """
-        Process a list of texts in parallel chunks.
+        Process a list of texts in parallel chunks with improved error handling.
         """
-        chunks = [texts[i:i+chunk_size] for i in range(0, len(texts), chunk_size)]
         processed_texts = []
-        with ProcessPoolExecutor(max_workers=self.config.processing_workers) as executor:
-            futures = [executor.submit(self._process_chunk, chunk) for chunk in chunks]
-            with tqdm(total=len(chunks), desc="Processing chunks") as pbar:
-                for future in as_completed(futures):
-                    try:
-                        processed_texts.extend(future.result())
-                        pbar.update(1)
-                    except Exception as e:
-                        logging.error(f"Error processing chunk: {str(e)}")
-                        traceback.print_exc()
+        
+        for i in range(0, len(texts), chunk_size):
+            chunk = texts[i:i + chunk_size]
+            try:
+                with ThreadPoolExecutor(max_workers=self.config.processing_workers) as executor:
+                    sub_chunk_size = max(100, chunk_size // self.config.processing_workers)
+                    futures = []
+                    
+                    for j in range(0, len(chunk), sub_chunk_size):
+                        sub_chunk = chunk[j:j + sub_chunk_size]
+                        futures.append(
+                            executor.submit(
+                                self._process_chunk, 
+                                sub_chunk, 
+                                worker_id=j // sub_chunk_size
+                            )
+                        )
+                    
+                    for future in as_completed(futures):
+                        try:
+                            result = future.result()
+                            if result:
+                                processed_texts.extend(result)
+                        except Exception as e:
+                            logging.error(f"Error in chunk processing: {str(e)}")
+                            continue
+                        
+            except Exception as e:
+                logging.error(f"Error in parallel processing: {str(e)}")
+                continue
+            
+            gc.collect()
+        
         return processed_texts
-
-    @staticmethod
-    def _process_chunk(chunk: List[str]) -> List[str]:
-        """
-        Process a chunk of text lines. 
-        In this simplified example, 'processing' might be identity or basic cleaning.
-        """
-        # Here you can add complex NLP processing if needed.
-        return [text.strip() for text in chunk if text.strip()]
-
-    @staticmethod
-    def extract_text(record: Any) -> str:
-        """
-        Extract text from a given record.
-        This method needs to be customized depending on the dataset structure.
-        For demonstration, we attempt to handle:
-         - Strings directly
-         - Dicts with a 'text' field
-         - If not found, returns empty string
-        """
-        if isinstance(record, str):
-            return record
-        elif isinstance(record, dict):
-            # Try the 'text' key
-            return record.get('text', '')
-        else:
-            return ''
 
 
 ###############################################################################
 # Main Execution
 ###############################################################################
 def main():
-    parser = argparse.ArgumentParser(description="Train a medical tokenizer on given datasets.")
-    parser.add_argument('--local_data_path', type=str, required=True, help="Path to store processed data and tokenizer.")
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='command')
+
+    process_parser = subparsers.add_parser('process')
+    train_parser = subparsers.add_parser('train')
+
+    parser.add_argument('--local_data_path', type=str, default="C:\\Users\\ASUS\\Desktop\\LuminaLM\\Data", help="Path to store processed data and tokenizer.")
     parser.add_argument('--vocab_size', type=int, default=60000, help="Vocabulary size for the tokenizer.")
     parser.add_argument('--min_frequency', type=int, default=3, help="Minimum frequency for BPE merges.")
     parser.add_argument('--log_file', type=str, default="medical_tokenization.log", help="Log file name.")
+    parser.add_argument('--cache_dir', type=str, default=".data_cache", help="Cache directory for datasets.")
+    parser.add_argument('--verbosity', type=str, default='INFO', help="Logging verbosity level.")
+    parser.add_argument('--retry_max_attempts', type=int, default=3, help="Maximum retry attempts.")
+    parser.add_argument('--retry_delay', type=int, default=1, help="Initial delay between retries.")
+    parser.add_argument('--retry_max_delay', type=int, default=10, help="Maximum delay between retries.")
+    parser.add_argument('--retry_backoff', type=int, default=2, help="Backoff multiplier for retries.")
+    parser.add_argument('--datasets', type=str, nargs='+', help="List of datasets to process.")
+    parser.add_argument('--file_formats', type=str, nargs='+', help="List of file formats to process.")
+    parser.add_argument('--resume', action='store_true', help="Resume processing")
     args = parser.parse_args()
 
-    setup_logging(args.log_file)
+    logging.basicConfig(level=getattr(logging, args.verbosity.upper(), None))
 
-    # Modified dataset configuration
+    # Updated dataset configuration
     datasets = [
-        {
-            "name": "openwebtext",
-            "configs": None,  # No specific config needed
-        },
-        {
-            "name": "pubmed_qa",
-            "configs": ["pqa_artificial", "pqa_labeled", "pqa_unlabeled"]
-        },
-        # Add more datasets as needed
-    ]
-
+    {
+        "name": "openwebtext",
+        "download_config": {
+            "cache_dir": args.cache_dir,
+            "streaming": True,
+            "split": "train",
+            "trust_remote_code": True
+        }
+    }
+]
+    
     try:
         # Create necessary directories
         tokens_dir = Path(args.local_data_path) / "tokens"
@@ -750,3 +1163,88 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+def _process_generic_texts(texts: List[str], output_path: Path, chunk_size: int, num_workers: int) -> Optional[str]:
+    """
+    Process a list of texts with proper chunking and error handling.
+    
+    Args:
+        texts: List of texts to process
+        output_path: Path to save processed texts
+        chunk_size: Size of chunks for processing
+        num_workers: Number of workers for parallel processing
+        
+    Returns:
+        Optional[str]: Path to processed file if successful, None otherwise
+    """
+    try:
+        # Process in chunks to manage memory
+        with open(output_path, 'w', encoding='utf-8') as f:
+            for i in range(0, len(texts), chunk_size):
+                chunk = texts[i:i + chunk_size]
+                try:
+                    # Process chunk
+                    processed_chunk = []
+                    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+                        futures = [
+                            executor.submit(
+                                DatasetProcessor._process_chunk, 
+                                chunk[j:j + chunk_size // num_workers],
+                                worker_id=j
+                            ) 
+                            for j in range(0, len(chunk), chunk_size // num_workers)
+                        ]
+                        
+                        for future in as_completed(futures):
+                            try:
+                                processed_chunk.extend(future.result())
+                            except Exception as e:
+                                logging.error(f"Error processing chunk: {e}")
+                                continue
+                    
+                    # Write chunk with error handling
+                    if processed_chunk:
+                        try:
+                            f.write('\n'.join(processed_chunk) + '\n')
+                            f.flush()
+                        except IOError as e:
+                            logging.error(f"Error writing chunk to file: {e}")
+                            # Attempt to write to backup file
+                            backup_path = output_path.with_suffix('.backup')
+                            with open(backup_path, 'a', encoding='utf-8') as backup_f:
+                                backup_f.write('\n'.join(processed_chunk) + '\n')
+                
+                except Exception as e:
+                    logging.error(f"Error processing chunk {i//chunk_size}: {e}")
+                    continue
+                
+                # Clear memory
+                processed_chunk.clear()
+        
+        return str(output_path)
+    
+    except Exception as e:
+        logging.error(f"Error in _process_generic_texts: {e}")
+        return None
+
+def dynamic_chunk_size():
+    total_memory = psutil.virtual_memory().total
+    return max(1000, int(total_memory * 0.1 / 8192))  # Assuming 8KB per text
+
+chunk_size = dynamic_chunk_size()
+
+class TestUtils(unittest.TestCase):
+    def test_with_retry(self):
+        # Add test cases for with_retry
+        pass
+
+    def test_managed_temp_file(self):
+        # Add test cases for managed_temp_file
+        pass
+
+    def test_split_chunk(self):
+        # Add test cases for split_chunk
+        pass
+
+if __name__ == '__main__':
+    unittest.main()
