@@ -58,8 +58,8 @@ class Config:
             'image/jpeg', 'image/png', 'image/webp'
         },
         image_processor: str = 'google/vit-base-patch16-224',
-        chunk_size: int = 1000000,
-        processing_workers: int = max(32, multiprocessing.cpu_count() - 1),
+        chunk_size: int = 10000,
+        processing_workers: int = max(64, multiprocessing.cpu_count() - 1),
         log_file: str = "medical_tokenization.log"
     ):
         self.local_data_path = Path(local_data_path)
@@ -423,10 +423,11 @@ class DatasetProcessor:
             'backoff': 2
         }
         
-        # Add memory monitoring
-        self.memory_threshold = 0.8  # 80% memory usage threshold
-        self.initial_chunk_size = self.config.chunk_size
-
+        # Update memory management parameters
+        self.memory_threshold = 0.7  # Lower threshold to 70%
+        self.max_workers = min(16, multiprocessing.cpu_count())  # Limit max workers
+        self.batch_size = 1000  # Smaller batch size for processing
+        
     def __del__(self):
         """Cleanup temporary directory on object destruction"""
         try:
@@ -623,50 +624,44 @@ class DatasetProcessor:
 
     def _get_optimal_workers(self) -> int:
         """Dynamically adjust worker count based on system resources"""
-        cpu_count = multiprocessing.cpu_count()
         memory = psutil.virtual_memory()
         
-        # Reduce workers if memory usage is high
+        # Reduce workers more aggressively when memory usage is high
         if memory.percent > self.memory_threshold * 100:
-            return max(1, cpu_count // 2)
-        return self.config.processing_workers
+            return max(1, self.max_workers // 4)
+        elif memory.percent > (self.memory_threshold * 0.8) * 100:
+            return max(1, self.max_workers // 2)
+        return self.max_workers
 
     def _process_chunk(self, chunk: List[str], worker_id: int) -> List[str]:
-        """
-        Process a chunk of texts with improved error handling and memory management.
-        
-        Args:
-            chunk: List of texts to process
-            worker_id: ID of the worker processing this chunk
-            
-        Returns:
-            List[str]: List of processed texts
-        """
+        """Process a chunk of texts with improved memory management"""
         processed = []
         try:
-            # Monitor memory usage
-            if psutil.virtual_memory().percent > self.memory_threshold * 100:
-                logging.warning(f"Worker {worker_id}: High memory usage detected")
-                gc.collect()
-            
-            for idx, text in enumerate(chunk):
-                try:
+            # Process in smaller batches with progress bar
+            for i in tqdm(range(0, len(chunk), self.batch_size), 
+                         desc=f"Worker {worker_id}", 
+                         leave=False):
+                batch = chunk[i:i + self.batch_size]
+                
+                # Check memory before processing batch
+                if psutil.virtual_memory().percent > self.memory_threshold * 100:
+                    gc.collect()
+                    torch.cuda.empty_cache() if torch.cuda.is_available() else None
+                    time.sleep(0.1)  # Brief pause to allow memory cleanup
+                
+                for text in batch:
                     if not isinstance(text, str):
                         continue
-                        
                     processed_text = self.preprocess_text(text)
                     if processed_text.strip():
                         processed.append(processed_text)
-                        
-                except Exception as e:
-                    logging.error(f"Worker {worker_id}: Error processing text at index {idx}: {e}")
-                    continue
+                
+                batch.clear()
                 
         except Exception as e:
             logging.error(f"Worker {worker_id}: Chunk processing error: {e}")
             
         finally:
-            # Clean up memory
             chunk.clear()
             gc.collect()
             
@@ -748,18 +743,16 @@ class DatasetProcessor:
             return None
 
     def process(self) -> List[str]:
-        """
-        Process all datasets and return a list of processed file paths.
-        For Hugging Face datasets, load and process them.
-        For local files, just process them directly.
-        """
+        """Process all datasets and return a list of processed file paths."""
         processed_files = []
-
-        for dataset_info in self.datasets:
-            # Determine if it's a Hugging Face dataset or a local file
+        
+        # Add progress bar for datasets
+        for dataset_info in tqdm(self.datasets, desc="Processing datasets"):
             if "name" in dataset_info and not dataset_info.get("path"):
                 # Hugging Face dataset
-                processed_files.extend(self._process_hf_dataset(dataset_info))
+                processed = self._process_hf_dataset(dataset_info)
+                if processed:
+                    processed_files.extend(processed)
             elif "path" in dataset_info:
                 # Local file
                 file_path = dataset_info["path"]
@@ -768,23 +761,20 @@ class DatasetProcessor:
                     processed_files.append(processed)
             else:
                 logging.warning(f"Dataset info not recognized: {dataset_info}")
-
+        
         return processed_files
 
     def _process_hf_dataset(self, dataset_info: Dict[str, Any]) -> List[str]:
-        """
-        Process a Hugging Face dataset (download and iterate over splits).
-        """
+        """Process a Hugging Face dataset with progress tracking"""
         name = dataset_info["name"]
         download_config = dataset_info.get("download_config", {})
         processed_files = []
         
         try:
-            # Ensure cache_dir is set
             cache_dir = download_config.get("cache_dir", "./hf_cache")
             download_config["cache_dir"] = cache_dir
 
-            # Load dataset with streaming
+            # Load dataset with streaming and progress bar
             dataset = load_dataset(name, **download_config)
             processed = self._process_hf_split(dataset, f"{name}_train")
             if processed:
@@ -1048,42 +1038,52 @@ class DatasetProcessor:
             return None
 
     def _parallel_process_texts(self, texts: List[str], chunk_size: int) -> List[str]:
-        """
-        Process a list of texts in parallel chunks with improved error handling.
-        """
+        """Process texts in parallel with improved memory management"""
         processed_texts = []
+        optimal_chunk_size = min(chunk_size, self.batch_size * 10)
         
-        for i in range(0, len(texts), chunk_size):
-            chunk = texts[i:i + chunk_size]
-            try:
-                with ThreadPoolExecutor(max_workers=self.config.processing_workers) as executor:
-                    sub_chunk_size = max(100, chunk_size // self.config.processing_workers)
-                    futures = []
-                    
-                    for j in range(0, len(chunk), sub_chunk_size):
-                        sub_chunk = chunk[j:j + sub_chunk_size]
-                        futures.append(
-                            executor.submit(
-                                self._process_chunk, 
-                                sub_chunk, 
-                                worker_id=j // sub_chunk_size
-                            )
-                        )
-                    
-                    for future in as_completed(futures):
-                        try:
-                            result = future.result()
-                            if result:
-                                processed_texts.extend(result)
-                        except Exception as e:
-                            logging.error(f"Error in chunk processing: {str(e)}")
-                            continue
+        # Add overall progress bar
+        with tqdm(total=len(texts), desc="Processing texts", unit="texts") as pbar:
+            for i in range(0, len(texts), optimal_chunk_size):
+                chunk = texts[i:i + optimal_chunk_size]
+                
+                # Check and manage memory before processing new chunk
+                if psutil.virtual_memory().percent > self.memory_threshold * 100:
+                    gc.collect()
+                    torch.cuda.empty_cache() if torch.cuda.is_available() else None
+                    time.sleep(0.5)  # Allow more time for memory cleanup
+                
+                try:
+                    workers = self._get_optimal_workers()
+                    with ThreadPoolExecutor(max_workers=workers) as executor:
+                        futures = []
+                        sub_chunk_size = max(100, len(chunk) // workers)
                         
-            except Exception as e:
-                logging.error(f"Error in parallel processing: {str(e)}")
-                continue
-            
-            gc.collect()
+                        for j in range(0, len(chunk), sub_chunk_size):
+                            sub_chunk = chunk[j:j + sub_chunk_size]
+                            futures.append(
+                                executor.submit(self._process_chunk, sub_chunk, j // sub_chunk_size)
+                            )
+                        
+                        for future in tqdm(as_completed(futures), 
+                                         total=len(futures), 
+                                         desc="Processing chunks",
+                                         leave=False):
+                            try:
+                                result = future.result()
+                                if result:
+                                    processed_texts.extend(result)
+                                    pbar.update(len(result))
+                            except Exception as e:
+                                logging.error(f"Error in chunk processing: {str(e)}")
+                                continue
+                
+                except Exception as e:
+                    logging.error(f"Error in parallel processing: {str(e)}")
+                    continue
+                
+                chunk.clear()
+                gc.collect()
         
         return processed_texts
 
