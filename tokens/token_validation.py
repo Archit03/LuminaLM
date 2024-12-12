@@ -8,6 +8,9 @@ from tokenizer import (
     HybridTokenizationStrategy,
     MedicalTokenizer
 )
+from typing import Dict, Any
+import yaml
+from pathlib import Path
 
 # Set up logging
 LOG_FILE = "validation.log"
@@ -16,6 +19,63 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler()]
 )
+
+def validate_config(config: Dict[str, Any]) -> bool:
+    """Validate configuration parameters"""
+    required_fields = {
+        'local_data_path': str,
+        'vocab_size': (int, type(None)),
+        'min_frequency': int,
+        'max_file_size_mb': int,
+        'allowed_extensions': set,
+        'allowed_mimetypes': set,
+        'chunk_size': int,
+        'processing_workers': int,
+        'log_file': str,
+        'gpu_memory_threshold': float
+    }
+    
+    try:
+        for field, expected_type in required_fields.items():
+            if field not in config:
+                raise ValueError(f"Missing required field: {field}")
+            
+            if not isinstance(config[field], expected_type):
+                raise TypeError(f"Invalid type for {field}: expected {expected_type}, got {type(config[field])}")
+        
+        # Additional validation
+        if config['min_frequency'] < 1:
+            raise ValueError("min_frequency must be >= 1")
+        
+        if config['max_file_size_mb'] <= 0:
+            raise ValueError("max_file_size_mb must be > 0")
+        
+        if not (0 < config['gpu_memory_threshold'] <= 1):
+            raise ValueError("gpu_memory_threshold must be between 0 and 1")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Configuration validation failed: {str(e)}")
+        return False
+
+def load_config(config_path: str) -> Dict[str, Any]:
+    """Load and validate configuration from YAML file"""
+    config_path = Path(config_path)
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+        
+    try:
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+            
+        if validate_config(config):
+            return config
+        else:
+            raise ValueError("Invalid configuration")
+            
+    except Exception as e:
+        raise RuntimeError(f"Error loading config: {str(e)}")
 
 def main():
     """Validation script for the medical tokenizer."""

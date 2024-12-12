@@ -1,14 +1,22 @@
 #!/bin/bash
 
-# Ensure the script exits on errors
-set -e
+# Ensure the script exits on errors and undefined variables
+set -eu
 
 # Define variables
 TOKENIZER_SCRIPT="tokenizer.py"
 VALIDATION_SCRIPT="token_validation.py"
-LOCAL_DATA_DIR="/content/LuminaLM/Data"  # Linux-style path
-TOKENIZER_OUTPUT_PATH="./medical_tokenizer.json"
+LOCAL_DATA_DIR="/content/LuminaLM/Data"
+TOKENIZER_OUTPUT_PATH="./lumina_tokenizer.json"
 VALIDATION_OUTPUT="./validation_results.txt"
+LOG_FILE="lumina_tokenization.log"
+
+# Print script configuration
+echo "=== LuminaLM Tokenizer Configuration ==="
+echo "Data Directory: $LOCAL_DATA_DIR"
+echo "Output Path: $TOKENIZER_OUTPUT_PATH"
+echo "Log File: $LOG_FILE"
+echo "=================================="
 
 # Check if the tokenizer script exists
 if [[ ! -f $TOKENIZER_SCRIPT ]]; then
@@ -22,9 +30,18 @@ if [[ ! -f $VALIDATION_SCRIPT ]]; then
   exit 1
 fi
 
-# Run the tokenizer script
+# Run the tokenizer script with error handling
 echo "Running tokenizer script..."
-python3 $TOKENIZER_SCRIPT --local_data_path="$LOCAL_DATA_DIR" --vocab_size=60000 --min_frequency=2 --log_file="medical_tokenization.log"
+if ! python3 $TOKENIZER_SCRIPT \
+    --local_data_path="$LOCAL_DATA_DIR" \
+    --vocab_size=32000 \
+    --min_frequency=3 \
+    --limit_alphabet=1000 \
+    --model_prefix="lumina" \
+    --log_file="$LOG_FILE"; then
+    echo "Error: Tokenizer script failed!"
+    exit 1
+fi
 
 # Check if the tokenizer output was created
 if [[ ! -f $TOKENIZER_OUTPUT_PATH ]]; then
@@ -32,9 +49,12 @@ if [[ ! -f $TOKENIZER_OUTPUT_PATH ]]; then
   exit 1
 fi
 
-# Run the validation script
+# Run the validation script with error handling
 echo "Running validation script..."
-python3 $VALIDATION_SCRIPT --tokenizer_path "$TOKENIZER_OUTPUT_PATH" > "$VALIDATION_OUTPUT"
+if ! python3 $VALIDATION_SCRIPT --tokenizer_path "$TOKENIZER_OUTPUT_PATH" > "$VALIDATION_OUTPUT"; then
+    echo "Error: Validation script failed!"
+    exit 1
+fi
 
 # Check if the validation output was created
 if [[ ! -f $VALIDATION_OUTPUT ]]; then
@@ -42,7 +62,10 @@ if [[ ! -f $VALIDATION_OUTPUT ]]; then
   exit 1
 fi
 
-# Display success message
-echo "Tokenizer creation and validation completed successfully."
+# Display final statistics
+echo -e "\n=== LuminaLM Tokenizer Status ==="
+if [[ -f "$LOG_FILE" ]]; then
+    echo "Tokenization log available at: $LOG_FILE"
+fi
 echo "Tokenizer saved at: $TOKENIZER_OUTPUT_PATH"
 echo "Validation results saved at: $VALIDATION_OUTPUT"
