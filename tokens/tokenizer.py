@@ -1154,39 +1154,102 @@ class DatasetProcessor:
             raise
 
     def _process_openwebtext(self, config: Dict[str, Any]) -> List[str]:
-        """Process OpenWebText dataset."""
+        """Process OpenWebText dataset with enhanced error handling and progress tracking."""
         try:
-            # Load dataset
-            dataset = load_dataset(
-                'openwebtext',
-                cache_dir=config.get('download_config', {}).get('cache_dir'),
-                trust_remote_code=config.get('download_config', {}).get('trust_remote_code', True)
-            )
+            logging.info("Starting OpenWebText dataset processing...")
             
-            # Process texts
+            # Configure dataset loading with proper error handling
+            download_config = config.get('download_config', {})
+            cache_dir = download_config.get('cache_dir', '.cache')
+            
+            # Ensure cache directory exists
+            Path(cache_dir).mkdir(parents=True, exist_ok=True)
+            
+            # Load dataset with progress tracking
+            logging.info("Loading OpenWebText dataset...")
+            try:
+                dataset = load_dataset(
+                    'openwebtext',
+                    cache_dir=cache_dir,
+                    trust_remote_code=True,
+                    streaming=True  # Use streaming for memory efficiency
+                )
+            except Exception as e:
+                logging.error(f"Failed to load OpenWebText dataset: {str(e)}")
+                # Try alternative loading method
+                try:
+                    dataset = load_dataset(
+                        'openwebtext',
+                        cache_dir=cache_dir,
+                        trust_remote_code=True,
+                        streaming=False
+                    )
+                except Exception as e2:
+                    logging.error(f"All attempts to load dataset failed: {str(e2)}")
+                    raise
+            
+            # Setup output directory
             output_dir = Path(self.config.local_data_path) / "processed" / "openwebtext"
             output_dir.mkdir(parents=True, exist_ok=True)
             
             processed_files = []
-            for split in dataset:
-                output_path = output_dir / f"{split}_processed.txt"
-                texts = [text['text'] for text in dataset[split]]
-                
-                result = self._process_generic_texts(
-                    texts=texts,
-                    output_path=output_path,
-                    chunk_size=self.batch_size,
-                    num_workers=self.current_workers,
-                    dataset_name='openwebtext'
-                )
-                
-                if result:
-                    processed_files.append(result)
+            batch_size = 10000  # Process in smaller batches
             
+            # Process each split in the dataset
+            for split_name, split_dataset in dataset.items():
+                logging.info(f"Processing split: {split_name}")
+                
+                # Process in batches with progress tracking
+                current_batch = []
+                current_file_idx = 0
+                
+                with tqdm(desc=f"Processing {split_name}", unit="texts") as pbar:
+                    for item in split_dataset:
+                        if 'text' in item and item['text']:
+                            current_batch.append(item['text'])
+                            
+                            if len(current_batch) >= batch_size:
+                                # Process current batch
+                                output_path = output_dir / f"{split_name}_batch_{current_file_idx}.txt"
+                                result = self._process_generic_texts(
+                                    texts=current_batch,
+                                    output_path=output_path,
+                                    chunk_size=self.batch_size,
+                                    num_workers=self.current_workers,
+                                    dataset_name='openwebtext'
+                                )
+                                
+                                if result:
+                                    processed_files.append(result)
+                                    current_file_idx += 1
+                                
+                                current_batch = []
+                                pbar.update(batch_size)
+                
+                    # Process remaining texts
+                    if current_batch:
+                        output_path = output_dir / f"{split_name}_batch_{current_file_idx}.txt"
+                        result = self._process_generic_texts(
+                            texts=current_batch,
+                            output_path=output_path,
+                            chunk_size=self.batch_size,
+                            num_workers=self.current_workers,
+                            dataset_name='openwebtext'
+                        )
+                        
+                        if result:
+                            processed_files.append(result)
+            
+            if not processed_files:
+                logging.warning("No files were processed from OpenWebText dataset")
+                return []
+            
+            logging.info(f"Successfully processed {len(processed_files)} files from OpenWebText")
             return processed_files
             
         except Exception as e:
             logging.error(f"Error processing OpenWebText: {str(e)}")
+            logging.error(traceback.format_exc())
             return []
 
     def _process_wikipedia(self, config: Dict[str, Any]) -> List[str]:
