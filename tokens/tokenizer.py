@@ -61,7 +61,7 @@ class Config:
         gpu_memory_threshold: float = 0.8
     ):
         self.local_data_path = Path(local_data_path)
-        self.vocab_size = vocab_size
+        self.vocab_size = vocab_size if vocab_size is not None else 60000
         self.min_frequency = min_frequency
         self.log_file = log_file
         self.chunk_size = chunk_size
@@ -524,6 +524,11 @@ class MedicalTokenizer:
     """
 
     def __init__(self, vocab_size: int = 60000, min_frequency: int = 2):
+        # Ensure vocab_size has a valid value
+        if vocab_size is None:
+            vocab_size = 60000  # Default vocabulary size if None is provided
+            logging.info(f"No vocab_size provided, using default: {vocab_size}")
+            
         self.tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
         self.tokenizer.pre_tokenizer = ByteLevel()
         self.vocab_size = vocab_size
@@ -541,6 +546,9 @@ class MedicalTokenizer:
         """Train the tokenizer with enhanced path validation."""
         try:
             logging.info("Starting tokenizer training...")
+            # Add device info message
+            device = "CUDA" if torch.cuda.is_available() else "CPU"
+            logging.info(f"I'm using {device} to do the job")
             
             # Validate save path before training
             save_path = self.path_manager.validate_save_path(save_path)
@@ -700,6 +708,13 @@ class DatasetProcessor:
         }
         
         self.temp_dir = tempfile.mkdtemp()
+    
+    @staticmethod
+    def _get_max_chunk_memory() -> int:
+        """Calculate maximum allowed chunk memory size based on available system memory"""
+        available_memory = psutil.virtual_memory().available
+        # Use 20% of available memory as maximum chunk size
+        return int(available_memory * 0.2)
 
     def _calculate_optimal_workers(self) -> int:
         """
@@ -945,16 +960,17 @@ class DatasetProcessor:
         output_path: Path, 
         chunk_size: int,
         num_workers: int,
-        dataset_name: str = 'general'  # Add dataset_name parameter with default
+        dataset_name: str = 'general'
     ) -> Optional[str]:
         """Process texts with improved memory management."""
         try:
             # Calculate memory-safe chunk size
-            available_memory = psutil.virtual_memory().available
-            optimal_chunk_size = min(chunk_size, max(1000, int(available_memory * 0.05 / 8192)))
-            max_workers = min(num_workers, optimal_chunk_size // 100)  # Ensure enough data per worker
+            max_chunk_memory = self._get_max_chunk_memory()
+            optimal_chunk_size = min(chunk_size, max(1000, int(max_chunk_memory / 8192)))
+            max_workers = min(num_workers, optimal_chunk_size // 100)
             
             with open(output_path, 'w', encoding='utf-8') as f:
+                # Process in single chunks to avoid pickling issues
                 for i in range(0, len(texts), optimal_chunk_size):
                     # Check memory pressure
                     if psutil.virtual_memory().percent > 85:
@@ -963,42 +979,30 @@ class DatasetProcessor:
                             torch.cuda.empty_cache()
                         time.sleep(1)
                         optimal_chunk_size = max(1000, optimal_chunk_size // 2)
-                        max_workers = max(1, max_workers // 2)
                     
                     chunk = texts[i:i + optimal_chunk_size]
-                    worker_chunk_size = max(100, len(chunk) // max_workers)
                     
-                    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                        futures = {}
-                        for j in range(0, len(chunk), worker_chunk_size):
-                            sub_chunk = chunk[j:j + worker_chunk_size]
-                            futures[executor.submit(
-                                DatasetProcessor._process_chunk_with_retry,
-                                sub_chunk,
-                                {'max_attempts': 3, 'delay': 1, 'max_delay': 10, 'backoff': 2},
-                                dataset_name  # Add dataset_name here
-                            )] = j
+                    # Process the chunk directly instead of using ProcessPoolExecutor
+                    try:
+                        processed_texts = []
+                        for text in chunk:
+                            processed_text = self.preprocess_text(text, dataset_name)
+                            if processed_text:
+                                processed_texts.append(processed_text)
                         
-                        # Process results as they complete
-                        processed_chunk = []
-                        for future in as_completed(futures):
-                            try:
-                                result = future.result(timeout=30)
-                                if result:
-                                    processed_chunk.extend(result)
-                                    f.write('\n'.join(result) + '\n')
-                                    f.flush()
-                            except Exception as e:
-                                logging.error(f"Chunk {futures[future]} failed: {str(e)}")
-                        
-                        # Clear memory explicitly
-                        del chunk
-                        del processed_chunk
-                        del futures
-                        gc.collect()
+                        if processed_texts:
+                            f.write('\n'.join(processed_texts) + '\n')
+                            f.flush()
+                    
+                    except Exception as e:
+                        logging.error(f"Error processing chunk at index {i}: {str(e)}")
+                    
+                    # Clear memory
+                    del chunk
+                    gc.collect()
+                
+                return str(output_path)
             
-            return str(output_path)
-        
         except Exception as e:
             logging.error(f"Error in _process_generic_texts: {str(e)}")
             if output_path.exists():
@@ -1009,7 +1013,7 @@ class DatasetProcessor:
         self, 
         chunk: List[str], 
         retry_config: Dict[str, Any],
-        dataset_name: str = 'general'  # Add dataset_name parameter with default
+        dataset_name: str = 'general'
     ) -> List[str]:
         """Process a chunk of texts with enhanced retry mechanism and adaptive sizing."""
         attempt = 0
@@ -1018,7 +1022,7 @@ class DatasetProcessor:
         
         # Calculate initial chunk memory footprint
         chunk_size = sum(len(text.encode('utf-8')) for text in chunk)
-        max_chunk_size = self._get_max_chunk_memory()
+        max_chunk_size = DatasetProcessor._get_max_chunk_memory()
         
         while attempt < retry_config['max_attempts']:
             try:
@@ -1031,12 +1035,12 @@ class DatasetProcessor:
                         sub_result = self._process_chunk_with_retry(
                             sub_chunk,
                             {**retry_config, 'max_attempts': retry_config['max_attempts'] - attempt},
-                            dataset_name  # Pass dataset_name here
+                            dataset_name
                         )
                         results.extend(sub_result)
                     return results
                     
-                return self._process_chunk(current_chunk, attempt, dataset_name)  # Pass dataset_name here
+                return self._process_chunk(current_chunk, attempt, dataset_name)
                 
             except MemoryError as e:
                 attempt += 1
@@ -1490,28 +1494,76 @@ class TokenizerPathManager:
         self.backup_dir = self.base_path / "backups"
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         
+    def validate_save_path(self, save_path: Union[str, Path]) -> Path:
+        """Validate and prepare save path for tokenizer"""
+        save_path = Path(save_path)
+        
+        # Ensure parent directory exists
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Validate file extension
+        if save_path.suffix.lower() != '.json':
+            save_path = save_path.with_suffix('.json')
+            
+        # Create backup if file exists
+        if save_path.exists():
+            self._create_backup(save_path)
+            
+        return save_path
+        
+    def safe_save(self, tokenizer: Any, save_path: Union[str, Path]) -> None:
+        """Safely save tokenizer with backup handling"""
+        save_path = self.validate_save_path(save_path)
+        temp_path = save_path.with_suffix('.tmp')
+        
+        try:
+            # Save to temporary file first
+            tokenizer.save(str(temp_path))
+            
+            # Rename temporary file to final path
+            temp_path.replace(save_path)
+            logging.info(f"Successfully saved tokenizer to {save_path}")
+            
+        except Exception as e:
+            logging.error(f"Failed to save tokenizer: {str(e)}")
+            if temp_path.exists():
+                temp_path.unlink()
+            # Attempt to restore from backup
+            self._restore_from_backup(save_path)
+            raise
+            
+    def _create_backup(self, file_path: Path) -> Path:
+        """Create backup of existing file"""
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        backup_path = self.backup_dir / f"{file_path.stem}_backup_{timestamp}{file_path.suffix}"
+        
+        try:
+            shutil.copy2(file_path, backup_path)
+            logging.info(f"Created backup at {backup_path}")
+            return backup_path
+        except Exception as e:
+            logging.error(f"Failed to create backup: {str(e)}")
+            raise
+            
+    def _restore_from_backup(self, target_path: Path) -> bool:
+        """Restore from most recent backup"""
+        try:
+            latest_backup = self.get_latest_backup()
+            if latest_backup and latest_backup.exists():
+                shutil.copy2(latest_backup, target_path)
+                logging.info(f"Restored from backup: {latest_backup}")
+                return True
+            return False
+        except Exception as e:
+            logging.error(f"Failed to restore from backup: {str(e)}")
+            return False
+            
     def get_latest_backup(self) -> Optional[Path]:
         """Get the most recent backup file"""
         backups = sorted(self.backup_dir.glob("*_backup_*.json"), 
                         key=lambda x: x.stat().st_mtime,
                         reverse=True)
         return backups[0] if backups else None
-        
-    def restore_from_backup(self, tokenizer_path: Path, specific_backup: Optional[Path] = None) -> bool:
-        """Restore tokenizer from backup"""
-        try:
-            backup_path = specific_backup or self.get_latest_backup()
-            if not backup_path or not backup_path.exists():
-                logging.error("No backup file found")
-                return False
-                
-            shutil.copy2(backup_path, tokenizer_path)
-            logging.info(f"Restored tokenizer from backup: {backup_path}")
-            return True
-            
-        except Exception as e:
-            logging.error(f"Failed to restore from backup: {str(e)}")
-            return False
 
 class ChunkManager:
     """Manages data chunking with dynamic worker adjustment"""
@@ -1779,13 +1831,27 @@ def main():
         for handler in logging.root.handlers[:]:
             logging.root.removeHandler(handler)
             
+        # Log CUDA availability
+        device = "CUDA" if torch.cuda.is_available() else "CPU"
+        if torch.cuda.is_available():
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)  # Convert to GB
+            logging.info(f"Using {device} - {gpu_name} ({gpu_memory:.2f} GB)")
+        else:
+            logging.info(f"Using {device} - CUDA not available")
+            
         parser = argparse.ArgumentParser(description='Medical text tokenizer')
         
-        # Enhanced argument parsing
-        parser.add_argument('--local_data_path', type=str, required=True,
+        # Modified to use default tokens directory
+        default_data_path = Path.cwd() / "tokens"
+        
+        # Modified arguments with default path and optional vocab_size
+        parser.add_argument('--local_data_path', type=str, 
+                          default=str(default_data_path),
                           help="Path to store processed data and tokenizer")
-        parser.add_argument('--vocab_size', type=int, default=60000,
-                          help="Vocabulary size for the tokenizer")
+        parser.add_argument('--vocab_size', type=int, 
+                          default=60000,  # Set explicit default
+                          help="Vocabulary size for the tokenizer (default: 60000)")
         parser.add_argument('--min_frequency', type=int, default=2,
                           help="Minimum frequency for BPE merges")
         parser.add_argument('--log_file', type=str, default="medical_tokenization.log",
@@ -1806,9 +1872,11 @@ def main():
         # Setup enhanced logging
         setup_logging(args.log_file)
 
-        # Create necessary directories
-        tokens_dir = Path(args.local_data_path) / "tokens"
+        # Create tokens directory in current working directory
+        tokens_dir = Path("tokens")
         tokens_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Cache directory
         cache_dir = Path(args.cache_dir)
         cache_dir.mkdir(parents=True, exist_ok=True)
         
@@ -1823,10 +1891,10 @@ def main():
             }
         ]
         
-        # Initialize configuration
+        # Initialize configuration with explicit vocab_size
         config = Config(
             local_data_path=args.local_data_path,
-            vocab_size=args.vocab_size,
+            vocab_size=args.vocab_size if args.vocab_size is not None else 60000,
             min_frequency=args.min_frequency,
             log_file=args.log_file,
             chunk_size=args.chunk_size,
@@ -1895,20 +1963,22 @@ if __name__ == "__main__":
     main()
 
 def _process_generic_texts(
+    self,
     texts: List[str], 
     output_path: Path, 
-    chunk_size: int, 
+    chunk_size: int,
     num_workers: int,
-    dataset_name: str = 'general'  # Add dataset_name parameter with default
+    dataset_name: str = 'general'
 ) -> Optional[str]:
     """Process texts with improved memory management."""
     try:
         # Calculate memory-safe chunk size
-        available_memory = psutil.virtual_memory().available
-        optimal_chunk_size = min(chunk_size, max(1000, int(available_memory * 0.05 / 8192)))
-        max_workers = min(num_workers, optimal_chunk_size // 100)  # Ensure enough data per worker
+        max_chunk_memory = self._get_max_chunk_memory()
+        optimal_chunk_size = min(chunk_size, max(1000, int(max_chunk_memory / 8192)))
+        max_workers = min(num_workers, optimal_chunk_size // 100)
         
         with open(output_path, 'w', encoding='utf-8') as f:
+            # Process in single chunks to avoid pickling issues
             for i in range(0, len(texts), optimal_chunk_size):
                 # Check memory pressure
                 if psutil.virtual_memory().percent > 85:
@@ -1917,41 +1987,29 @@ def _process_generic_texts(
                         torch.cuda.empty_cache()
                     time.sleep(1)
                     optimal_chunk_size = max(1000, optimal_chunk_size // 2)
-                    max_workers = max(1, max_workers // 2)
                 
                 chunk = texts[i:i + optimal_chunk_size]
-                worker_chunk_size = max(100, len(chunk) // max_workers)
                 
-                with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                    futures = {}
-                    for j in range(0, len(chunk), worker_chunk_size):
-                        sub_chunk = chunk[j:j + worker_chunk_size]
-                        futures[executor.submit(
-                            DatasetProcessor._process_chunk_with_retry,
-                            sub_chunk,
-                            {'max_attempts': 3, 'delay': 1, 'max_delay': 10, 'backoff': 2},
-                            dataset_name  # Add dataset_name here
-                        )] = j
+                # Process the chunk directly instead of using ProcessPoolExecutor
+                try:
+                    processed_texts = []
+                    for text in chunk:
+                        processed_text = self.preprocess_text(text, dataset_name)
+                        if processed_text:
+                            processed_texts.append(processed_text)
                     
-                    # Process results as they complete
-                    processed_chunk = []
-                    for future in as_completed(futures):
-                        try:
-                            result = future.result(timeout=30)
-                            if result:
-                                processed_chunk.extend(result)
-                                f.write('\n'.join(result) + '\n')
-                                f.flush()
-                        except Exception as e:
-                            logging.error(f"Chunk {futures[future]} failed: {str(e)}")
+                    if processed_texts:
+                        f.write('\n'.join(processed_texts) + '\n')
+                        f.flush()
                 
-                # Clear memory explicitly
+                except Exception as e:
+                    logging.error(f"Error processing chunk at index {i}: {str(e)}")
+                
+                # Clear memory
                 del chunk
-                del processed_chunk
-                del futures
                 gc.collect()
-        
-        return str(output_path)
+            
+            return str(output_path)
         
     except Exception as e:
         logging.error(f"Error in _process_generic_texts: {str(e)}")
@@ -2010,5 +2068,3 @@ def split_chunk(chunk: List[Any], num_parts: int) -> Generator[List[Any], None, 
         if start < len(chunk):
             yield chunk[start:end]
         start = end
-
-
