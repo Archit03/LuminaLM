@@ -7,6 +7,7 @@ set SCRIPT_PATH=tokenizer.py
 set LOG_FILE=tokenizer.log
 set MIN_FREQ=2
 set CHUNK_SIZE=10000
+set WORKERS=8
 
 :: Check Python installation
 %PYTHON_PATH% --version >nul 2>&1
@@ -29,10 +30,10 @@ echo.
 :: Run the tokenizer with enhanced configuration
 echo Starting tokenizer training...
 %PYTHON_PATH% "%SCRIPT_PATH%" ^
-    --min_frequency %MIN_FREQ% ^
-    --log_file "%LOG_FILE%" ^
+    --min_freq %MIN_FREQ% ^
+    --log "%LOG_FILE%" ^
     --chunk_size %CHUNK_SIZE% ^
-    --max_workers 8
+    --workers %WORKERS%
 
 if errorlevel 1 (
     echo Error: Tokenizer training failed. Check %LOG_FILE% for details.

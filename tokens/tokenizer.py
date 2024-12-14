@@ -14,7 +14,7 @@ from itertools import islice
 from tqdm import tqdm
 import torch
 from torch import Tensor
-from datasets import load_dataset, DatasetDict
+from datasets import load_dataset, DatasetDict, IterableDataset
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.pre_tokenizers import ByteLevel
@@ -276,32 +276,39 @@ class TokenizationUtilities:
 # Memory Management
 ###############################################################################
 class MemoryManager:
-    """Manages memory usage and cleanup."""
-    def __init__(self):
-        self.threshold = 0.9
+    """Enhanced memory manager with alerts and dynamic thresholds"""
+    def __init__(self, alert_threshold: float = 0.8, critical_threshold: float = 0.9):
+        self.alert_threshold = alert_threshold
+        self.critical_threshold = critical_threshold
+        self.last_alert_time = 0
+        self.alert_cooldown = 300  # 5 minutes between alerts
+        
+    def check_memory(self) -> Tuple[bool, str]:
+        """Check memory status with detailed reporting"""
+        memory = psutil.virtual_memory()
+        current_usage = memory.percent / 100
+        
+        status_message = f"Memory usage: {memory.percent}%"
+        
+        if current_usage >= self.critical_threshold:
+            if time.time() - self.last_alert_time > self.alert_cooldown:
+                self.last_alert_time = time.time()
+                logging.critical(f"Critical memory usage: {memory.percent}%")
+            return True, f"CRITICAL: {status_message}"
+            
+        elif current_usage >= self.alert_threshold:
+            if time.time() - self.last_alert_time > self.alert_cooldown:
+                self.last_alert_time = time.time()
+                logging.warning(f"High memory usage: {memory.percent}%")
+            return True, f"WARNING: {status_message}"
+            
+        return False, status_message
 
-    def clean_memory(self, aggressive: bool = False):
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            if aggressive:
-                torch.cuda.ipc_collect()
-
-    @contextmanager
-    def monitor_memory(self, operation: str = ""):
-        try:
-            yield
-        finally:
-            if self.should_cleanup():
-                self.clean_memory()
-
-    def should_cleanup(self) -> bool:
-        if torch.cuda.is_available():
-            memory_allocated = torch.cuda.memory_allocated()
-            memory_reserved = torch.cuda.memory_reserved()
-            if memory_reserved > 0:
-                return (memory_allocated / memory_reserved) > self.threshold
-        return False
+    def get_safe_chunk_size(self, item_size_bytes: int = 8192) -> int:
+        """Calculate safe chunk size based on available memory"""
+        available_memory = psutil.virtual_memory().available
+        target_memory = available_memory * 0.5  # Use 50% of available memory
+        return max(1000, int(target_memory / item_size_bytes))
 
 
 ###############################################################################
@@ -521,99 +528,171 @@ class HybridTokenizationStrategy:
 # MedicalTokenizer
 ###############################################################################
 class MedicalTokenizer:
-    """
-    Tokenizer class for training and encoding with both autoregressive and bidirectional strategies.
-    """
+    """Tokenizer class for training and encoding with both autoregressive and bidirectional strategies."""
 
     def __init__(self, vocab_size: int = 60000, min_frequency: int = 2):
-        # Ensure vocab_size has a valid value
-        if vocab_size is None:
-            vocab_size = 60000  # Default vocabulary size if None is provided
-            logging.info(f"No vocab_size provided, using default: {vocab_size}")
-            
+        # Initialize tokenizer with BPE model and ByteLevel pre-tokenizer
         self.tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
-        self.tokenizer.pre_tokenizer = ByteLevel()
+        self.tokenizer.pre_tokenizer = ByteLevel(add_prefix_space=True)
+        
         self.vocab_size = vocab_size
         self.min_frequency = min_frequency
         self.special_tokens = ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"]
+        
+        # Configure the trainer with proper settings
         self.trainer = BpeTrainer(
             vocab_size=self.vocab_size,
             min_frequency=self.min_frequency,
-            special_tokens=self.special_tokens
+            special_tokens=self.special_tokens,
+            initial_alphabet=ByteLevel.alphabet(),
+            show_progress=True
         )
+        
         self.strategy = HybridTokenizationStrategy(self.tokenizer)
         self.path_manager = TokenizerPathManager(Path.cwd())
 
     def train(self, files: List[str], save_path: str):
-        """Train the tokenizer with enhanced path validation and encoding handling."""
+        """Train the tokenizer with enhanced validation and error handling."""
         try:
             logging.info("Starting tokenizer training...")
-            device = "CUDA" if torch.cuda.is_available() else "CPU"
-            logging.info(f"Using {device} to do the job")
             
-            # Validate save path before training
-            save_path = self.path_manager.validate_save_path(save_path)
+            # Validate input files
+            valid_files = []
+            for file in files:
+                try:
+                    with open(file, 'r', encoding='utf-8') as f:
+                        f.readline()  # Test read
+                    valid_files.append(file)
+                except Exception as e:
+                    logging.warning(f"Skipping invalid file {file}: {str(e)}")
             
-            # Train tokenizer
-            self.tokenizer.train(files, self.trainer)
+            if not valid_files:
+                raise ValueError("No valid files provided for training")
             
-            # Save with proper encoding
-            self.tokenizer.save(str(save_path), pretty=True)
+            # Create backup of existing tokenizer if it exists
+            save_path = Path(save_path)
+            backup_path = None
+            if save_path.exists():
+                backup_path = save_path.with_suffix('.backup')
+                shutil.copy2(save_path, backup_path)
+                logging.info(f"Created backup at {backup_path}")
             
-            # Verify the saved file
             try:
-                with open(save_path, 'r', encoding='utf-8') as f:
-                    json.load(f)  # Validate JSON format
-            except UnicodeDecodeError:
-                # If UTF-8 fails, try saving with a different encoding
-                self.tokenizer.save(str(save_path), pretty=True, encoding='latin1')
+                # Initialize BPE trainer with special tokens
+                trainer = BpeTrainer(
+                    vocab_size=self.vocab_size,
+                    min_frequency=self.min_frequency,
+                    special_tokens=self.special_tokens,
+                    show_progress=True
+                )
+                
+                # Train the tokenizer
+                self.tokenizer.train(files=valid_files, trainer=trainer)
+                
+                # Verify vocabulary was created
+                vocab = self.tokenizer.get_vocab()
+                if not vocab:
+                    raise ValueError("Training resulted in empty vocabulary")
+                
+                # Verify special tokens are present
+                for token in self.special_tokens:
+                    if token not in vocab:
+                        raise ValueError(f"Special token {token} missing from vocabulary")
+                
+                # Save tokenizer directly using its built-in save method
+                self.tokenizer.save(str(save_path))
+                
+                # Verify saved file
+                if not self._verify_saved_tokenizer(save_path):
+                    raise ValueError("Saved tokenizer verification failed")
+                
+                # If everything succeeded, remove backup
+                if backup_path and backup_path.exists():
+                    backup_path.unlink()
+                
+                logging.info(f"Successfully trained and saved tokenizer to {save_path}")
+                
+            except Exception as e:
+                # Restore from backup if available
+                if backup_path and backup_path.exists():
+                    shutil.copy2(backup_path, save_path)
+                    logging.info("Restored from backup due to training error")
+                raise
                 
         except Exception as e:
             logging.error(f"Failed to train/save tokenizer: {e}")
             raise
 
+    def _verify_saved_tokenizer(self, save_path: Path) -> bool:
+        """Comprehensive verification of saved tokenizer."""
+        try:
+            # Check file exists and is readable
+            if not save_path.exists():
+                logging.error("Tokenizer file does not exist")
+                return False
+            
+            # Test loading the tokenizer
+            try:
+                test_tokenizer = Tokenizer.from_file(str(save_path))
+            except Exception as e:
+                logging.error(f"Failed to load tokenizer: {e}")
+                return False
+            
+            # Verify vocabulary
+            vocab = test_tokenizer.get_vocab()
+            if not vocab:
+                logging.error("Empty vocabulary in saved tokenizer")
+                return False
+            
+            # Verify special tokens in vocabulary
+            for token in self.special_tokens:
+                if token not in vocab:
+                    logging.error(f"Special token missing from vocabulary: {token}")
+                    return False
+            
+            # Test tokenizer functionality with a more robust test
+            test_texts = [
+                "This is a test sentence.",
+                "Another test with numbers 123.",
+                "Special characters: !@#$%",
+                "[CLS] Test with special tokens [SEP]"
+            ]
+            
+            for test_text in test_texts:
+                try:
+                    encoded = test_tokenizer.encode(test_text)
+                    if not encoded or not encoded.ids:
+                        logging.error(f"Tokenizer failed to encode: {test_text}")
+                        return False
+                    
+                    decoded = test_tokenizer.decode(encoded.ids)
+                    if not decoded or not decoded.strip():
+                        logging.error(f"Tokenizer failed to decode: {test_text}")
+                        return False
+                    
+                except Exception as e:
+                    logging.error(f"Tokenizer test failed for: {test_text}\nError: {e}")
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            logging.error(f"Tokenizer verification failed: {e}")
+            return False
+
     def load(self, tokenizer_path: str):
-        """Load a previously trained tokenizer with validation and encoding handling."""
+        """Load a previously trained tokenizer with validation."""
         path = Path(tokenizer_path)
         
         if not path.exists():
             raise FileNotFoundError(f"Tokenizer file not found: {path}")
         
-        if not path.is_file():
-            raise ValueError(f"Tokenizer path is not a file: {path}")
+        if not self._verify_saved_tokenizer(path):
+            raise ValueError("Invalid tokenizer file")
         
-        try:
-            # Try different encodings
-            encodings = ['utf-8', 'utf-8-sig', 'latin1']
-            config = None
-            
-            for encoding in encodings:
-                try:
-                    with open(path, 'r', encoding=encoding) as f:
-                        config = json.load(f)
-                    break
-                except UnicodeDecodeError:
-                    continue
-                    
-            if config is None:
-                # If all encodings fail, try binary mode with chardet
-                with open(path, 'rb') as f:
-                    raw_data = f.read()
-                    detected = chardet.detect(raw_data)
-                    encoding = detected['encoding']
-                    if encoding:
-                        with open(path, 'r', encoding=encoding) as f:
-                            config = json.load(f)
-                            
-            if not config or not all(key in config for key in ['model', 'vocab', 'merges']):
-                raise ValueError("Invalid tokenizer file format")
-            
-            self.tokenizer = Tokenizer.from_file(str(path))
-            self.strategy = HybridTokenizationStrategy(self.tokenizer)
-            logging.info(f"Successfully loaded tokenizer from {path}")
-            
-        except Exception as e:
-            raise RuntimeError(f"Failed to load tokenizer: {str(e)}")
+        self.tokenizer = Tokenizer.from_file(str(path))
+        self.strategy = HybridTokenizationStrategy(self.tokenizer)
+        logging.info(f"Successfully loaded tokenizer from {path}")
 
     def encode(self, texts: List[str], task_type: str = 'auto', **kwargs) -> Dict[str, Tensor]:
         """
@@ -662,23 +741,30 @@ class FileValidator:
         self.allowed_mimetypes = allowed_mimetypes
         self.max_file_size = max_file_size
 
-    def validate_file(self, file_path: Union[str, Path]) -> Tuple[bool, str]:
-        file_path = Path(file_path)
+    def validate_file(self, file_path: str) -> bool:
         try:
-            if not file_path.exists():
-                return False, "File does not exist"
-            if not file_path.is_file():
-                return False, "Path is not a file"
-            if file_path.suffix.lower() not in self.allowed_extensions:
-                return False, f"Unsupported file extension. Allowed: {self.allowed_extensions}"
-            mime_type, _ = mimetypes.guess_type(str(file_path))
-            if mime_type not in self.allowed_mimetypes:
-                return False, f"Invalid file type: {mime_type}"
-            if file_path.stat().st_size > self.max_file_size:
-                return False, f"File too large. Maximum size: {self.max_file_size / 1024 / 1024}MB"
-            return True, ""
+            with open(file_path, 'r', encoding='utf-8') as f:
+                # Try to read some content
+                content = f.read(1024)  # Read first 1KB
+                if not content.strip():
+                    return False
+                return True
+        except UnicodeDecodeError:
+            # Try to detect encoding
+            with open(file_path, 'rb') as f:
+                raw = f.read(1024)
+                result = chardet.detect(raw)
+                if result['encoding']:
+                    try:
+                        with open(file_path, 'r', encoding=result['encoding']) as f:
+                            content = f.read(1024)
+                            return bool(content.strip())
+                    except:
+                        pass
+            return False
         except Exception as e:
-            return False, f"Validation error: {str(e)}"
+            logging.error(f"File validation error for {file_path}: {str(e)}")
+            return False
 
     @staticmethod
     def sanitize_filename(filename: str) -> str:
@@ -698,726 +784,216 @@ class DatasetProcessor:
         self.datasets = datasets
         self.config = config
         self.memory_threshold = 0.8
-        self.file_validator = FileValidator(
-            allowed_extensions=config.allowed_extensions,
-            allowed_mimetypes=config.allowed_mimetypes,
-            max_file_size=config.max_file_size
-        )
-        
-        # Initialize dataset-specific configurations with field definitions
-        self.dataset_specific_configs = {
-            'openwebtext': {
-                'required_fields': ['text'],
-                'text_fields': ['text', 'title'],
-                'numeric_fields': [],
-                'date_fields': [],
-                'preprocessing': {
-                    'lower_case': True,
-                    'strip_newlines': True,
-                    'min_length': 50
-                }
-            },
-            'wikipedia': {
-                'required_fields': ['text'],
-                'text_fields': ['text', 'title', 'section'],
-                'numeric_fields': ['id'],
-                'date_fields': ['timestamp'],
-                'preprocessing': {
-                    'lower_case': False,
-                    'strip_newlines': False,
-                    'min_length': 100
-                }
-            },
-            'local': {
-                'required_fields': ['text'],
-                'text_fields': ['text'],
-                'numeric_fields': [],
-                'date_fields': [],
-                'preprocessing': {
-                    'lower_case': True,
-                    'strip_newlines': True,
-                    'min_length': 20
-                }
-            },
-            'general': {
-                'required_fields': ['text'],
-                'text_fields': ['text'],
-                'numeric_fields': [],
-                'date_fields': [],
-                'preprocessing': {
-                    'lower_case': True,
-                    'strip_newlines': True,
-                    'min_length': 20
-                }
-            }
-        }
-        
-        # Initialize other attributes
-        self.total_files = self._calculate_total_files()
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        if torch.cuda.is_available():
-            self.gpu_memory_monitor = GPUMemoryMonitor(threshold=config.gpu_memory_threshold)
-        
-        self.memory_monitor = MemoryMonitor(threshold=0.7)
         self.batch_size = self._calculate_optimal_batch_size()
         self.current_workers = self._calculate_optimal_workers()
+        self.cache_dir = Path(config.cache_dir)
         
-        self.thread_pool = ThreadPoolExecutor(max_workers=self.current_workers)
-        self.process_pool = ProcessPoolExecutor(max_workers=self.current_workers)
-        
-        self.retry_config = {
-            'max_attempts': 3,
-            'delay': 1,
-            'max_delay': 10,
-            'backoff': 2
-        }
-        
-        self.temp_dir = tempfile.mkdtemp()
-    
-    @staticmethod
-    def _get_max_chunk_memory() -> int:
-        """Calculate maximum allowed chunk memory size based on available system memory"""
-        available_memory = psutil.virtual_memory().available
-        # Use 20% of available memory as maximum chunk size
-        return int(available_memory * 0.2)
+        # Create necessary directories
+        self.output_dir = Path(config.local_data_path) / "processed"
+        self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def _calculate_optimal_workers(self) -> int:
-        """
-        Dynamically determine optimal number of workers based on system resources and dataset size.
-        """
+    def _process_local_dataset(self, config: Dict[str, Any]) -> List[str]:
+        """Process local dataset from directory."""
         try:
-            # Get system information
-            cpu_count = multiprocessing.cpu_count()
-            memory = psutil.virtual_memory()
-            base_workers = max(1, cpu_count // 2)
-            if memory.percent > 80:
-                return max(1, cpu_count // 4)
-            elif memory.percent > 60:
-                return max(1, cpu_count // 2)
-            
-            #Adjust based on dataset size
-            if self.total_files > 1000:
-                base_workers = min(base_workers, 2)
-            elif self.total_files > 1000:
-                base_workers = min(base_workers, 4)
-            
-            #Consider GPU if available
-            if torch.cuda.is_available():
-                gpu_memory = torch.cuda.get_device_properties(0).total_memory
-                gpu_memory_usage = torch.cuda.memory_allocated()
-                if gpu_memory_usage > gpu_memory * 0.8:
-                    base_workers = max(1, base_workers // 2)
-
-            if self.config.max_workers is not None:
-                base_workers = min(base_workers, self.config.max_workers)
-            
-            return max(1, base_workers)
-        except Exception as e:
-            logging.error(f"Error calculating optimal workers: {str(e)}, falling back to {base_workers} workers")
-            return max(1, multiprocessing.cpu_count() // 2)
-    
-    def _calculate_optimal_batch_size(self) -> int:
-        """Calculate optimal batch size based on available system resources."""
-        #Get available system memory
-        memory = psutil.virtual_memory()
-        available_memory = memory.available
-
-        #Base batch size calculation(assuming ~1KB per text item)
-        base_batch_size = max(100, available_memory // (1024 * 1024))
-
-        if torch.cuda.is_available():
-            gpu_memory = torch.cuda.get_device_properties(0).total_memory
-            gpu_memory_used = torch.cuda.memory_allocated()
-            gpu_factor = (gpu_memory - gpu_memory_used) / gpu_memory
-        
-        cpu_count = multiprocessing.cpu_count()
-        base_size = min(base_size, cpu_count * 100)
-
-        min_batch_size = 100
-        max_batch_size = 10000
-
-        return max(min_batch_size, min(base_size, max_batch_size))
-        
-    def get_dataset_config(self, dataset_name: str) -> Dict[str, Any]:
-        """Get configuration for specific dataset with fallback to 'general'."""
-        if dataset_name not in self.dataset_specific_configs:
-            logging.warning(f"Unsupported dataset type: {dataset_name}, falling back to 'general'")
-        return self.dataset_specific_configs.get(dataset_name, self.dataset_specific_configs['general'])
-    
-    def preprocess_text(self, text: str, dataset_name: str) -> str:
-        """Apply dataset-specific preprocessing."""
-        config = self.get_dataset_config(dataset_name)
-        preprocessing = config['preprocessing']
-        
-        if not text:
-            return ""
-            
-        if preprocessing.get('lower_case', True):
-            text = text.lower()
-            
-        if preprocessing.get('strip_newlines', True):
-            text = ' '.join(text.split())
-            
-        # Skip texts that are too short
-        if len(text) < preprocessing.get('min_length', 20):
-            return ""
-            
-        return text
-
-    def extract_text(self, record: Any, dataset_type: str = 'general') -> str:
-        """
-        Enhanced text extraction with dataset-specific handling and validation.
-        """
-        try:
-            config = self.get_dataset_config(dataset_type)
-            
-            if isinstance(record, str):
-                return self.preprocess_text(record, dataset_type)
-            
-            if isinstance(record, dict):
-                # Extract and combine text from all relevant fields
-                text_parts = []
-                missing_required = []
-                
-                # Process required fields
-                for field in config['required_fields']:
-                    if field in record:
-                        value = record[field]
-                        if value is not None and str(value).strip():
-                            text_parts.append(str(value))
-                    else:
-                        missing_required.append(field)
-                
-                if missing_required:
-                    logging.warning(
-                        f"Missing required fields for {dataset_type} dataset: {missing_required}"
-                    )
-                    if not text_parts:  # If no required fields were found
-                        return ""
-                
-                # Process optional text fields
-                for field in config['text_fields']:
-                    if field in record and record[field] is not None:
-                        text_parts.append(str(record[field]))
-                
-                # Process numeric fields with context
-                for field in config['numeric_fields']:
-                    if field in record and record[field] is not None:
-                        try:
-                            numeric_value = float(record[field])
-                            text_parts.append(f"{field}: {numeric_value}")
-                        except (ValueError, TypeError):
-                            logging.warning(f"Invalid numeric value in field '{field}'")
-                
-                # Process date fields with formatting
-                for field in config['date_fields']:
-                    if field in record and record[field] is not None:
-                        try:
-                            date_val = pd.to_datetime(record[field]).strftime('%Y-%m-%d')
-                            text_parts.append(f"{field}: {date_val}")
-                        except Exception as e:
-                            logging.warning(f"Could not parse date in field '{field}': {e}")
-                
-                combined_text = " ".join(text_parts)
-                return self.preprocess_text(combined_text, dataset_type)  # Pass dataset_type here
-            
-            logging.warning(f"Unsupported record type: {type(record)}")
-            return ""
-            
-        except Exception as e:
-            logging.error(f"Error in text extraction: {str(e)}")
-            return ""
-
-    def process_with_memory_management(self, texts: Generator[str, None, None], dataset_name: str) -> Generator[str, None, None]:
-        """Memory-efficient text processing using generators"""
-        buffer_size = 1000
-        buffer = []
-        try:
-            for text in texts:
-                processed_text = self.preprocess_text(text, dataset_name)
-                if processed_text.strip():
-                    buffer.append(processed_text)
-                    if len(buffer) >= buffer_size:
-                        yield from buffer
-                        buffer.clear()
-                        gc.collect()  # Force garbage collection
-        except Exception as e:
-            logging.error(f"Error in text processing stream: {e}")
-        finally:
-            if buffer:
-                yield from buffer
-
-    @contextmanager
-    def _memory_guard(self, threshold: float = 0.9):
-        """
-        Context manager to monitor and manage memory usage.
-        
-        Args:
-            threshold: Memory usage threshold (0-1) to trigger cleanup
-        """
-        try:
-            yield
-        finally:
-            memory = psutil.virtual_memory()
-            if memory.percent > threshold * 100:
-                gc.collect()
-                torch.cuda.empty_cache() if torch.cuda.is_available() else None
-
-    def _get_optimal_chunk_size(self) -> int:
-        """
-        Dynamically calculate optimal chunk size based on system resources.
-        """
-        available_memory = psutil.virtual_memory().available
-        base_chunk_size = 1000  # Minimum chunk size
-        
-        # Use 5% of available memory, assuming 8KB per text
-        memory_based_size = max(base_chunk_size, int(available_memory * 0.05 / 8192))
-        
-        # Cap at a reasonable maximum
-        max_chunk_size = 100000
-        return min(memory_based_size, max_chunk_size)
-
-    def _get_optimal_workers(self) -> int:
-        """Dynamically adjust worker count based on system resources"""
-        memory = psutil.virtual_memory()
-        
-        if memory.percent > 90:
-            self.current_workers = self.min_workers
-        elif memory.percent > 80:
-            self.current_workers = max(self.min_workers, self.current_workers // 2)
-        elif memory.percent < 60 and self.current_workers < multiprocessing.cpu_count():
-            self.current_workers = min(self.current_workers * 2, multiprocessing.cpu_count())
-            
-        return self.current_workers
-        
-    def get_chunk_size(self) -> int:
-        """Calculate optimal chunk size based on available memory"""
-        available_memory = psutil.virtual_memory().available
-        return max(1000, int(available_memory * 0.1 / 8192))  # 8KB per text estimate
-
-    def _process_chunk(self, chunk: List[str], worker_id: int, dataset_name: str) -> List[str]:
-        """Process a chunk of texts with improved memory management"""
-        processed = []
-        try:
-            # Process in smaller batches with progress bar
-            for i in range(0, len(chunk), self.batch_size):
-                batch = chunk[i:i + self.batch_size]
-                
-                # Process each text in the batch
-                for text in batch:
-                    processed_text = self.preprocess_text(text, dataset_name)
-                    if processed_text:  # Only add non-empty processed texts
-                        processed.append(processed_text)
-                        
-                # Memory management
-                if psutil.virtual_memory().percent > self.memory_threshold * 100:
-                    gc.collect()
-                    
-        except Exception as e:
-            logging.error(f"Worker {worker_id}: Chunk processing error: {str(e)}")
-            raise
-            
-        return processed
-
-    def _process_generic_texts(
-        self,
-        texts: List[str], 
-        output_path: Path, 
-        chunk_size: int,
-        num_workers: int,
-        dataset_name: str = 'general'
-    ) -> Optional[str]:
-        """Process texts with improved memory management and dataset-specific directories."""
-        try:
-            # Create dataset-specific directory in the processed folder
-            processed_dir = Path("LuminaLM/tokens/tokens/processed") / dataset_name
-            processed_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Update output path to be in the dataset-specific directory
-            output_filename = output_path.name
-            output_path = processed_dir / output_filename
-            
-            # Calculate memory-safe chunk size
-            max_chunk_memory = self._get_max_chunk_memory()
-            optimal_chunk_size = min(chunk_size, max(1000, int(max_chunk_memory / 8192)))
-            max_workers = min(num_workers, optimal_chunk_size // 100)
-            
-            logging.info(f"Processing {dataset_name} dataset to {output_path}")
-            
-            with open(output_path, 'w', encoding='utf-8') as f:
-                # Process in single chunks to avoid pickling issues
-                for i in range(0, len(texts), optimal_chunk_size):
-                    # Check memory pressure
-                    if psutil.virtual_memory().percent > 85:
-                        gc.collect()
-                        if torch.cuda.is_available():
-                            torch.cuda.empty_cache()
-                        time.sleep(1)
-                        optimal_chunk_size = max(1000, optimal_chunk_size // 2)
-                    
-                    chunk = texts[i:i + optimal_chunk_size]
-                    
-                    # Process the chunk directly instead of using ProcessPoolExecutor
-                    try:
-                        processed_texts = []
-                        for text in chunk:
-                            processed_text = self.preprocess_text(text, dataset_name)
-                            if processed_text:
-                                processed_texts.append(processed_text)
-                        
-                        if processed_texts:
-                            f.write('\n'.join(processed_texts) + '\n')
-                            f.flush()
-                    
-                    except Exception as e:
-                        logging.error(f"Error processing chunk at index {i} for {dataset_name}: {str(e)}")
-                    
-                    # Clear memory
-                    del chunk
-                    gc.collect()
-                
-                logging.info(f"Successfully processed {dataset_name} dataset to {output_path}")
-                return str(output_path)
-            
-        except Exception as e:
-            logging.error(f"Error in _process_generic_texts for {dataset_name}: {str(e)}")
-            if output_path.exists():
-                output_path.unlink()
-            return None
-
-    def _process_chunk_with_retry(
-        self, 
-        chunk: List[str], 
-        retry_config: Dict[str, Any],
-        dataset_name: str = 'general'
-    ) -> List[str]:
-        """Process a chunk of texts with enhanced retry mechanism and adaptive sizing."""
-        attempt = 0
-        exceptions = []
-        current_chunk = chunk
-        
-        # Calculate initial chunk memory footprint
-        chunk_size = sum(len(text.encode('utf-8')) for text in chunk)
-        max_chunk_size = DatasetProcessor._get_max_chunk_memory()
-        
-        while attempt < retry_config['max_attempts']:
-            try:
-                # If chunk is too large, split it
-                if chunk_size > max_chunk_size:
-                    logging.warning(f"Chunk size ({chunk_size} bytes) exceeds limit ({max_chunk_size} bytes). Splitting...")
-                    split_size = max(1, len(current_chunk) // 2)
-                    results = []
-                    for sub_chunk in [current_chunk[:split_size], current_chunk[split_size:]]:
-                        sub_result = self._process_chunk_with_retry(
-                            sub_chunk,
-                            {**retry_config, 'max_attempts': retry_config['max_attempts'] - attempt},
-                            dataset_name
-                        )
-                        results.extend(sub_result)
-                    return results
-                    
-                return self._process_chunk(current_chunk, attempt, dataset_name)
-                
-            except MemoryError as e:
-                attempt += 1
-                exceptions.append((attempt, str(e), traceback.format_exc()))
-                # Reduce chunk size on memory error
-                current_chunk = current_chunk[:len(current_chunk)//2]
-                chunk_size = sum(len(text.encode('utf-8')) for text in current_chunk)
-                
-            except Exception as e:
-                attempt += 1
-                exceptions.append((attempt, str(e), traceback.format_exc()))
-                
-            if attempt < retry_config['max_attempts']:
-                delay = min(
-                    retry_config['delay'] * (retry_config['backoff'] ** (attempt - 1)),
-                    retry_config['max_delay']
-                )
-                logging.warning(f"Attempt {attempt} failed. Retrying in {delay}s...")
-                time.sleep(delay)
-            else:
-                self._log_retry_failures(exceptions, current_chunk)
+            # Get path from config
+            data_path = Path(config.get('config', {}).get('path', ''))
+            if not data_path.exists():
+                logging.error(f"Dataset path does not exist: {data_path}")
                 return []
-
-    def _calculate_optimal_batch_size(self) -> int:
-        """Calculate optimal batch size based on available system resources."""
-        try:
-            # Get available system memory
-            memory = psutil.virtual_memory()
-            available_memory = memory.available
             
-            # Base batch size calculation (assuming ~1KB per text item)
-            base_size = max(100, available_memory // (1024 * 1024))  # Convert to MB
+            if not data_path.is_dir():
+                logging.error(f"Dataset path is not a directory: {data_path}")
+                return []
             
-            # Adjust based on GPU if available
-            if torch.cuda.is_available():
-                gpu_memory = torch.cuda.get_device_properties(0).total_memory
-                gpu_memory_used = torch.cuda.memory_allocated()
-                gpu_factor = (gpu_memory - gpu_memory_used) / gpu_memory
-                base_size = int(base_size * gpu_factor)
+            # Create output directory for this dataset
+            dataset_output_dir = self.output_dir / "local"
+            dataset_output_dir.mkdir(parents=True, exist_ok=True)
             
-            # Adjust based on CPU cores
-            cpu_count = multiprocessing.cpu_count()
-            base_size = min(base_size, cpu_count * 1000)
+            processed_files = []
+            pattern = config.get('config', {}).get('pattern', '*.txt')
             
-            # Set reasonable bounds
-            min_batch_size = 100
-            max_batch_size = 10000
+            # Find all text files
+            text_files = list(data_path.glob(pattern))
+            if not text_files:
+                logging.warning(f"No {pattern} files found in {data_path}")
+                return []
             
-            return max(min_batch_size, min(base_size, max_batch_size))
+            logging.info(f"Found {len(text_files)} files to process")
+            
+            # Process each file
+            for file_path in text_files:
+                try:
+                    if not self._is_valid_file(file_path):
+                        continue
+                        
+                    output_path = dataset_output_dir / f"{file_path.stem}_processed.txt"
+                    
+                    # Read and process file
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        text = f.read()
+                    
+                    if not text.strip():
+                        logging.warning(f"Empty file: {file_path}")
+                        continue
+                    
+                    # Write processed text
+                    with open(output_path, 'w', encoding='utf-8') as f:
+                        f.write(text)
+                    
+                    processed_files.append(str(output_path))
+                    logging.info(f"Successfully processed: {file_path}")
+                    
+                except Exception as e:
+                    logging.error(f"Error processing file {file_path}: {str(e)}")
+                    continue
+            
+            return processed_files
             
         except Exception as e:
-            logging.warning(f"Error calculating optimal batch size: {e}")
-            return 1000  # Default fallback value
+            logging.error(f"Error processing local dataset: {str(e)}")
+            return []
 
-    def _calculate_total_files(self) -> int:
-        """Calculate total number of files to be processed across all datasets."""
-        total = 0
+    def _process_huggingface_dataset(self, config: Dict[str, Any]) -> List[str]:
+        """Process HuggingFace dataset."""
+        try:
+            dataset_name = config.get('config', {}).get('dataset_name')
+            if not dataset_name:
+                logging.error("No dataset name provided")
+                return []
+            
+            logging.info(f"Loading HuggingFace dataset: {dataset_name}")
+            
+            # Create output directory for this dataset
+            dataset_output_dir = self.output_dir / dataset_name.replace('/', '_')
+            dataset_output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Load dataset
+            try:
+                if dataset_name == "openwebtext":
+                    # Handle streaming for OpenWebText
+                    dataset = load_dataset(
+                        dataset_name,
+                        streaming=True,
+                        split='train'
+                    )
+                    return self._process_streaming_dataset(dataset, dataset_output_dir)
+                else:
+                    # Handle regular datasets
+                    dataset = load_dataset(
+                        dataset_name,
+                        split=config.get('config', {}).get('split', 'train')
+                    )
+                    return self._process_regular_dataset(dataset, dataset_output_dir)
+                    
+            except Exception as e:
+                logging.error(f"Error loading dataset {dataset_name}: {str(e)}")
+                return []
+                
+        except Exception as e:
+            logging.error(f"Error processing HuggingFace dataset: {str(e)}")
+            return []
+
+    def _process_streaming_dataset(self, dataset: IterableDataset, output_dir: Path) -> List[str]:
+        """Process streaming dataset (like OpenWebText)."""
+        processed_files = []
+        batch_count = 0
+        
+        try:
+            # Process in batches
+            batch = []
+            batch_size = self.batch_size
+            
+            for item in dataset:
+                text = item.get('text', '').strip()
+                if text:
+                    batch.append(text)
+                    
+                if len(batch) >= batch_size:
+                    output_path = output_dir / f"batch_{batch_count}.txt"
+                    with open(output_path, 'w', encoding='utf-8') as f:
+                        f.write('\n'.join(batch))
+                    processed_files.append(str(output_path))
+                    batch = []
+                    batch_count += 1
+                    
+                    # Limit the number of batches for OpenWebText
+                    if batch_count >= 100:  # Adjust this number as needed
+                        break
+            
+            # Process remaining items
+            if batch:
+                output_path = output_dir / f"batch_{batch_count}.txt"
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    f.write('\n'.join(batch))
+                processed_files.append(str(output_path))
+            
+            return processed_files
+            
+        except Exception as e:
+            logging.error(f"Error processing streaming dataset: {str(e)}")
+            return []
+
+    def _process_regular_dataset(self, dataset: DatasetDict, output_dir: Path) -> List[str]:
+        """Process regular (non-streaming) dataset."""
+        processed_files = []
+        
+        try:
+            # Get text field name (assuming it's either 'text' or 'content')
+            text_field = 'text' if 'text' in dataset.features else 'content'
+            
+            # Process in batches
+            for i in range(0, len(dataset), self.batch_size):
+                batch = dataset[i:i + self.batch_size]
+                texts = [item[text_field] for item in batch if item[text_field]]
+                
+                if texts:
+                    output_path = output_dir / f"batch_{i//self.batch_size}.txt"
+                    with open(output_path, 'w', encoding='utf-8') as f:
+                        f.write('\n'.join(texts))
+                    processed_files.append(str(output_path))
+            
+            return processed_files
+            
+        except Exception as e:
+            logging.error(f"Error processing regular dataset: {str(e)}")
+            return []
+
+    def process(self) -> List[str]:
+        """Process all datasets and return list of processed file paths."""
+        all_processed_files = []
+        
         try:
             for dataset_config in self.datasets:
-                # Ensure dataset_config is a dictionary
                 if not isinstance(dataset_config, dict):
                     logging.warning(f"Invalid dataset configuration format: {dataset_config}")
                     continue
-                    
-                dataset_name = dataset_config.get('name', '')
                 
-                if dataset_name == 'openwebtext':
-                    # For OpenWebText, estimate based on typical dataset size
-                    total += 8000000  # Approximate number of documents in OpenWebText
-                elif dataset_name == 'wikipedia':
-                    # For Wikipedia, estimate based on typical dump size
-                    total += 6000000  # Approximate number of articles
-                elif dataset_name == 'local':
-                    # For local datasets, check the actual file count
-                    data_path = Path(dataset_config.get('path', ''))
-                    if data_path.exists() and data_path.is_dir():
-                        total += sum(1 for _ in data_path.rglob('*') 
-                                   if self.file_validator.validate_file(_)[0])
-                else:
-                    # For unknown dataset types, use a default estimate
-                    total += 1000
-            
-            return max(1, total)  # Ensure at least 1 to avoid division by zero
-            
-        except Exception as e:
-            logging.error(f"Error calculating total files: {str(e)}")
-            return 1000  # Return a default value if calculation fails
-
-    def process(self) -> List[str]:
-        """
-        Process all datasets and return list of processed file paths.
-        """
-        processed_files = []
-        try:
-            for dataset_config in self.datasets:
                 dataset_name = dataset_config.get('name', '')
+                dataset_type = dataset_config.get('type', '')
+                
                 logging.info(f"Processing dataset: {dataset_name}")
                 
-                try:
-                    if dataset_name == 'openwebtext':
-                        files = self._process_openwebtext(dataset_config)
-                    elif dataset_name == 'wikipedia':
-                        files = self._process_wikipedia(dataset_config)
-                    else:
-                        files = self._process_custom_dataset(dataset_config)
-                    
-                    if files:
-                        processed_files.extend(files)
-                        logging.info(f"Successfully processed {len(files)} files from {dataset_name}")
-                    else:
-                        logging.warning(f"No files processed from dataset: {dataset_name}")
-                        
-                except Exception as e:
-                    logging.error(f"Error processing dataset {dataset_name}: {str(e)}")
+                if dataset_type == 'local':
+                    processed_files = self._process_local_dataset(dataset_config)
+                elif dataset_type == 'huggingface':
+                    processed_files = self._process_huggingface_dataset(dataset_config)
+                else:
+                    logging.warning(f"Unsupported dataset type: {dataset_type}")
                     continue
+                    
+                if processed_files:
+                    all_processed_files.extend(processed_files)
+                else:
+                    logging.warning(f"No files processed from dataset: {dataset_name}")
             
-            if not processed_files:
+            if not all_processed_files:
                 raise ValueError("No files were successfully processed")
-                
-            return processed_files
+            
+            return all_processed_files
             
         except Exception as e:
             logging.error(f"Error in dataset processing: {str(e)}")
             raise
-
-    def _process_openwebtext(self, config: Dict[str, Any]) -> List[str]:
-        """Process OpenWebText dataset with enhanced error handling and progress tracking."""
-        try:
-            logging.info("Starting OpenWebText dataset processing...")
-            
-            # Configure dataset loading with proper error handling
-            download_config = config.get('download_config', {})
-            cache_dir = download_config.get('cache_dir', '.cache')
-            
-            # Ensure cache directory exists
-            Path(cache_dir).mkdir(parents=True, exist_ok=True)
-            
-            # Load dataset with progress tracking
-            logging.info("Loading OpenWebText dataset...")
-            try:
-                dataset = load_dataset(
-                    'openwebtext',
-                    cache_dir=cache_dir,
-                    trust_remote_code=True,
-                    streaming=True  # Use streaming for memory efficiency
-                )
-            except Exception as e:
-                logging.error(f"Failed to load OpenWebText dataset: {str(e)}")
-                # Try alternative loading method
-                try:
-                    dataset = load_dataset(
-                        'openwebtext',
-                        cache_dir=cache_dir,
-                        trust_remote_code=True,
-                        streaming=False
-                    )
-                except Exception as e2:
-                    logging.error(f"All attempts to load dataset failed: {str(e2)}")
-                    raise
-            
-            # Setup output directory
-            output_dir = Path(self.config.local_data_path) / "processed" / "openwebtext"
-            output_dir.mkdir(parents=True, exist_ok=True)
-            
-            processed_files = []
-            batch_size = 10000  # Process in smaller batches
-            
-            # Process each split in the dataset
-            for split_name, split_dataset in dataset.items():
-                logging.info(f"Processing split: {split_name}")
-                
-                # Process in batches with progress tracking
-                current_batch = []
-                current_file_idx = 0
-                
-                with tqdm(desc=f"Processing {split_name}", unit="texts") as pbar:
-                    for item in split_dataset:
-                        if 'text' in item and item['text']:
-                            current_batch.append(item['text'])
-                            
-                            if len(current_batch) >= batch_size:
-                                # Process current batch
-                                output_path = output_dir / f"{split_name}_batch_{current_file_idx}.txt"
-                                result = self._process_generic_texts(
-                                    texts=current_batch,
-                                    output_path=output_path,
-                                    chunk_size=self.batch_size,
-                                    num_workers=self.current_workers,
-                                    dataset_name='openwebtext'
-                                )
-                                
-                                if result:
-                                    processed_files.append(result)
-                                    current_file_idx += 1
-                                
-                                current_batch = []
-                                pbar.update(batch_size)
-                
-                    # Process remaining texts
-                    if current_batch:
-                        output_path = output_dir / f"{split_name}_batch_{current_file_idx}.txt"
-                        result = self._process_generic_texts(
-                            texts=current_batch,
-                            output_path=output_path,
-                            chunk_size=self.batch_size,
-                            num_workers=self.current_workers,
-                            dataset_name='openwebtext'
-                        )
-                        
-                        if result:
-                            processed_files.append(result)
-            
-            if not processed_files:
-                logging.warning("No files were processed from OpenWebText dataset")
-                return []
-            
-            logging.info(f"Successfully processed {len(processed_files)} files from OpenWebText")
-            return processed_files
-            
-        except Exception as e:
-            logging.error(f"Error processing OpenWebText: {str(e)}")
-            logging.error(traceback.format_exc())
-            return []
-
-    def _process_wikipedia(self, config: Dict[str, Any]) -> List[str]:
-        """Process Wikipedia dataset."""
-        try:
-            # Load dataset
-            dataset = load_dataset(
-                'wikipedia',
-                '20220301.en',
-                cache_dir=config.get('download_config', {}).get('cache_dir'),
-                trust_remote_code=config.get('download_config', {}).get('trust_remote_code', True)
-            )
-            
-            # Process texts
-            output_dir = Path(self.config.local_data_path) / "processed" / "wikipedia"
-            output_dir.mkdir(parents=True, exist_ok=True)
-            
-            processed_files = []
-            for split in dataset:
-                output_path = output_dir / f"{split}_processed.txt"
-                texts = [text['text'] for text in dataset[split]]
-                
-                result = self._process_generic_texts(
-                    texts=texts,
-                    output_path=output_path,
-                    chunk_size=self.batch_size,
-                    num_workers=self.current_workers,
-                    dataset_name='wikipedia'
-                )
-                
-                if result:
-                    processed_files.append(result)
-            
-            return processed_files
-            
-        except Exception as e:
-            logging.error(f"Error processing Wikipedia: {str(e)}")
-            return []
-
-    def _process_custom_dataset(self, config: Dict[str, Any]) -> List[str]:
-        """Process custom dataset from local files."""
-        try:
-            data_path = Path(config.get('path', ''))
-            if not data_path.exists():
-                raise FileNotFoundError(f"Dataset path not found: {data_path}")
-            
-            output_dir = Path(self.config.local_data_path) / "processed" / data_path.name
-            output_dir.mkdir(parents=True, exist_ok=True)
-            
-            processed_files = []
-            valid_files = [
-                f for f in data_path.rglob('*')
-                if self.file_validator.validate_file(f)[0]
-            ]
-            
-            for file_path in valid_files:
-                relative_path = file_path.relative_to(data_path)
-                output_path = output_dir / f"{relative_path.stem}_processed.txt"
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    texts = f.readlines()
-                
-                result = self._process_generic_texts(
-                    texts=texts,
-                    output_path=output_path,
-                    chunk_size=self.batch_size,
-                    num_workers=self.current_workers,
-                    dataset_name='custom'
-                )
-                
-                if result:
-                    processed_files.append(result)
-            
-            return processed_files
-            
-        except Exception as e:
-            logging.error(f"Error processing custom dataset: {str(e)}")
-            return []
 
 class GPUMemoryMonitor:
     """Enhanced GPU memory monitor with fallback mechanisms"""
@@ -1656,7 +1232,7 @@ class ChunkManager:
     def __init__(self, initial_workers: int = multiprocessing.cpu_count()):
         self.current_workers = initial_workers
         self.min_workers = 1
-        self.memory_monitor = MemoryMonitor()
+        self.memory_monitor = MemoryManager()
         
     def adjust_workers(self) -> int:
         """Dynamically adjust worker count based on system resources"""
@@ -1909,428 +1485,395 @@ class EnhancedLogger:
 ###############################################################################
 # Main Execution
 ###############################################################################
-def main():
-    """Enhanced main function with better configuration and error handling."""
-    try:
-        # Remove any existing handlers to avoid duplicates
-        for handler in logging.root.handlers[:]:
-            logging.root.removeHandler(handler)
-            
-        # Log CUDA availability
-        device = "CUDA" if torch.cuda.is_available() else "CPU"
-        if torch.cuda.is_available():
-            gpu_name = torch.cuda.get_device_name(0)
-            gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)  # Convert to GB
-            logging.info(f"Using {device} - {gpu_name} ({gpu_memory:.2f} GB)")
-        else:
-            logging.info(f"Using {device} - CUDA not available")
-            
-        parser = argparse.ArgumentParser(description='Medical text tokenizer')
-        
-        # Modified to use default tokens directory
-        default_data_path = Path.cwd() / "tokens"
-        
-        # Modified arguments
-        parser.add_argument('--local_data_path', type=str, 
-                          default=str(default_data_path),
-                          help="Path to store processed data and tokenizer")
-        parser.add_argument('--vocab_size', type=int, 
-                          default=60000,
-                          help="Vocabulary size for the tokenizer (default: 60000)")
-        parser.add_argument('--min_frequency', type=int, default=2,
-                          help="Minimum frequency for BPE merges")
-        parser.add_argument('--log_file', type=str, default="medical_tokenization.log",
-                          help="Log file path")
-        parser.add_argument('--cache_dir', type=str, default=".data_cache",
-                          help="Cache directory for datasets")
-        parser.add_argument('--chunk_size', type=int, default=1000,
-                          help="Initial chunk size for processing")
-        parser.add_argument('--max_workers', type=int, 
-                          default=max(1, multiprocessing.cpu_count() - 1),
-                          help="Maximum number of worker processes")
-        parser.add_argument('--memory_threshold', type=float, default=0.8,
-                          help="Memory usage threshold (0-1) for adaptive processing")
-        
-        # Parse only known args to avoid conflicts with unittest arguments
-        args, unknown = parser.parse_known_args()
-
-        # Setup enhanced logging
-        setup_logging(args.log_file)
-
-        # Create tokens directory in current working directory
-        tokens_dir = Path("tokens")
-        tokens_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Cache directory
-        cache_dir = Path(args.cache_dir)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Updated dataset configuration with proper validation and required fields
-        dataset_configs = [
-            {
-                "name": "openwebtext",
-                "download_config": {
-                    "cache_dir": str(cache_dir),
-                    "trust_remote_code": True
-                },
-                "preprocessing": {
-                    "pipeline": "general",
-                    "lower_case": True,
-                    "strip_newlines": True,
-                    "min_length": 50
-                }
-            },
-            {
-                "name": "huggingface",
-                "huggingface_id": "Malikeh1375/medical-question-answering-datasets",
-                "subset": "all-processed",
-                "preprocessing": {
-                    "pipeline": "medical",
-                    "lower_case": False,
-                    "strip_newlines": False,
-                    "min_length": 20
-                }
-            },
-            {
-                "name": "local",
-                "path": r"C:\Users\ASUS\Desktop\LuminaLM\Data",
-                "preprocessing": {
-                    "pipeline": "general",
-                    "lower_case": True,
-                    "strip_newlines": True,
-                    "min_length": 20
-                },
-                "file_types": [".txt", ".json", ".csv"]
-            }
-        ]
-        
-        # Initialize configuration
-        config = Config(
-            local_data_path=args.local_data_path,
-            vocab_size=args.vocab_size,
-            min_frequency=args.min_frequency,
-            log_file=args.log_file,
-            chunk_size=args.chunk_size,
-            max_workers=args.max_workers,
-            memory_threshold=args.memory_threshold,
-            cache_dir=str(cache_dir)
-        )
-        
-        # Initialize memory manager
-        memory_manager = MemoryManager()
-        
-        with memory_manager.monitor_memory("dataset_processing"):
-            # Validate configurations before processing
-            valid_configs = [
-                config for config in dataset_configs 
-                if validate_dataset_config(config)
-            ]
-            
-            if not valid_configs:
-                logging.error("No valid dataset configurations found")
-                return
-                
-            # Load datasets with valid configurations
-            results = load_datasets(valid_configs, cache_dir=str(cache_dir))
-            
-            if not results['datasets']:
-                logging.error("No datasets were successfully loaded")
-                return
-            
-            # Train tokenizer with memory monitoring
-            tokenizer = MedicalTokenizer(
-                vocab_size=config.vocab_size,
-                min_frequency=config.min_frequency
-            )
-            
-            # Initialize dataset processor
-            dataset_processor = DatasetProcessor(results['datasets'], config)
-            
-            # Process the loaded datasets
-            processed_files = []
-            for dataset_name, dataset in results['datasets'].items():
-                if isinstance(dataset, (DatasetDict, dict)):
-                    for split_name, split_data in dataset.items():
-                        output_path = tokens_dir / f"{dataset_name}_{split_name}_processed.txt"
-                        texts = [text['text'] for text in split_data] if 'text' in split_data[0] else split_data
-                        result = dataset_processor._process_generic_texts(
-                            texts=texts,
-                            output_path=output_path,
-                            chunk_size=config.chunk_size,
-                            num_workers=config.max_workers,
-                            dataset_name=dataset_name
-                        )
-                        if result:
-                            processed_files.append(result)
-            
-            if not processed_files:
-                logging.error("No files were successfully processed")
-                return
-            
-            # Train and validate tokenizer
-            tokenizer_path = tokens_dir / "Medical_tokenizer.json"
-            backup_path = None
-            
-            try:
-                with tqdm(total=1, desc="Training tokenizer") as pbar:
-                    if tokenizer_path.exists():
-                        backup_path = tokenizer_path.with_suffix('.backup')
-                        shutil.copy2(tokenizer_path, backup_path)
-                        logging.info(f"Created backup at {backup_path}")
-                    
-                    # First save the tokenizer
-                    tokenizer.tokenizer.save(str(tokenizer_path))
-                    pbar.update(1)
-                    
-                    # Validate the saved file
-                    try:
-                        with open(tokenizer_path, 'r', encoding='utf-8') as f:
-                            config = json.load(f)
-                            if not all(key in config for key in ['model', 'vocab']):
-                                raise ValueError("Invalid tokenizer configuration")
-                    except Exception as e:
-                        raise ValueError(f"Invalid tokenizer file: {str(e)}")
-                    
-                    # Test tokenizer functionality
-                    test_tokenizer = MedicalTokenizer()
-                    test_tokenizer.load(str(tokenizer_path))
-                    
-                    # Test encoding
-                    sample_text = "This is a test sentence."
-                    encoded = test_tokenizer.tokenizer.encode(sample_text)
-                    if not encoded:
-                        raise ValueError("Tokenizer validation failed: unable to encode text")
-                    
-                    logging.info("Tokenizer validation successful")
-                    
-                    if backup_path and backup_path.exists():
-                        backup_path.unlink()
-                        
-            except Exception as e:
-                logging.error(f"Error during tokenizer training: {e}")
-                if backup_path and backup_path.exists():
-                    shutil.copy2(backup_path, tokenizer_path)
-                    logging.info("Restored from backup due to training error")
-                raise
-            
-        logging.info("Processing and training completed successfully!")
-        
-    except Exception as e:
-        logging.error(f"Error during processing: {e}")
-        logging.error(traceback.format_exc())
-        sys.exit(1)
-    finally:
-        # Cleanup
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-
 def validate_dataset_config(config: Dict[str, Any]) -> bool:
     """Validate dataset configuration."""
-    required_fields = {
-        'openwebtext': ['name', 'download_config'],
-        'huggingface': ['name', 'huggingface_id'],
-        'local': ['name', 'path']
-    }
-    
-    try:
-        dataset_type = config.get('name')
-        if not dataset_type:
-            logging.error("Dataset configuration missing 'name' field")
+    if not isinstance(config, dict) or 'datasets' not in config:
+        logging.error("Invalid configuration: missing 'datasets' key")
+        return False
+
+    for dataset in config['datasets']:
+        if not isinstance(dataset, dict):
+            logging.error(f"Invalid dataset configuration: {dataset}")
             return False
             
-        required = required_fields.get(dataset_type, [])
-        missing = [field for field in required if field not in config]
-        
+        required_fields = {'name', 'type', 'config'}
+        missing = required_fields - set(dataset.keys())
         if missing:
-            logging.error(f"Dataset {dataset_type} missing required fields: {missing}")
+            logging.error(f"Dataset missing required fields: {missing}")
             return False
             
-        # Validate specific fields
-        if dataset_type == 'local':
-            path = Path(config['path'])
+        if dataset['type'] not in {'huggingface', 'local'}:
+            logging.error(f"Unsupported dataset type: {dataset['type']}")
+            return False
+            
+        if dataset['type'] == 'local':
+            path = Path(dataset['config']['path'])
             if not path.exists():
                 logging.error(f"Local dataset path does not exist: {path}")
                 return False
-                
-        return True
-        
-    except Exception as e:
-        logging.error(f"Error validating dataset config: {str(e)}")
-        return False
 
-def load_datasets(dataset_configs: List[Dict[str, Any]], cache_dir: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+    return True
+
+def process_local_dataset(input_path: Union[str, Path], output_path: Path, chunk_size: int) -> Optional[str]:
+    """Process local dataset files with chunking and progress bar."""
+    try:
+        input_path = Path(input_path)
+        if not input_path.exists():
+            logging.error(f"Input path does not exist: {input_path}")
+            return None
+
+        # If input_path is a directory, process all text files in it
+        if input_path.is_dir():
+            processed_files = []
+            text_files = list(input_path.glob('*.txt'))  # Add more extensions if needed
+            
+            # Process each file with progress bar
+            for file_path in tqdm(text_files, desc="Processing local files"):
+                try:
+                    output_file = output_path.parent / f"{output_path.stem}_{file_path.stem}.txt"
+                    total_size = file_path.stat().st_size
+                    
+                    with open(file_path, 'r', encoding='utf-8') as infile, \
+                         open(output_file, 'w', encoding='utf-8') as outfile, \
+                         tqdm(total=total_size, 
+                              desc=f"Processing {file_path.name}",
+                              unit='B', 
+                              unit_scale=True,
+                              leave=False) as pbar:
+                        while chunk := infile.read(chunk_size):
+                            outfile.write(chunk)
+                            pbar.update(len(chunk.encode('utf-8')))
+                    processed_files.append(str(output_file))
+                except Exception as e:
+                    logging.warning(f"Error processing file {file_path}: {str(e)}")
+                    continue
+            
+            if processed_files:
+                return processed_files[0]  # Return at least one processed file
+            return None
+
+        # If input_path is a file
+        else:
+            total_size = input_path.stat().st_size
+            with open(input_path, 'r', encoding='utf-8') as infile, \
+                 open(output_path, 'w', encoding='utf-8') as outfile, \
+                 tqdm(total=total_size, 
+                      desc=f"Processing {input_path.name}",
+                      unit='B', 
+                      unit_scale=True) as pbar:
+                while chunk := infile.read(chunk_size):
+                    outfile.write(chunk)
+                    pbar.update(len(chunk.encode('utf-8')))
+            return str(output_path)
+
+    except PermissionError as e:
+        logging.error(f"Permission denied accessing {input_path}. Please check file permissions.")
+        return None
+    except Exception as e:
+        logging.error(f"Error processing local dataset {input_path}: {str(e)}")
+        return None
+
+def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = None, executor: Optional[Any] = None) -> Dict[str, Any]:
     """Load datasets with enhanced validation."""
     results = {
         'datasets': {},
-        'stats': {'total_samples': 0, 'failed_loads': 0},
-        'metadata': {}
+        'stats': {'total_samples': 0, 'failed_loads': 0}
     }
     
-    # Validate configurations first
-    valid_configs = [
-        config for config in dataset_configs 
-        if validate_dataset_config(config)
-    ]
-    
-    if not valid_configs:
-        raise ValueError("No valid dataset configurations provided")
-    
-    # Continue with loading using valid configurations
-    with tqdm(total=len(valid_configs), desc="Loading datasets") as pbar:
-        for config in valid_configs:
-            try:
-                dataset_name = config['name']
-                dataset = load_dataset_by_type(config, cache_dir)
+    for dataset in dataset_config['datasets']:
+        try:
+            if dataset['type'] == 'local':
+                results['datasets'][dataset['name']] = dataset['config']['path']
+            elif dataset['type'] == 'huggingface':
+                dataset_obj = load_dataset(
+                    dataset['config']['dataset_name'],
+                    streaming=dataset['config'].get('streaming', True),
+                    split=dataset['config'].get('split', 'train'),
+                    cache_dir=cache_dir,
+                    trust_remote_code=True
+                )
+                results['datasets'][dataset['name']] = dataset_obj
                 
-                if dataset is not None:
-                    results['datasets'][dataset_name] = dataset
-                    # Update statistics...
-                    
-            except Exception as e:
-                logging.error(f"Error loading dataset {config['name']}: {str(e)}")
-                results['stats']['failed_loads'] += 1
-            finally:
-                pbar.update(1)
-                
+        except Exception as e:
+            logging.error(f"Failed to load dataset {dataset['name']}: {str(e)}")
+            results['stats']['failed_loads'] += 1
+            continue  # Continue to next dataset instead of stopping
+            
+    if not results['datasets']:
+        raise ValueError("No datasets were successfully loaded")
+            
     return results
 
-def load_dataset_by_type(config: Dict[str, Any], cache_dir: Optional[str] = None) -> Optional[Any]:
-    """Load dataset based on its type with proper error handling."""
-    dataset_type = config['name']
-    
+def process_streaming_dataset(dataset: Any, output_path: Path, chunk_size: int, dataset_name: str) -> Optional[str]:
+    """Process streaming dataset with chunking and progress bar."""
     try:
-        if dataset_type == 'openwebtext':
-            return load_dataset(
-                'openwebtext',
-                **config['download_config']
+        with open(output_path, 'w', encoding='utf-8') as f:
+            batch = []
+            
+            # Initialize progress bar
+            pbar = tqdm(
+                dataset, 
+                desc=f"Processing {dataset_name}",
+                unit=" samples",
+                dynamic_ncols=True  # Automatically adjust to terminal width
             )
             
-        elif dataset_type == 'huggingface':
-            return load_dataset(
-                config['huggingface_id'],
-                config.get('subset'),
-                cache_dir=cache_dir
-            )
-            
-        elif dataset_type == 'local':
-            return load_local_dataset(config)
-            
-        else:
-            logging.warning(f"Unsupported dataset type: {dataset_type}")
-            return None
-            
-    except Exception as e:
-        logging.error(f"Error loading {dataset_type} dataset: {str(e)}")
-        return None
-
-def load_local_dataset(config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Load dataset from local directory."""
-    try:
-        data_path = Path(config['path'])
-        if not data_path.exists():
-            raise FileNotFoundError(f"Dataset path not found: {data_path}")
-            
-        dataset = {'text': []}
-        for file_path in data_path.rglob('*'):
-            if file_path.is_file() and file_path.suffix.lower() in {'.txt', '.json', '.csv'}:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    dataset['text'].extend(f.readlines())
-                    
-        return dataset
+            for item in pbar:
+                text = item.get('text', '').strip()
+                if text:
+                    batch.append(text)
+                    if len(batch) >= chunk_size:
+                        f.write('\n'.join(batch) + '\n')
+                        batch = []
+                        
+                        # Update progress bar description with memory info
+                        memory_percent = psutil.virtual_memory().percent
+                        pbar.set_description(
+                            f"Processing {dataset_name} (Memory: {memory_percent:.1f}%)"
+                        )
+                        
+                        # Memory management
+                        if memory_percent > 85:
+                            gc.collect()
+                            
+            if batch:  # Write remaining items
+                f.write('\n'.join(batch) + '\n')
+                
+        return str(output_path)
         
     except Exception as e:
-        logging.error(f"Error loading local dataset: {str(e)}")
+        logging.error(f"Error processing streaming dataset {dataset_name}: {str(e)}")
         return None
+
+class WorkerManager:
+    """Manages worker pools with dynamic scaling"""
+    def __init__(self, initial_workers: int = None):
+        self.min_workers = 1
+        self.max_workers = multiprocessing.cpu_count()
+        self.current_workers = initial_workers or self.max_workers
+        self.memory_manager = MemoryManager()
+
+    def adjust_workers(self) -> int:
+        """Dynamically adjust worker count based on system resources"""
+        memory = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent()
+        
+        # Reduce workers under high memory or CPU pressure
+        if memory.percent > 90 or cpu_percent > 90:
+            self.current_workers = self.min_workers
+        elif memory.percent > 80 or cpu_percent > 80:
+            self.current_workers = max(self.min_workers, self.current_workers // 2)
+        elif memory.percent < 60 and cpu_percent < 60:
+            self.current_workers = min(
+                self.current_workers * 2,
+                self.max_workers
+            )
+        
+        logging.info(f"Adjusted workers to {self.current_workers} "
+                    f"(Memory: {memory.percent}%, CPU: {cpu_percent}%)")
+        return self.current_workers
+
+    @contextmanager
+    def get_executor(self):
+        """Get appropriate executor based on current conditions"""
+        try:
+            if self.current_workers == 1:
+                yield None  # Signal to use synchronous processing
+            else:
+                with ProcessPoolExecutor(max_workers=self.current_workers) as executor:
+                    yield executor
+        finally:
+            self.adjust_workers()
+
+def main():
+    """Enhanced main function with better configuration and error handling."""
+    try:
+        # Parse arguments
+        parser = argparse.ArgumentParser(
+            description='Medical text tokenizer',
+            conflict_handler='resolve'  # Handle argument conflicts
+        )
+        
+        # Training arguments group
+        training_args = parser.add_argument_group('Training Arguments')
+        training_args.add_argument('--local_data_path', type=str, 
+                          default=str(Path.cwd() / "tokens"),
+                          help="Path to store processed data and tokenizer")
+        training_args.add_argument('--vocab_size', type=int, 
+                          default=60000,
+                          help="Vocabulary size for the tokenizer")
+        training_args.add_argument('--min_freq', type=int, 
+                          default=2,
+                          help="Minimum frequency for BPE merges")
+        training_args.add_argument('--config', type=str, 
+                          default="dataset_config.yaml",
+                          help="Dataset configuration file path")
+        training_args.add_argument('--log', type=str, 
+                          default="tokenizer.log",
+                          help="Log file path")
+        training_args.add_argument('--chunk_size', type=int, 
+                          default=10000,
+                          help="Chunk size for processing")
+        training_args.add_argument('--workers', type=int, 
+                          default=8,
+                          help="Maximum number of workers for parallel processing")
+
+        args = parser.parse_args()
+        
+        # Setup logging
+        setup_logging(args.log)
+        
+        # Initialize managers
+        memory_manager = MemoryManager()
+        worker_manager = WorkerManager(initial_workers=args.workers)
+        gpu_monitor = GPUMemoryMonitor() if torch.cuda.is_available() else None
+        
+        # Load and validate configuration
+        config_path = Path(args.config)
+        if not config_path.exists():
+            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+            
+        try:
+            with open(config_path) as f:
+                dataset_config = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML configuration: {str(e)}")
+            
+        if not validate_dataset_config(dataset_config):
+            raise ValueError("Invalid dataset configuration")
+            
+        # Initialize tokenizer
+        tokenizer = MedicalTokenizer(
+            vocab_size=args.vocab_size,
+            min_frequency=args.min_freq
+        )
+        
+        # Process datasets one at a time with overall progress
+        logging.info("Starting dataset processing...")
+        processed_files = []
+        
+        with worker_manager.get_executor() as executor:
+            try:
+                # Load datasets with progress tracking
+                dataset_results = load_datasets(
+                    dataset_config,
+                    cache_dir=args.local_data_path,
+                    executor=executor
+                )
+                
+                if not dataset_results['datasets']:
+                    raise ValueError("No datasets were successfully loaded")
+                
+                # Process datasets one at a time with progress tracking
+                total_datasets = len(dataset_results['datasets'])
+                with tqdm(total=total_datasets, desc="Overall Progress", position=0) as dataset_pbar:
+                    for dataset_name, dataset in dataset_results['datasets'].items():
+                        try:
+                            logging.info(f"Processing dataset: {dataset_name}")
+                            
+                            # Monitor memory and adjust chunk size if needed
+                            chunk_size = memory_manager.get_safe_chunk_size()
+                            
+                            if isinstance(dataset, (str, Path)):
+                                # Handle local file datasets
+                                processed_file = process_local_dataset(
+                                    dataset,
+                                    Path(args.local_data_path) / f"{dataset_name}_processed.txt",
+                                    chunk_size
+                                )
+                            else:
+                                # Handle streaming/regular datasets
+                                processed_file = process_streaming_dataset(
+                                    dataset,
+                                    Path(args.local_data_path) / f"{dataset_name}_processed.txt",
+                                    chunk_size,
+                                    dataset_name
+                                )
+                                
+                            if processed_file:
+                                processed_files.append(processed_file)
+                                
+                        except Exception as e:
+                            logging.error(f"Error processing dataset {dataset_name}: {str(e)}")
+                            continue  # Continue with next dataset
+                        finally:
+                            dataset_pbar.update(1)
+                            
+                        # Check memory status and cleanup if needed
+                        if memory_manager.check_memory()[0]:
+                            logging.warning("High memory usage detected, triggering cleanup")
+                            gc.collect()
+                            if torch.cuda.is_available():
+                                torch.cuda.empty_cache()
+                                
+            except Exception as e:
+                logging.error(f"Error during dataset processing: {str(e)}")
+                if not processed_files:  # Only raise if no files were processed
+                    raise
+        
+        # Train tokenizer
+        logging.info("Starting tokenizer training...")
+        try:
+            tokenizer.train(
+                processed_files,
+                save_path=str(Path(args.local_data_path) / "tokenizer.json")
+            )
+        except Exception as e:
+            logging.error(f"Tokenizer training failed: {str(e)}")
+            raise
+            
+        logging.info("Tokenizer training completed successfully")
+        
+    except Exception as e:
+        logging.error(f"Critical error in main execution: {str(e)}")
+        logging.error(traceback.format_exc())
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
 
-def _process_generic_texts(
-    self,
-    texts: List[str], 
-    output_path: Path, 
-    chunk_size: int,
-    num_workers: int,
-    dataset_name: str = 'general'
-) -> Optional[str]:
-    """Process texts with improved memory management and dataset-specific directories."""
-    try:
-        # Create dataset-specific directory in the processed folder
-        processed_dir = Path("LuminaLM/tokens/tokens/processed") / dataset_name
-        processed_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Update output path to be in the dataset-specific directory
-        output_filename = output_path.name
-        output_path = processed_dir / output_filename
-        
-        # Calculate memory-safe chunk size
-        max_chunk_memory = self._get_max_chunk_memory()
-        optimal_chunk_size = min(chunk_size, max(1000, int(max_chunk_memory / 8192)))
-        max_workers = min(num_workers, optimal_chunk_size // 100)
-        
-        logging.info(f"Processing {dataset_name} dataset to {output_path}")
-        
-        with open(output_path, 'w', encoding='utf-8') as f:
-            # Process in single chunks to avoid pickling issues
-            for i in range(0, len(texts), optimal_chunk_size):
-                # Check memory pressure
-                if psutil.virtual_memory().percent > 85:
-                    gc.collect()
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
-                    time.sleep(1)
-                    optimal_chunk_size = max(1000, optimal_chunk_size // 2)
-                
-                chunk = texts[i:i + optimal_chunk_size]
-                
-                # Process the chunk directly instead of using ProcessPoolExecutor
-                try:
-                    processed_texts = []
-                    for text in chunk:
-                        processed_text = self.preprocess_text(text, dataset_name)
-                        if processed_text:
-                            processed_texts.append(processed_text)
-                    
-                    if processed_texts:
-                        f.write('\n'.join(processed_texts) + '\n')
-                        f.flush()
-                
-                except Exception as e:
-                    logging.error(f"Error processing chunk at index {i} for {dataset_name}: {str(e)}")
-                
-                # Clear memory
-                del chunk
-                gc.collect()
-            
-            logging.info(f"Successfully processed {dataset_name} dataset to {output_path}")
-            return str(output_path)
-        
-    except Exception as e:
-        logging.error(f"Error in _process_generic_texts for {dataset_name}: {str(e)}")
-        if output_path.exists():
-            output_path.unlink()
-        return None
+class RetryHandler:
+    """Handles retries for operations with exponential backoff"""
+    def __init__(self, max_retries: int = 3, base_delay: float = 1.0):
+        self.max_retries = max_retries
+        self.base_delay = base_delay
 
-def dynamic_chunk_size():
-    total_memory = psutil.virtual_memory().total
-    return max(1000, int(total_memory * 0.1 / 8192))  # Assuming 8KB per text
+    @contextmanager
+    def retry_context(self, operation_name: str):
+        """Context manager for retry logic"""
+        for attempt in range(self.max_retries):
+            try:
+                yield attempt
+                break  # Success, exit retry loop
+            except Exception as e:
+                delay = self.base_delay * (2 ** attempt)  # Exponential backoff
+                if attempt < self.max_retries - 1:
+                    logging.warning(
+                        f"{operation_name} failed (attempt {attempt + 1}/{self.max_retries}): "
+                        f"{str(e)}. Retrying in {delay:.1f}s..."
+                    )
+                    time.sleep(delay)
+                else:
+                    logging.error(
+                        f"{operation_name} failed after {self.max_retries} attempts: {str(e)}"
+                    )
+                    raise
 
-chunk_size = dynamic_chunk_size()
-
-class TestUtils(unittest.TestCase):
-    def test_with_retry(self):
-        # Add test cases for with_retry
-        #To be added later. For all 3. 
-        pass
-
-    def test_managed_temp_file(self):
-        # Add test cases for managed_temp_file
-        pass
-
-    def test_split_chunk(self):
-        # Add test cases for split_chunk
-        pass
-
-if __name__ == '__main__':
-    unittest.main()
+    async def async_retry(self, coroutine, operation_name: str):
+        """Async retry handler"""
+        for attempt in range(self.max_retries):
+            try:
+                return await coroutine
+            except Exception as e:
+                delay = self.base_delay * (2 ** attempt)
+                if attempt < self.max_retries - 1:
+                    logging.warning(
+                        f"{operation_name} failed (attempt {attempt + 1}/{self.max_retries}): "
+                        f"{str(e)}. Retrying in {delay:.1f}s..."
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    logging.error(
+                        f"{operation_name} failed after {self.max_retries} attempts: {str(e)}"
+                    )
+                    raise

@@ -1,0 +1,15 @@
+datasets:
+- config:
+    path: "C:/Users/ASUS/Desktop/LuminaLM/Data"
+    pattern: '*.txt'
+  name: local
+  type: local
+- name: openwebtext
+  type: huggingface
+  config:
+    dataset_name: "openwebtext"
+    streaming: true
+    split: "train"
+    trust_remote_code: true
+    use_auth_token: true
+    revision: "main"
