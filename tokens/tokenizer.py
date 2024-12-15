@@ -49,7 +49,7 @@ class Config:
     def __init__(
         self,
         local_data_path: str,
-        vocab_size: int = 60000,
+        vocab_size: Optional[int] = None,
         min_frequency: int = 2,
         log_file: str = "tokenizer.log",
         chunk_size: int = 1000,
@@ -528,205 +528,224 @@ class HybridTokenizationStrategy:
 # MedicalTokenizer
 ###############################################################################
 class MedicalTokenizer:
-    """Tokenizer class for training and encoding with both autoregressive and bidirectional strategies."""
-
-    def __init__(self, vocab_size: int = 60000, min_frequency: int = 2):
-        # Initialize tokenizer with BPE model and ByteLevel pre-tokenizer
+    """Enhanced tokenizer class with dynamic vocabulary sizing and comprehensive preprocessing."""
+    
+    def __init__(
+        self,
+        vocab_size: Optional[int] = 60000,
+        min_frequency: int = 2,
+        padding_strategy: str = 'longest',
+        truncation_strategy: str = 'longest_first',
+        max_length: int = 512,
+        normalize: bool = True
+    ):
+        # Initialize tokenizer with BPE model and special tokens
         self.tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
+        
+        # Set up pre-tokenizer first
         self.tokenizer.pre_tokenizer = ByteLevel(add_prefix_space=True)
         
-        self.vocab_size = vocab_size
+        # Add special tokens to the tokenizer's model
+        special_tokens = ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]", "[BOS]", "[EOS]"]
+        for token in special_tokens:
+            _ = self.tokenizer.token_to_id(token)
+        
+        # Configure padding and truncation
+        self.padding_config = {
+            'strategy': padding_strategy,
+            'pad_token': "[PAD]",
+            'pad_token_id': 0,
+            'pad_to_multiple_of': 8
+        }
+        
+        self.truncation_config = {
+            'strategy': truncation_strategy,
+            'max_length': max_length,
+            'stride': 0,
+            'direction': 'right'
+        }
+        
+        # Special tokens configuration
+        self.special_tokens = {
+            'pad_token': "[PAD]",
+            'unk_token': "[UNK]",
+            'cls_token': "[CLS]",
+            'sep_token': "[SEP]",
+            'mask_token': "[MASK]",
+            'bos_token': "[BOS]",
+            'eos_token': "[EOS]"
+        }
+        
+        # Normalization configuration
+        self.normalize = normalize
+        if normalize:
+            self.normalizer = self._setup_normalizer()
+            self.tokenizer.normalizer = self.normalizer
+        
+        # Dynamic vocabulary sizing
+        self.initial_vocab_size = vocab_size
         self.min_frequency = min_frequency
-        self.special_tokens = ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"]
+        self.vocab_size = self._calculate_dynamic_vocab_size()
         
-        # Configure the trainer with proper settings
-        self.trainer = BpeTrainer(
-            vocab_size=self.vocab_size,
-            min_frequency=self.min_frequency,
-            special_tokens=self.special_tokens,
-            initial_alphabet=ByteLevel.alphabet(),
-            show_progress=True
-        )
+        # Configure tokenizer components
+        self._setup_tokenizer()
+
+    def _setup_normalizer(self):
+        """Setup text normalization rules."""
+        from tokenizers import normalizers
+        return normalizers.Sequence([
+            normalizers.NFKC(),  # Unicode normalization
+            normalizers.Replace(r'[\n\r\t]+', ' '),  # Replace newlines/tabs
+            normalizers.Replace(r'\s+', ' '),  # Normalize whitespace
+            normalizers.Replace(r'(?<=\d)[,.](?=\d{3})', ''),  # Handle numbers
+            normalizers.Lowercase(),  # Convert to lowercase
+            # Medical-specific normalizations
+            normalizers.Replace(r'\b(?:mg/dl|mg/dL)\b', 'mg/dL'),  # Standardize units
+            normalizers.Replace(r'\b(?:mcg|µg|ug)/(?:ml|mL)\b', 'μg/mL'),
+            normalizers.Replace(r'\b(?:ng)/(?:ml|mL)\b', 'ng/mL')
+        ])
+
+    def _setup_tokenizer(self):
+        """Configure tokenizer components."""
+        # Set pre-tokenizer
+        self.tokenizer.pre_tokenizer = ByteLevel(add_prefix_space=True)
         
-        self.strategy = HybridTokenizationStrategy(self.tokenizer)
-        self.path_manager = TokenizerPathManager(Path.cwd())
-
-    def train(self, files: List[str], save_path: str):
-        """Train the tokenizer with enhanced validation and error handling."""
+        # Set normalizer if enabled
+        if self.normalize:
+            self.tokenizer.normalizer = self.normalizer
+        
+        # Configure post-processor for special token handling
+        from tokenizers.processors import TemplateProcessing
+        
         try:
-            logging.info("Starting tokenizer training...")
-            
-            # Validate input files
-            valid_files = []
-            for file in files:
-                try:
-                    with open(file, 'r', encoding='utf-8') as f:
-                        f.readline()  # Test read
-                    valid_files.append(file)
-                except Exception as e:
-                    logging.warning(f"Skipping invalid file {file}: {str(e)}")
-            
-            if not valid_files:
-                raise ValueError("No valid files provided for training")
-            
-            # Create backup of existing tokenizer if it exists
-            save_path = Path(save_path)
-            backup_path = None
-            if save_path.exists():
-                backup_path = save_path.with_suffix('.backup')
-                shutil.copy2(save_path, backup_path)
-                logging.info(f"Created backup at {backup_path}")
-            
-            try:
-                # Initialize BPE trainer with special tokens
-                trainer = BpeTrainer(
-                    vocab_size=self.vocab_size,
-                    min_frequency=self.min_frequency,
-                    special_tokens=self.special_tokens,
-                    show_progress=True
-                )
-                
-                # Train the tokenizer
-                self.tokenizer.train(files=valid_files, trainer=trainer)
-                
-                # Verify vocabulary was created
-                vocab = self.tokenizer.get_vocab()
-                if not vocab:
-                    raise ValueError("Training resulted in empty vocabulary")
-                
-                # Verify special tokens are present
-                for token in self.special_tokens:
-                    if token not in vocab:
-                        raise ValueError(f"Special token {token} missing from vocabulary")
-                
-                # Save tokenizer directly using its built-in save method
-                self.tokenizer.save(str(save_path))
-                
-                # Verify saved file
-                if not self._verify_saved_tokenizer(save_path):
-                    raise ValueError("Saved tokenizer verification failed")
-                
-                # If everything succeeded, remove backup
-                if backup_path and backup_path.exists():
-                    backup_path.unlink()
-                
-                logging.info(f"Successfully trained and saved tokenizer to {save_path}")
-                
-            except Exception as e:
-                # Restore from backup if available
-                if backup_path and backup_path.exists():
-                    shutil.copy2(backup_path, save_path)
-                    logging.info("Restored from backup due to training error")
-                raise
-                
-        except Exception as e:
-            logging.error(f"Failed to train/save tokenizer: {e}")
-            raise
-
-    def _verify_saved_tokenizer(self, save_path: Path) -> bool:
-        """Comprehensive verification of saved tokenizer."""
-        try:
-            # Check file exists and is readable
-            if not save_path.exists():
-                logging.error("Tokenizer file does not exist")
-                return False
-            
-            # Test loading the tokenizer
-            try:
-                test_tokenizer = Tokenizer.from_file(str(save_path))
-            except Exception as e:
-                logging.error(f"Failed to load tokenizer: {e}")
-                return False
-            
-            # Verify vocabulary
-            vocab = test_tokenizer.get_vocab()
-            if not vocab:
-                logging.error("Empty vocabulary in saved tokenizer")
-                return False
-            
-            # Verify special tokens in vocabulary
-            for token in self.special_tokens:
-                if token not in vocab:
-                    logging.error(f"Special token missing from vocabulary: {token}")
-                    return False
-            
-            # Test tokenizer functionality with a more robust test
-            test_texts = [
-                "This is a test sentence.",
-                "Another test with numbers 123.",
-                "Special characters: !@#$%",
-                "[CLS] Test with special tokens [SEP]"
+            # Create special tokens as a list of tuples (token, id)
+            special_tokens = [
+                (self.special_tokens['cls_token'], 0),  # CLS token with ID 0
+                (self.special_tokens['sep_token'], 1),  # SEP token with ID 1
             ]
             
-            for test_text in test_texts:
-                try:
-                    encoded = test_tokenizer.encode(test_text)
-                    if not encoded or not encoded.ids:
-                        logging.error(f"Tokenizer failed to encode: {test_text}")
-                        return False
-                    
-                    decoded = test_tokenizer.decode(encoded.ids)
-                    if not decoded or not decoded.strip():
-                        logging.error(f"Tokenizer failed to decode: {test_text}")
-                        return False
-                    
-                except Exception as e:
-                    logging.error(f"Tokenizer test failed for: {test_text}\nError: {e}")
-                    return False
-            
-            return True
-            
+            self.tokenizer.post_processor = TemplateProcessing(
+                single=f"$A {self.special_tokens['sep_token']}",
+                pair=f"{self.special_tokens['cls_token']} $A {self.special_tokens['sep_token']} $B {self.special_tokens['sep_token']}",
+                special_tokens=special_tokens  # Pass as sequence of tuples
+            )
         except Exception as e:
-            logging.error(f"Tokenizer verification failed: {e}")
-            return False
+            logging.error(f"Failed to set up post-processor: {str(e)}")
+            # Fallback to simpler configuration if needed
+            self.tokenizer.post_processor = TemplateProcessing(
+                single="$A",
+                pair="$A $B",
+                special_tokens=[]  # Empty sequence for fallback
+            )
 
-    def load(self, tokenizer_path: str):
-        """Load a previously trained tokenizer with validation."""
-        path = Path(tokenizer_path)
-        
-        if not path.exists():
-            raise FileNotFoundError(f"Tokenizer file not found: {path}")
-        
-        if not self._verify_saved_tokenizer(path):
-            raise ValueError("Invalid tokenizer file")
-        
-        self.tokenizer = Tokenizer.from_file(str(path))
-        self.strategy = HybridTokenizationStrategy(self.tokenizer)
-        logging.info(f"Successfully loaded tokenizer from {path}")
+    def _calculate_dynamic_vocab_size(self) -> int:
+        """Calculate vocabulary size."""
+        return 60000  # Fixed vocabulary size
 
-    def encode(self, texts: List[str], task_type: str = 'auto', **kwargs) -> Dict[str, Tensor]:
-        """
-        Encode texts using the given task type ('auto' or 'bi').
-        """
-        return self.strategy.hybrid_encode(texts, task_type=task_type, **kwargs)
-
-    def validate(self) -> bool:
-        """Validate the tokenizer configuration and functionality."""
+    def _analyze_dataset_vocabulary(self) -> int:
+        """Analyze dataset to count unique tokens."""
+        if not hasattr(self.tokenizer, 'pre_tokenizer') or self.tokenizer.pre_tokenizer is None:
+            logging.error("Pre-tokenizer not initialized")
+            return 0
+        
+        unique_tokens = set()
+        sample_size = 100000  # Limit analysis to first 100K tokens
+        
         try:
-            # Check if tokenizer has been initialized
-            if not self.tokenizer:
-                return False
-                
-            # Check if tokenizer has vocabulary
-            if not self.tokenizer.get_vocab():
-                return False
-                
-            # Test basic tokenization
-            test_text = "This is a test sentence."
-            encoded = self.tokenizer.encode(test_text)
-            if not encoded:
-                return False
-                
-            # Test special tokens
-            for token in self.special_tokens:
-                if token not in self.tokenizer.get_vocab():
-                    return False
-                    
-            return True
+            # Sample text for analysis
+            sample_text = "John was admitted to the emergency room after experiencing severe headaches and blurred vision. The physician ordered a CT scan to rule out intracranial hemorrhage. Meanwhile, artificial intelligence tools in radiology have improved diagnostic accuracy significantly. In other news, OpenAI has released a state-of-the-art language model capable of generating coherent and contextually aware text."
+            tokens = self.tokenizer.pre_tokenizer.pre_tokenize_str(sample_text)
+            
+            for token, _ in tokens:
+                unique_tokens.add(token)
+                if len(unique_tokens) >= sample_size:
+                    break
+            
+            return len(unique_tokens)
             
         except Exception as e:
-            logging.error(f"Tokenizer validation error: {e}")
-            return False
+            logging.warning(f"Vocabulary analysis failed: {str(e)}")
+            return 0
+
+    def train(self, files: List[str], save_path: str):
+        """Train tokenizer with dynamic configuration."""
+        try:
+            # Configure trainer with current settings
+            trainer = BpeTrainer(
+                vocab_size=self.vocab_size,
+                min_frequency=self.min_frequency,
+                special_tokens=list(self.special_tokens.values()),
+                initial_alphabet=ByteLevel.alphabet(),
+                show_progress=True
+            )
+            
+            # Train tokenizer
+            self.tokenizer.train(files=files, trainer=trainer)
+            
+            # Save configuration along with tokenizer
+            config = {
+                'vocab_size': self.vocab_size,
+                'min_frequency': self.min_frequency,
+                'padding': self.padding_config,
+                'truncation': self.truncation_config,
+                'special_tokens': self.special_tokens,
+                'normalize': self.normalize
+            }
+            
+            # Save tokenizer and config
+            self.tokenizer.save(save_path)
+            with open(f"{save_path}.config", 'w') as f:
+                json.dump(config, f, indent=2)
+                
+        except Exception as e:
+            logging.error(f"Training failed: {e}")
+            raise
+
+    def encode(
+        self,
+        texts: Union[str, List[str]],
+        padding: bool = True,
+        truncation: bool = True,
+        max_length: Optional[int] = None,
+        return_tensors: bool = True
+    ) -> Dict[str, Union[List[int], Tensor]]:
+        """Enhanced encoding with configurable padding and truncation."""
+        if isinstance(texts, str):
+            texts = [texts]
+            
+        # Apply encoding with current configuration
+        encodings = self.tokenizer.encode_batch(texts)
+        
+        # Handle padding if requested
+        if padding:
+            max_len = max(len(enc.ids) for enc in encodings)
+            if max_length:
+                max_len = min(max_len, max_length)
+                
+            for enc in encodings:
+                padding_length = max_len - len(enc.ids)
+                if padding_length > 0:
+                    enc.ids.extend([self.padding_config['pad_token_id']] * padding_length)
+                    enc.attention_mask.extend([0] * padding_length)
+                    
+        # Handle truncation if requested
+        if truncation and max_length:
+            for enc in encodings:
+                if len(enc.ids) > max_length:
+                    enc.ids = enc.ids[:max_length]
+                    enc.attention_mask = enc.attention_mask[:max_length]
+                    
+        # Prepare output
+        output = {
+            'input_ids': [enc.ids for enc in encodings],
+            'attention_mask': [enc.attention_mask for enc in encodings]
+        }
+        
+        # Convert to tensors if requested
+        if return_tensors:
+            output = {k: torch.tensor(v) for k, v in output.items()}
+            
+        return output
 
 
 ###############################################################################
@@ -1816,7 +1835,7 @@ def main():
         try:
             tokenizer.train(
                 processed_files,
-                save_path=str(Path(args.local_data_path) / "tokenizer.json")
+                save_path=str(Path(args.local_data_path) / "Medical_tokenizer.json")
             )
         except Exception as e:
             logging.error(f"Tokenizer training failed: {str(e)}")

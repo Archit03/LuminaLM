@@ -1,165 +1,134 @@
 import logging
-import torch
-import traceback
 import os
+import traceback
 from tokenizers import Tokenizer
-from tokenizer import (
-    TokenizationUtilities,
-    HybridTokenizationStrategy,
-    MedicalTokenizer
-)
-from typing import Dict, Any
-import yaml
-from pathlib import Path
+import torch
+import matplotlib.pyplot as plt
+from typing import List, Dict
 
-# Set up logging
-LOG_FILE = "validation.log"
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler()]
-)
+# Logging setup
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s - %(levelname)s - %(message)s",
+                    handlers=[logging.FileHandler("tokens/validation.log"),
+                              logging.StreamHandler()])
 
-def validate_config(config: Dict[str, Any]) -> bool:
-    """Validate configuration parameters"""
-    required_fields = {
-        'local_data_path': str,
-        'vocab_size': (int, type(None)),
-        'min_frequency': int,
-        'max_file_size_mb': int,
-        'allowed_extensions': set,
-        'allowed_mimetypes': set,
-        'chunk_size': int,
-        'processing_workers': int,
-        'log_file': str,
-        'gpu_memory_threshold': float
-    }
-    
+def plot_sequence_lengths(original_lengths: List[int], truncated_lengths: List[int]):
+    """Plots original vs. truncated sequence lengths."""
+    plt.figure(figsize=(10, 6))
+    plt.plot(original_lengths, label="Original Lengths", marker="o")
+    plt.plot(truncated_lengths, label="Truncated Lengths", marker="x")
+    plt.xlabel("Sample Index")
+    plt.ylabel("Sequence Length")
+    plt.title("Sequence Lengths Before and After Truncation")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("tokens/sequence_lengths.png")
+    plt.show()
+
+def plot_attention_mask_coverage(attention_masks: torch.Tensor):
+    """Plots attention mask coverage (ratio of non-padded tokens to total tokens)."""
+    coverage = attention_masks.sum(dim=1).float() / attention_masks.size(1)
+    plt.figure(figsize=(10, 6))
+    plt.bar(range(len(coverage)), coverage, color="skyblue")
+    plt.xlabel("Sample Index")
+    plt.ylabel("Attention Mask Coverage")
+    plt.title("Attention Mask Coverage per Sample")
+    plt.grid(True)
+    plt.savefig("tokens/attention_mask_coverage.png")
+    plt.show()
+
+def plot_padding_efficiency(attention_masks: torch.Tensor, max_length: int):
+    """Plots padding efficiency (ratio of used tokens to max length)."""
+    efficiency = attention_masks.sum(dim=1).float() / max_length
+    plt.figure(figsize=(10, 6))
+    plt.bar(range(len(efficiency)), efficiency, color="lightcoral")
+    plt.xlabel("Sample Index")
+    plt.ylabel("Padding Efficiency")
+    plt.title("Padding Efficiency per Sample")
+    plt.grid(True)
+    plt.savefig("tokens/padding_efficiency.png")
+    plt.show()
+
+def validate_tokenizer(tokenizer_path: str, sample_texts: List[str], max_length: int = None):
+    """Validates the tokenizer on a set of sample texts."""
     try:
-        for field, expected_type in required_fields.items():
-            if field not in config:
-                raise ValueError(f"Missing required field: {field}")
-            
-            if not isinstance(config[field], expected_type):
-                raise TypeError(f"Invalid type for {field}: expected {expected_type}, got {type(config[field])}")
-        
-        # Additional validation
-        if config['min_frequency'] < 1:
-            raise ValueError("min_frequency must be >= 1")
-        
-        if config['max_file_size_mb'] <= 0:
-            raise ValueError("max_file_size_mb must be > 0")
-        
-        if not (0 < config['gpu_memory_threshold'] <= 1):
-            raise ValueError("gpu_memory_threshold must be between 0 and 1")
-        
-        return True
-        
-    except Exception as e:
-        print(f"Configuration validation failed: {str(e)}")
-        return False
-
-def load_config(config_path: str) -> Dict[str, Any]:
-    """Load and validate configuration from YAML file"""
-    config_path = Path(config_path)
-    if not config_path.exists():
-        raise FileNotFoundError(f"Config file not found: {config_path}")
-        
-    try:
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-            
-        if validate_config(config):
-            return config
-        else:
-            raise ValueError("Invalid configuration")
-            
-    except Exception as e:
-        raise RuntimeError(f"Error loading config: {str(e)}")
-
-def main():
-    """Validation script for the medical tokenizer."""
-    try:
-        # Load the trained tokenizer
-        tokenizer_path = "Medical_tokenizer.json"
-        logging.info(f"Loading tokenizer from {tokenizer_path}")
-        
-        # Add file existence check
+        # Load the tokenizer
         if not os.path.exists(tokenizer_path):
-            raise FileNotFoundError(f"Tokenizer file not found at {tokenizer_path}")
-            
-        tokenizer = Tokenizer.from_file(tokenizer_path)
-        medical_tokenizer = MedicalTokenizer()
-        medical_tokenizer.tokenizer = tokenizer
-        medical_tokenizer.strategy = HybridTokenizationStrategy(tokenizer)
+            raise FileNotFoundError(f"Tokenizer file not found: {tokenizer_path}")
 
-        # Expanded sample texts with more diverse medical content
-        sample_texts = [
-            "Patient presents with severe chest pain.",
-            "Medical history includes hypertension and diabetes.",
-            "The patient was administered 5mg of medication Atorvastatin.",
-            "Symptoms include fever, cough, and shortness of breath.",
-            "Lab results: WBC 12.3, RBC 4.5, Platelets 250k",
-            "Patient reports allergies to penicillin and sulfa drugs",
-            "Post-operative recovery shows good wound healing"
+        logging.info(f"Loading tokenizer from {tokenizer_path}")
+        tokenizer = Tokenizer.from_file(tokenizer_path)
+
+        # Encode texts
+        logging.info("Encoding sample texts...")
+        encoded_batch = [
+            tokenizer.encode(text).ids for text in sample_texts
         ]
 
-        # Add validation metrics
-        def validate_encoding(encoding, task_type):
-            logging.info(f"\nValidating {task_type} encoding:")
-            logging.info(f"Shape of input_ids: {encoding['input_ids'].shape}")
-            logging.info(f"Sequence lengths: {encoding['input_ids'].sum(dim=1)}")
-            logging.info(f"Attention mask statistics: {encoding['attention_mask'].float().mean():.2f} coverage")
-            
-            # Validate special tokens
-            special_token_count = sum(1 for id in encoding['input_ids'].flatten() 
-                                    if id in special_token_ids)
-            logging.info(f"Special tokens found: {special_token_count}")
+        # Set max_length dynamically based on the longest sequence if not provided
+        if max_length is None:
+            max_length = max(len(seq) for seq in encoded_batch)
+            logging.info(f"Dynamic max_length set to: {max_length}")
 
-        # Perform and validate autoregressive encoding
-        logging.info("\nPerforming autoregressive encoding...")
-        auto_encoding = medical_tokenizer.encode(sample_texts, task_type='auto')
-        validate_encoding(auto_encoding, 'autoregressive')
+        # Analyze sequence lengths
+        original_lengths = [len(ids) for ids in encoded_batch]
+        truncated_lengths = []
 
-        # Perform and validate bidirectional encoding
-        logging.info("\nPerforming bidirectional encoding...")
-        bi_encoding = medical_tokenizer.encode(sample_texts, task_type='bi')
-        validate_encoding(bi_encoding, 'bidirectional')
+        # Validate sequence lengths and log truncation details
+        for idx, ids in enumerate(encoded_batch):
+            if len(ids) > max_length:
+                logging.warning(f"Truncating sequence at index {idx} to max length {max_length}.")
+                truncated_tokens = ids[max_length:]
+                logging.info(f"Truncated tokens for Text {idx}: {truncated_tokens}")
+                encoded_batch[idx] = ids[:max_length]
+            truncated_lengths.append(len(encoded_batch[idx]))
 
-        # Enhanced MLM validation
-        logging.info("\nGenerating masked language model inputs...")
-        utilities = TokenizationUtilities()
-        special_token_ids = [medical_tokenizer.tokenizer.token_to_id(token) 
-                            for token in medical_tokenizer.special_tokens]
+        # Convert to tensors
+        input_ids = [torch.tensor(ids, dtype=torch.long) for ids in encoded_batch]
+        attention_masks = [
+            torch.tensor([1] * len(ids) + [0] * (max_length - len(ids)), dtype=torch.long)
+            if len(ids) < max_length else torch.tensor([1] * max_length, dtype=torch.long)
+            for ids in encoded_batch
+        ]
 
-        masked_inputs, labels, mask = utilities.generate_masked_lm_inputs(
-            auto_encoding['input_ids'],
-            mask_probability=0.15,
-            mask_token_id=medical_tokenizer.tokenizer.token_to_id("[MASK]"),
-            special_token_ids=special_token_ids,
-            vocab_size=medical_tokenizer.vocab_size
-        )
+        # Pad sequences
+        padded_input_ids = torch.nn.utils.rnn.pad_sequence(input_ids, batch_first=True, padding_value=0)
+        padded_attention_masks = torch.stack(attention_masks, dim=0)
 
-        # Add detailed MLM statistics
-        total_tokens = mask.numel()
-        masked_tokens = mask.sum().item()
-        mask_percentage = (masked_tokens / total_tokens) * 100
+        # Log validation results
+        logging.info("Validation Results:")
+        logging.info(f"Padded Input IDs Shape: {padded_input_ids.shape}")
+        logging.info(f"Padded Attention Masks Shape: {padded_attention_masks.shape}")
 
-        logging.info(f"\nMLM Statistics:")
-        logging.info(f"Total tokens: {total_tokens}")
-        logging.info(f"Masked tokens: {masked_tokens}")
-        logging.info(f"Actual mask percentage: {mask_percentage:.2f}%")
-        
-        # Validate mask consistency
-        mask_positions = mask.nonzero(as_tuple=True)
-        label_consistency = torch.all(labels[mask] != -100).item()
-        logging.info(f"Labels at masked positions are valid: {label_consistency}")
+        # Example output
+        logging.info("Sample Encoded Outputs:")
+        for idx, input_ids in enumerate(padded_input_ids):
+            logging.info(f"Text {idx}: {sample_texts[idx]}")
+            logging.info(f"Input IDs: {input_ids.tolist()}")
 
-        logging.info("Validation completed successfully.")
+        # Plot sequence lengths
+        plot_sequence_lengths(original_lengths, truncated_lengths)
+
+        # Plot attention mask coverage
+        plot_attention_mask_coverage(padded_attention_masks)
+
+        # Plot padding efficiency
+        plot_padding_efficiency(padded_attention_masks, max_length)
 
     except Exception as e:
         logging.error(f"Error during validation: {e}")
         logging.error(traceback.format_exc())
 
 if __name__ == "__main__":
-    main()
+    tokenizer_path = "tokens/tokenizer.json"
+    sample_texts = [
+        "Patient presents with severe chest pain.",
+        "Medical history includes hypertension and diabetes.",
+        "The patient was administered 5mg of Atorvastatin.",
+        "Symptoms include fever, cough, and shortness of breath.",
+        "Lab results: WBC 12.3, RBC 4.5, Platelets 250k",
+        "Patient reports allergies to penicillin and sulfa drugs.",
+        "Post-operative recovery shows good wound healing."
+    ]
+
+    validate_tokenizer(tokenizer_path, sample_texts)

@@ -1,0 +1,21 @@
+2024-12-15 21:22:26,861 - INFO - Loading tokenizer from tokens/tokenizer.json
+2024-12-15 21:22:27,132 - INFO - Encoding sample texts...
+2024-12-15 21:22:27,134 - INFO - Dynamic max_length set to: 18
+2024-12-15 21:22:27,135 - INFO - Validation Results:
+2024-12-15 21:22:27,136 - INFO - Padded Input IDs Shape: torch.Size([7, 18])
+2024-12-15 21:22:27,136 - INFO - Padded Attention Masks Shape: torch.Size([7, 18])
+2024-12-15 21:22:27,137 - INFO - Sample Encoded Outputs:
+2024-12-15 21:22:27,137 - INFO - Text 0: Patient presents with severe chest pain.
+2024-12-15 21:22:27,149 - INFO - Input IDs: [5502, 9414, 355, 5447, 7643, 2285, 20, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+2024-12-15 21:22:27,163 - INFO - Text 1: Medical history includes hypertension and diabetes.
+2024-12-15 21:22:27,164 - INFO - Input IDs: [2638, 1685, 3352, 34898, 299, 11685, 20, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+2024-12-15 21:22:27,164 - INFO - Text 2: The patient was administered 5mg of Atorvastatin.
+2024-12-15 21:22:27,165 - INFO - Input IDs: [267, 5502, 365, 16454, 755, 15233, 297, 369, 285, 39629, 21312, 20, 1, 0, 0, 0, 0, 0]
+2024-12-15 21:22:27,165 - INFO - Text 3: Symptoms include fever, cough, and shortness of breath.
+2024-12-15 21:22:27,166 - INFO - Input IDs: [7534, 2316, 13648, 18, 16874, 18, 299, 1610, 1217, 297, 8288, 20, 1, 0, 0, 0, 0, 0]
+2024-12-15 21:22:27,166 - INFO - Text 4: Lab results: WBC 12.3, RBC 4.5, Platelets 250k
+2024-12-15 21:22:27,167 - INFO - Input IDs: [1542, 2381, 32, 41877, 1453, 20, 25, 18, 45575, 721, 20, 27, 18, 6843, 4929, 8984, 81, 1]
+2024-12-15 21:22:27,168 - INFO - Text 5: Patient reports allergies to penicillin and sulfa drugs.
+2024-12-15 21:22:27,168 - INFO - Input IDs: [5502, 2556, 30795, 292, 55627, 299, 19185, 71, 4173, 20, 1, 0, 0, 0, 0, 0, 0, 0]
+2024-12-15 21:22:27,169 - INFO - Text 6: Post-operative recovery shows good wound healing.
+2024-12-15 21:22:27,169 - INFO - Input IDs: [1036, 19, 23809, 6324, 2278, 866, 10683, 11214, 20, 1, 0, 0, 0, 0, 0, 0, 0, 0]

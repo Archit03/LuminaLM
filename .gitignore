@@ -8,3 +8,4 @@ LuminaLM\embeddings\api.env
 api.env
 tokens/tokens/processed
 tokens/tokenizer.log
+tokens/tokens/
