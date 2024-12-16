@@ -1536,6 +1536,9 @@ def process_local_dataset(input_path: Union[str, Path], output_path: Path, chunk
             logging.error(f"Input path does not exist: {input_path}")
             return None
 
+        # Create output directory if it doesn't exist
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
         # If input_path is a directory, process all text files in it
         if input_path.is_dir():
             processed_files = []
@@ -1544,19 +1547,13 @@ def process_local_dataset(input_path: Union[str, Path], output_path: Path, chunk
             # Process each file with progress bar
             for file_path in tqdm(text_files, desc="Processing local files"):
                 try:
-                    output_file = output_path.parent / f"{output_path.stem}_{file_path.stem}.txt"
-                    total_size = file_path.stat().st_size
+                    # Simplified output path - just append _processed to the original name
+                    output_file = output_path.parent / f"local_processed_{file_path.name}"
                     
                     with open(file_path, 'r', encoding='utf-8') as infile, \
-                         open(output_file, 'w', encoding='utf-8') as outfile, \
-                         tqdm(total=total_size, 
-                              desc=f"Processing {file_path.name}",
-                              unit='B', 
-                              unit_scale=True,
-                              leave=False) as pbar:
+                         open(output_file, 'w', encoding='utf-8') as outfile:
                         while chunk := infile.read(chunk_size):
                             outfile.write(chunk)
-                            pbar.update(len(chunk.encode('utf-8')))
                     processed_files.append(str(output_file))
                 except Exception as e:
                     logging.warning(f"Error processing file {file_path}: {str(e)}")
@@ -1568,21 +1565,12 @@ def process_local_dataset(input_path: Union[str, Path], output_path: Path, chunk
 
         # If input_path is a file
         else:
-            total_size = input_path.stat().st_size
             with open(input_path, 'r', encoding='utf-8') as infile, \
-                 open(output_path, 'w', encoding='utf-8') as outfile, \
-                 tqdm(total=total_size, 
-                      desc=f"Processing {input_path.name}",
-                      unit='B', 
-                      unit_scale=True) as pbar:
+                 open(output_path, 'w', encoding='utf-8') as outfile:
                 while chunk := infile.read(chunk_size):
                     outfile.write(chunk)
-                    pbar.update(len(chunk.encode('utf-8')))
             return str(output_path)
 
-    except PermissionError as e:
-        logging.error(f"Permission denied accessing {input_path}. Please check file permissions.")
-        return None
     except Exception as e:
         logging.error(f"Error processing local dataset {input_path}: {str(e)}")
         return None
@@ -1599,13 +1587,31 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
             if dataset['type'] == 'local':
                 results['datasets'][dataset['name']] = dataset['config']['path']
             elif dataset['type'] == 'huggingface':
-                dataset_obj = load_dataset(
-                    dataset['config']['dataset_name'],
-                    streaming=dataset['config'].get('streaming', True),
-                    split=dataset['config'].get('split', 'train'),
-                    cache_dir=cache_dir,
-                    trust_remote_code=True
-                )
+                # Extract dataset specific parameters
+                dataset_name = dataset['config']['dataset_name']
+                config = dataset['config'].get('config')
+                
+                # Different loading logic based on dataset
+                if 'medical-question-answering-datasets' in dataset_name:
+                    dataset_obj = load_dataset(
+                        dataset_name,
+                        config,  # Pass config directly for medical dataset
+                        streaming=dataset['config'].get('streaming', False),
+                        split=dataset['config'].get('split', 'train'),
+                        cache_dir=cache_dir,
+                        trust_remote_code=True
+                    )
+                
+                else:
+                    # For other datasets like openwebtext
+                    dataset_obj = load_dataset(
+                        dataset_name,
+                        streaming=dataset['config'].get('streaming', False),
+                        split=dataset['config'].get('split', 'train'),
+                        cache_dir=cache_dir,
+                        trust_remote_code=True
+                    )
+                    
                 results['datasets'][dataset['name']] = dataset_obj
                 
         except Exception as e:
