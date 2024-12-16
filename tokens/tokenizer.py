@@ -40,6 +40,7 @@ import threading
 import aiofiles
 from logging.handlers import RotatingFileHandler
 import chardet
+import numpy as np
 
 ###############################################################################
 # Configuration
@@ -913,44 +914,38 @@ class DatasetProcessor:
             return []
 
     def _process_streaming_dataset(self, dataset: IterableDataset, output_dir: Path) -> List[str]:
-        """Process streaming dataset (like OpenWebText)."""
-        processed_files = []
-        batch_count = 0
-        
+        """Process streaming dataset with chunking."""
         try:
-            # Process in batches
-            batch = []
-            batch_size = self.batch_size
-            
-            for item in dataset:
-                text = item.get('text', '').strip()
-                if text:
-                    batch.append(text)
+            output_path = output_dir / "processed.txt"
+            with open(output_path, 'w', encoding='utf-8') as f:
+                batch = []
+                
+                pbar = tqdm(
+                    dataset, 
+                    desc="Processing streaming dataset",
+                    unit=" samples"
+                )
+                
+                for item in pbar:
+                    text = item.get('text', '').strip()
+                    if text:
+                        batch.append(text)
+                        if len(batch) >= self.batch_size:  # Use self.batch_size instead of chunk_size
+                            f.write('\n'.join(batch) + '\n')
+                            batch = []
+                            
+                            # Memory management
+                            if psutil.virtual_memory().percent > 85:
+                                gc.collect()
+                                
+                if batch:  # Write remaining items
+                    f.write('\n'.join(batch) + '\n')
                     
-                if len(batch) >= batch_size:
-                    output_path = output_dir / f"batch_{batch_count}.txt"
-                    with open(output_path, 'w', encoding='utf-8') as f:
-                        f.write('\n'.join(batch))
-                    processed_files.append(str(output_path))
-                    batch = []
-                    batch_count += 1
-                    
-                    # Limit the number of batches for OpenWebText
-                    if batch_count >= 100:  # Adjust this number as needed
-                        break
-            
-            # Process remaining items
-            if batch:
-                output_path = output_dir / f"batch_{batch_count}.txt"
-                with open(output_path, 'w', encoding='utf-8') as f:
-                    f.write('\n'.join(batch))
-                processed_files.append(str(output_path))
-            
-            return processed_files
+            return str(output_path)
             
         except Exception as e:
             logging.error(f"Error processing streaming dataset: {str(e)}")
-            return []
+            return None
 
     def _process_regular_dataset(self, dataset: DatasetDict, output_dir: Path) -> List[str]:
         """Process regular (non-streaming) dataset."""
@@ -1624,17 +1619,18 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
     return results
 
 def process_streaming_dataset(dataset: Any, output_path: Path, chunk_size: int, dataset_name: str) -> Optional[str]:
-    """Process streaming dataset with chunking and progress bar."""
+    """Process streaming dataset with chunking."""
     try:
+        # Ensure parent directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
         with open(output_path, 'w', encoding='utf-8') as f:
             batch = []
             
-            # Initialize progress bar
             pbar = tqdm(
                 dataset, 
-                desc=f"Processing {dataset_name}",
-                unit=" samples",
-                dynamic_ncols=True  # Automatically adjust to terminal width
+                desc="Processing streaming dataset",
+                unit=" samples"
             )
             
             for item in pbar:
@@ -1645,14 +1641,8 @@ def process_streaming_dataset(dataset: Any, output_path: Path, chunk_size: int, 
                         f.write('\n'.join(batch) + '\n')
                         batch = []
                         
-                        # Update progress bar description with memory info
-                        memory_percent = psutil.virtual_memory().percent
-                        pbar.set_description(
-                            f"Processing {dataset_name} (Memory: {memory_percent:.1f}%)"
-                        )
-                        
                         # Memory management
-                        if memory_percent > 85:
+                        if psutil.virtual_memory().percent > 85:
                             gc.collect()
                             
             if batch:  # Write remaining items
@@ -1675,7 +1665,7 @@ class WorkerManager:
     def adjust_workers(self) -> int:
         """Dynamically adjust worker count based on system resources"""
         memory = psutil.virtual_memory()
-        cpu_percent = psutil.cpu_percent()
+        cpu_percent = psutil.cpu_percent(interval=1)
         
         # Reduce workers under high memory or CPU pressure
         if memory.percent > 90 or cpu_percent > 90:
@@ -1767,80 +1757,39 @@ def main():
             min_frequency=args.min_freq
         )
         
-        # Process datasets one at a time with overall progress
-        logging.info("Starting dataset processing...")
+        # Initialize logging directory
+        log_dir = Path("logs")
+        log_dir.mkdir(exist_ok=True)
+        
+        # Load datasets
+        dataset_results = load_datasets(dataset_config)
+        
+        # Process datasets and collect processed files
         processed_files = []
-        
-        with worker_manager.get_executor() as executor:
-            try:
-                # Load datasets with progress tracking
-                dataset_results = load_datasets(
-                    dataset_config,
-                    cache_dir=args.local_data_path,
-                    executor=executor
-                )
+        for dataset_name, dataset in dataset_results['datasets'].items():
+            if isinstance(dataset, str):  # Local dataset path
+                processed_file = process_local_dataset(dataset, 
+                    Path(args.local_data_path) / f"{dataset_name}_processed.txt",
+                    args.chunk_size)
+            else:  # HuggingFace dataset
+                processed_file = process_streaming_dataset(dataset,
+                    Path(args.local_data_path) / f"{dataset_name}_processed.txt",
+                    args.chunk_size,
+                    dataset_name)
                 
-                if not dataset_results['datasets']:
-                    raise ValueError("No datasets were successfully loaded")
-                
-                # Process datasets one at a time with progress tracking
-                total_datasets = len(dataset_results['datasets'])
-                with tqdm(total=total_datasets, desc="Overall Progress", position=0) as dataset_pbar:
-                    for dataset_name, dataset in dataset_results['datasets'].items():
-                        try:
-                            logging.info(f"Processing dataset: {dataset_name}")
-                            
-                            # Monitor memory and adjust chunk size if needed
-                            chunk_size = memory_manager.get_safe_chunk_size()
-                            
-                            if isinstance(dataset, (str, Path)):
-                                # Handle local file datasets
-                                processed_file = process_local_dataset(
-                                    dataset,
-                                    Path(args.local_data_path) / f"{dataset_name}_processed.txt",
-                                    chunk_size
-                                )
-                            else:
-                                # Handle streaming/regular datasets
-                                processed_file = process_streaming_dataset(
-                                    dataset,
-                                    Path(args.local_data_path) / f"{dataset_name}_processed.txt",
-                                    chunk_size,
-                                    dataset_name
-                                )
-                                
-                            if processed_file:
-                                processed_files.append(processed_file)
-                                
-                        except Exception as e:
-                            logging.error(f"Error processing dataset {dataset_name}: {str(e)}")
-                            continue  # Continue with next dataset
-                        finally:
-                            dataset_pbar.update(1)
-                            
-                        # Check memory status and cleanup if needed
-                        if memory_manager.check_memory()[0]:
-                            logging.warning("High memory usage detected, triggering cleanup")
-                            gc.collect()
-                            if torch.cuda.is_available():
-                                torch.cuda.empty_cache()
-                                
-            except Exception as e:
-                logging.error(f"Error during dataset processing: {str(e)}")
-                if not processed_files:  # Only raise if no files were processed
-                    raise
-        
-        # Train tokenizer
+            if processed_file:
+                processed_files.append(processed_file)
+
+        if not processed_files:
+            raise ValueError("No files were successfully processed")
+
+        # Train tokenizer with processed files
         logging.info("Starting tokenizer training...")
-        try:
-            tokenizer.train(
-                processed_files,
-                save_path=str(Path(args.local_data_path) / "Medical_tokenizer.json")
-            )
-        except Exception as e:
-            logging.error(f"Tokenizer training failed: {str(e)}")
-            raise
-            
+        tokenizer.train(
+            processed_files,
+            save_path=str(Path(args.local_data_path) / "Medical_tokenizer.json")
+        )
+
         logging.info("Tokenizer training completed successfully")
         
     except Exception as e:
@@ -1896,3 +1845,110 @@ class RetryHandler:
                         f"{operation_name} failed after {self.max_retries} attempts: {str(e)}"
                     )
                     raise
+
+class DatasetLogger:
+    """Dedicated logger for dataset processing with detailed metrics and status tracking"""
+    def __init__(self, dataset_name: str, log_file: Path):
+        self.dataset_name = dataset_name
+        self.log_file = log_file
+        self.start_time = None
+        self.metrics = {
+            'processed_items': 0,
+            'failed_items': 0,
+            'total_tokens': 0,
+            'errors': [],
+            'warnings': [],
+            'memory_usage': []
+        }
+        
+        # Setup dataset-specific log file
+        self.dataset_log_file = log_file.parent / f"dataset_{dataset_name}.log"
+        self._setup_logger()
+
+    def _setup_logger(self):
+        """Setup dedicated logger for this dataset"""
+        self.logger = logging.getLogger(f"dataset.{self.dataset_name}")
+        self.logger.setLevel(logging.DEBUG)
+        
+        # File handler for dataset-specific logs
+        file_handler = RotatingFileHandler(
+            self.dataset_log_file,
+            maxBytes=10 * 1024 * 1024,  # 10MB
+            backupCount=3
+        )
+        formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)s - [%(name)s] %(message)s'
+        )
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
+
+    def start_processing(self):
+        """Mark the start of dataset processing"""
+        self.start_time = time.time()
+        self.logger.info(f"Started processing dataset: {self.dataset_name}")
+        self._log_system_state("Initial state")
+
+    def end_processing(self):
+        """Log final statistics and processing duration"""
+        duration = time.time() - self.start_time
+        self.logger.info(
+            f"Completed processing dataset: {self.dataset_name}\n"
+            f"Duration: {duration:.2f}s\n"
+            f"Processed items: {self.metrics['processed_items']}\n"
+            f"Failed items: {self.metrics['failed_items']}\n"
+            f"Total tokens: {self.metrics['total_tokens']}\n"
+            f"Average memory usage: {np.mean(self.metrics['memory_usage']):.1f}%"
+        )
+        self._log_system_state("Final state")
+
+    def log_progress(self, items_processed: int, tokens: int):
+        """Log processing progress with memory usage"""
+        self.metrics['processed_items'] += items_processed
+        self.metrics['total_tokens'] += tokens
+        
+        # Track memory usage
+        memory_percent = psutil.virtual_memory().percent
+        self.metrics['memory_usage'].append(memory_percent)
+        
+        self.logger.debug(
+            f"Progress update:\n"
+            f"Items processed: {items_processed}\n"
+            f"Total tokens: {tokens}\n"
+            f"Memory usage: {memory_percent}%"
+        )
+
+    def log_error(self, error: str, item_id: Optional[str] = None):
+        """Log processing errors with context"""
+        self.metrics['failed_items'] += 1
+        self.metrics['errors'].append((item_id, error))
+        self.logger.error(
+            f"Processing error:\n"
+            f"Item ID: {item_id}\n"
+            f"Error: {error}"
+        )
+
+    def log_warning(self, message: str, context: Optional[Dict] = None):
+        """Log warnings with optional context"""
+        self.metrics['warnings'].append((message, context))
+        self.logger.warning(
+            f"Warning: {message}\n"
+            f"Context: {context if context else 'None'}"
+        )
+
+    def _log_system_state(self, state_name: str):
+        """Log system resource state"""
+        memory = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent(interval=1)
+        
+        if torch.cuda.is_available():
+            gpu_memory = torch.cuda.memory_allocated() / torch.cuda.max_memory_allocated()
+            gpu_info = f"GPU Memory: {gpu_memory:.1%}"
+        else:
+            gpu_info = "GPU: Not available"
+            
+        self.logger.info(
+            f"System State - {state_name}:\n"
+            f"Memory Usage: {memory.percent}%\n"
+            f"CPU Usage: {cpu_percent}%\n"
+            f"{gpu_info}"
+        )
