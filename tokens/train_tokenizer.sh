@@ -31,10 +31,10 @@ echo
 # Run the tokenizer with enhanced configuration
 echo "Starting tokenizer training..."
 $PYTHON_PATH "$SCRIPT_PATH" \
-    --min_frequency $MIN_FREQ \
-    --log_file "$LOG_FILE" \
+    --min_freq $MIN_FREQ \
+    --log "$LOG_FILE" \
     --chunk_size $CHUNK_SIZE \
-    --max_workers 8
+    --workers 8
 
 if [ $? -ne 0 ]; then
     echo "Error: Tokenizer training failed. Check $LOG_FILE for details."
