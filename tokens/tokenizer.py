@@ -1700,35 +1700,53 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
                 
                 if hf_dataset_name == "stas/openwebtext-10k":
                     try:
-                        with tqdm(desc=f"Loading {dataset_name}", position=0, leave=True) as pbar:
+                        # Set timeout for dataset loading
+                        download_config = DownloadConfig(
+                            max_retries=3,
+                            num_proc=4,  # Use multiple processes for downloading
+                            timeout=100.0  # 100 seconds timeout
+                        )
+                        
+                        with tqdm(desc=f"Downloading {dataset_name}", position=0, leave=True) as pbar:
                             dataset_obj = load_dataset(
                                 "stas/openwebtext-10k",
                                 split="train",
-                                cache_dir=dataset_cache_dir
+                                cache_dir=dataset_cache_dir,
+                                download_config=download_config
                             )
                             pbar.update(1)
-                            
+                        
+                        # Take subset if specified
                         if ':' in split:
-                            with tqdm(desc=f"Processing {dataset_name}", position=0, leave=True) as pbar:
+                            with tqdm(desc=f"Selecting subset for {dataset_name}", 
+                                    total=1000, position=0, leave=True) as pbar:
                                 dataset_obj = dataset_obj.select(range(1000))
-                                pbar.update(1)
+                                pbar.update(1000)
                             
                     except Exception as e:
-                        logging.error(f"Failed to load {dataset_name}: {str(e)}")
+                        logging.error(f"Failed to load {dataset_name} (timeout={download_config.timeout}s): {str(e)}")
                         continue
                     
                 elif hf_dataset_name == "medalpaca/medical_qa_512":
                     try:
-                        with tqdm(desc=f"Loading {dataset_name}", position=0, leave=True) as pbar:
+                        # Set timeout for dataset loading
+                        download_config = DownloadConfig(
+                            max_retries=3,
+                            num_proc=4,  # Use multiple processes for downloading
+                            timeout=100.0  # 100 seconds timeout
+                        )
+                        
+                        with tqdm(desc=f"Downloading {dataset_name}", position=0, leave=True) as pbar:
                             dataset_obj = load_dataset(
                                 "medalpaca/medical_qa_512",
                                 split="train",
-                                cache_dir=dataset_cache_dir
+                                cache_dir=dataset_cache_dir,
+                                download_config=download_config
                             )
                             pbar.update(1)
                             
                     except Exception as e:
-                        logging.error(f"Failed to load {dataset_name}: {str(e)}")
+                        logging.error(f"Failed to load {dataset_name} (timeout={download_config.timeout}s): {str(e)}")
                         continue
                 
                 else:
@@ -1737,15 +1755,22 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
                 # Process and validate dataset
                 if dataset_obj is not None and len(dataset_obj) > 0:
                     if 'question' in dataset_obj.features and 'answer' in dataset_obj.features:
+                        total_examples = len(dataset_obj)
                         with tqdm(desc=f"Processing {dataset_name}", 
-                                total=len(dataset_obj), unit="examples",
+                                total=total_examples,
+                                unit="examples",
                                 position=0, leave=True) as pbar:
-                            dataset_obj = dataset_obj.map(
-                                lambda x: {'text': f"Question: {x['question']}\nAnswer: {x['answer']}"},
-                                remove_columns=dataset_obj.column_names,
-                                desc=f"Processing {dataset_name}"
-                            )
-                            pbar.update(len(dataset_obj))
+                            processed = 0
+                            batch_size = 1000
+                            for i in range(0, total_examples, batch_size):
+                                batch = dataset_obj.select(range(i, min(i + batch_size, total_examples)))
+                                batch = batch.map(
+                                    lambda x: {'text': f"Question: {x['question']}\nAnswer: {x['answer']}"},
+                                    remove_columns=batch.column_names
+                                )
+                                processed += len(batch)
+                                pbar.update(len(batch))
+                                pbar.set_postfix({'processed': f"{processed}/{total_examples}"})
                     
                     results['datasets'][dataset_name] = dataset_obj
                     results['stats']['total_samples'] += len(dataset_obj)
