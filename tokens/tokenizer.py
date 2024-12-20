@@ -40,6 +40,7 @@ import threading
 import aiofiles
 from logging.handlers import RotatingFileHandler
 import chardet
+import numpy as np
 
 ###############################################################################
 # Configuration
@@ -49,7 +50,7 @@ class Config:
     def __init__(
         self,
         local_data_path: str,
-        vocab_size: int = 60000,
+        vocab_size: Optional[int] = None,
         min_frequency: int = 2,
         log_file: str = "tokenizer.log",
         chunk_size: int = 1000,
@@ -276,32 +277,39 @@ class TokenizationUtilities:
 # Memory Management
 ###############################################################################
 class MemoryManager:
-    """Manages memory usage and cleanup."""
-    def __init__(self):
-        self.threshold = 0.9
+    """Enhanced memory manager with alerts and dynamic thresholds"""
+    def __init__(self, alert_threshold: float = 0.8, critical_threshold: float = 0.9):
+        self.alert_threshold = alert_threshold
+        self.critical_threshold = critical_threshold
+        self.last_alert_time = 0
+        self.alert_cooldown = 300  # 5 minutes between alerts
+        
+    def check_memory(self) -> Tuple[bool, str]:
+        """Check memory status with detailed reporting"""
+        memory = psutil.virtual_memory()
+        current_usage = memory.percent / 100
+        
+        status_message = f"Memory usage: {memory.percent}%"
+        
+        if current_usage >= self.critical_threshold:
+            if time.time() - self.last_alert_time > self.alert_cooldown:
+                self.last_alert_time = time.time()
+                logging.critical(f"Critical memory usage: {memory.percent}%")
+            return True, f"CRITICAL: {status_message}"
+            
+        elif current_usage >= self.alert_threshold:
+            if time.time() - self.last_alert_time > self.alert_cooldown:
+                self.last_alert_time = time.time()
+                logging.warning(f"High memory usage: {memory.percent}%")
+            return True, f"WARNING: {status_message}"
+            
+        return False, status_message
 
-    def clean_memory(self, aggressive: bool = False):
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            if aggressive:
-                torch.cuda.ipc_collect()
-
-    @contextmanager
-    def monitor_memory(self, operation: str = ""):
-        try:
-            yield
-        finally:
-            if self.should_cleanup():
-                self.clean_memory()
-
-    def should_cleanup(self) -> bool:
-        if torch.cuda.is_available():
-            memory_allocated = torch.cuda.memory_allocated()
-            memory_reserved = torch.cuda.memory_reserved()
-            if memory_reserved > 0:
-                return (memory_allocated / memory_reserved) > self.threshold
-        return False
+    def get_safe_chunk_size(self, item_size_bytes: int = 8192) -> int:
+        """Calculate safe chunk size based on available memory"""
+        available_memory = psutil.virtual_memory().available
+        target_memory = available_memory * 0.5  # Use 50% of available memory
+        return max(1000, int(target_memory / item_size_bytes))
 
 
 ###############################################################################
@@ -521,205 +529,224 @@ class HybridTokenizationStrategy:
 # MedicalTokenizer
 ###############################################################################
 class MedicalTokenizer:
-    """Tokenizer class for training and encoding with both autoregressive and bidirectional strategies."""
-
-    def __init__(self, vocab_size: int = 60000, min_frequency: int = 2):
-        # Initialize tokenizer with BPE model and ByteLevel pre-tokenizer
+    """Enhanced tokenizer class with dynamic vocabulary sizing and comprehensive preprocessing."""
+    
+    def __init__(
+        self,
+        vocab_size: Optional[int] = 60000,
+        min_frequency: int = 2,
+        padding_strategy: str = 'longest',
+        truncation_strategy: str = 'longest_first',
+        max_length: int = 512,
+        normalize: bool = True
+    ):
+        # Initialize tokenizer with BPE model and special tokens
         self.tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
+        
+        # Set up pre-tokenizer first
         self.tokenizer.pre_tokenizer = ByteLevel(add_prefix_space=True)
         
-        self.vocab_size = vocab_size
+        # Add special tokens to the tokenizer's model
+        special_tokens = ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]", "[BOS]", "[EOS]"]
+        for token in special_tokens:
+            _ = self.tokenizer.token_to_id(token)
+        
+        # Configure padding and truncation
+        self.padding_config = {
+            'strategy': padding_strategy,
+            'pad_token': "[PAD]",
+            'pad_token_id': 0,
+            'pad_to_multiple_of': 8
+        }
+        
+        self.truncation_config = {
+            'strategy': truncation_strategy,
+            'max_length': max_length,
+            'stride': 0,
+            'direction': 'right'
+        }
+        
+        # Special tokens configuration
+        self.special_tokens = {
+            'pad_token': "[PAD]",
+            'unk_token': "[UNK]",
+            'cls_token': "[CLS]",
+            'sep_token': "[SEP]",
+            'mask_token': "[MASK]",
+            'bos_token': "[BOS]",
+            'eos_token': "[EOS]"
+        }
+        
+        # Normalization configuration
+        self.normalize = normalize
+        if normalize:
+            self.normalizer = self._setup_normalizer()
+            self.tokenizer.normalizer = self.normalizer
+        
+        # Dynamic vocabulary sizing
+        self.initial_vocab_size = vocab_size
         self.min_frequency = min_frequency
-        self.special_tokens = ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"]
+        self.vocab_size = self._calculate_dynamic_vocab_size()
         
-        # Configure the trainer with proper settings
-        self.trainer = BpeTrainer(
-            vocab_size=self.vocab_size,
-            min_frequency=self.min_frequency,
-            special_tokens=self.special_tokens,
-            initial_alphabet=ByteLevel.alphabet(),
-            show_progress=True
-        )
+        # Configure tokenizer components
+        self._setup_tokenizer()
+
+    def _setup_normalizer(self):
+        """Setup text normalization rules."""
+        from tokenizers import normalizers
+        return normalizers.Sequence([
+            normalizers.NFKC(),  # Unicode normalization
+            normalizers.Replace(r'[\n\r\t]+', ' '),  # Replace newlines/tabs
+            normalizers.Replace(r'\s+', ' '),  # Normalize whitespace
+            normalizers.Replace(r'(?<=\d)[,.](?=\d{3})', ''),  # Handle numbers
+            normalizers.Lowercase(),  # Convert to lowercase
+            # Medical-specific normalizations
+            normalizers.Replace(r'\b(?:mg/dl|mg/dL)\b', 'mg/dL'),  # Standardize units
+            normalizers.Replace(r'\b(?:mcg|µg|ug)/(?:ml|mL)\b', 'μg/mL'),
+            normalizers.Replace(r'\b(?:ng)/(?:ml|mL)\b', 'ng/mL')
+        ])
+
+    def _setup_tokenizer(self):
+        """Configure tokenizer components."""
+        # Set pre-tokenizer
+        self.tokenizer.pre_tokenizer = ByteLevel(add_prefix_space=True)
         
-        self.strategy = HybridTokenizationStrategy(self.tokenizer)
-        self.path_manager = TokenizerPathManager(Path.cwd())
-
-    def train(self, files: List[str], save_path: str):
-        """Train the tokenizer with enhanced validation and error handling."""
+        # Set normalizer if enabled
+        if self.normalize:
+            self.tokenizer.normalizer = self.normalizer
+        
+        # Configure post-processor for special token handling
+        from tokenizers.processors import TemplateProcessing
+        
         try:
-            logging.info("Starting tokenizer training...")
-            
-            # Validate input files
-            valid_files = []
-            for file in files:
-                try:
-                    with open(file, 'r', encoding='utf-8') as f:
-                        f.readline()  # Test read
-                    valid_files.append(file)
-                except Exception as e:
-                    logging.warning(f"Skipping invalid file {file}: {str(e)}")
-            
-            if not valid_files:
-                raise ValueError("No valid files provided for training")
-            
-            # Create backup of existing tokenizer if it exists
-            save_path = Path(save_path)
-            backup_path = None
-            if save_path.exists():
-                backup_path = save_path.with_suffix('.backup')
-                shutil.copy2(save_path, backup_path)
-                logging.info(f"Created backup at {backup_path}")
-            
-            try:
-                # Initialize BPE trainer with special tokens
-                trainer = BpeTrainer(
-                    vocab_size=self.vocab_size,
-                    min_frequency=self.min_frequency,
-                    special_tokens=self.special_tokens,
-                    show_progress=True
-                )
-                
-                # Train the tokenizer
-                self.tokenizer.train(files=valid_files, trainer=trainer)
-                
-                # Verify vocabulary was created
-                vocab = self.tokenizer.get_vocab()
-                if not vocab:
-                    raise ValueError("Training resulted in empty vocabulary")
-                
-                # Verify special tokens are present
-                for token in self.special_tokens:
-                    if token not in vocab:
-                        raise ValueError(f"Special token {token} missing from vocabulary")
-                
-                # Save tokenizer directly using its built-in save method
-                self.tokenizer.save(str(save_path))
-                
-                # Verify saved file
-                if not self._verify_saved_tokenizer(save_path):
-                    raise ValueError("Saved tokenizer verification failed")
-                
-                # If everything succeeded, remove backup
-                if backup_path and backup_path.exists():
-                    backup_path.unlink()
-                
-                logging.info(f"Successfully trained and saved tokenizer to {save_path}")
-                
-            except Exception as e:
-                # Restore from backup if available
-                if backup_path and backup_path.exists():
-                    shutil.copy2(backup_path, save_path)
-                    logging.info("Restored from backup due to training error")
-                raise
-                
-        except Exception as e:
-            logging.error(f"Failed to train/save tokenizer: {e}")
-            raise
-
-    def _verify_saved_tokenizer(self, save_path: Path) -> bool:
-        """Comprehensive verification of saved tokenizer."""
-        try:
-            # Check file exists and is readable
-            if not save_path.exists():
-                logging.error("Tokenizer file does not exist")
-                return False
-            
-            # Test loading the tokenizer
-            try:
-                test_tokenizer = Tokenizer.from_file(str(save_path))
-            except Exception as e:
-                logging.error(f"Failed to load tokenizer: {e}")
-                return False
-            
-            # Verify vocabulary
-            vocab = test_tokenizer.get_vocab()
-            if not vocab:
-                logging.error("Empty vocabulary in saved tokenizer")
-                return False
-            
-            # Verify special tokens in vocabulary
-            for token in self.special_tokens:
-                if token not in vocab:
-                    logging.error(f"Special token missing from vocabulary: {token}")
-                    return False
-            
-            # Test tokenizer functionality with a more robust test
-            test_texts = [
-                "This is a test sentence.",
-                "Another test with numbers 123.",
-                "Special characters: !@#$%",
-                "[CLS] Test with special tokens [SEP]"
+            # Create special tokens as a list of tuples (token, id)
+            special_tokens = [
+                (self.special_tokens['cls_token'], 0),  # CLS token with ID 0
+                (self.special_tokens['sep_token'], 1),  # SEP token with ID 1
             ]
             
-            for test_text in test_texts:
-                try:
-                    encoded = test_tokenizer.encode(test_text)
-                    if not encoded or not encoded.ids:
-                        logging.error(f"Tokenizer failed to encode: {test_text}")
-                        return False
-                    
-                    decoded = test_tokenizer.decode(encoded.ids)
-                    if not decoded or not decoded.strip():
-                        logging.error(f"Tokenizer failed to decode: {test_text}")
-                        return False
-                    
-                except Exception as e:
-                    logging.error(f"Tokenizer test failed for: {test_text}\nError: {e}")
-                    return False
-            
-            return True
-            
+            self.tokenizer.post_processor = TemplateProcessing(
+                single=f"$A {self.special_tokens['sep_token']}",
+                pair=f"{self.special_tokens['cls_token']} $A {self.special_tokens['sep_token']} $B {self.special_tokens['sep_token']}",
+                special_tokens=special_tokens  # Pass as sequence of tuples
+            )
         except Exception as e:
-            logging.error(f"Tokenizer verification failed: {e}")
-            return False
+            logging.error(f"Failed to set up post-processor: {str(e)}")
+            # Fallback to simpler configuration if needed
+            self.tokenizer.post_processor = TemplateProcessing(
+                single="$A",
+                pair="$A $B",
+                special_tokens=[]  # Empty sequence for fallback
+            )
 
-    def load(self, tokenizer_path: str):
-        """Load a previously trained tokenizer with validation."""
-        path = Path(tokenizer_path)
-        
-        if not path.exists():
-            raise FileNotFoundError(f"Tokenizer file not found: {path}")
-        
-        if not self._verify_saved_tokenizer(path):
-            raise ValueError("Invalid tokenizer file")
-        
-        self.tokenizer = Tokenizer.from_file(str(path))
-        self.strategy = HybridTokenizationStrategy(self.tokenizer)
-        logging.info(f"Successfully loaded tokenizer from {path}")
+    def _calculate_dynamic_vocab_size(self) -> int:
+        """Calculate vocabulary size."""
+        return 60000  # Fixed vocabulary size
 
-    def encode(self, texts: List[str], task_type: str = 'auto', **kwargs) -> Dict[str, Tensor]:
-        """
-        Encode texts using the given task type ('auto' or 'bi').
-        """
-        return self.strategy.hybrid_encode(texts, task_type=task_type, **kwargs)
-
-    def validate(self) -> bool:
-        """Validate the tokenizer configuration and functionality."""
+    def _analyze_dataset_vocabulary(self) -> int:
+        """Analyze dataset to count unique tokens."""
+        if not hasattr(self.tokenizer, 'pre_tokenizer') or self.tokenizer.pre_tokenizer is None:
+            logging.error("Pre-tokenizer not initialized")
+            return 0
+        
+        unique_tokens = set()
+        sample_size = 100000  # Limit analysis to first 100K tokens
+        
         try:
-            # Check if tokenizer has been initialized
-            if not self.tokenizer:
-                return False
-                
-            # Check if tokenizer has vocabulary
-            if not self.tokenizer.get_vocab():
-                return False
-                
-            # Test basic tokenization
-            test_text = "This is a test sentence."
-            encoded = self.tokenizer.encode(test_text)
-            if not encoded:
-                return False
-                
-            # Test special tokens
-            for token in self.special_tokens:
-                if token not in self.tokenizer.get_vocab():
-                    return False
-                    
-            return True
+            # Sample text for analysis
+            sample_text = "John was admitted to the emergency room after experiencing severe headaches and blurred vision. The physician ordered a CT scan to rule out intracranial hemorrhage. Meanwhile, artificial intelligence tools in radiology have improved diagnostic accuracy significantly. In other news, OpenAI has released a state-of-the-art language model capable of generating coherent and contextually aware text."
+            tokens = self.tokenizer.pre_tokenizer.pre_tokenize_str(sample_text)
+            
+            for token, _ in tokens:
+                unique_tokens.add(token)
+                if len(unique_tokens) >= sample_size:
+                    break
+            
+            return len(unique_tokens)
             
         except Exception as e:
-            logging.error(f"Tokenizer validation error: {e}")
-            return False
+            logging.warning(f"Vocabulary analysis failed: {str(e)}")
+            return 0
+
+    def train(self, files: List[str], save_path: str):
+        """Train tokenizer with dynamic configuration."""
+        try:
+            # Configure trainer with current settings
+            trainer = BpeTrainer(
+                vocab_size=self.vocab_size,
+                min_frequency=self.min_frequency,
+                special_tokens=list(self.special_tokens.values()),
+                initial_alphabet=ByteLevel.alphabet(),
+                show_progress=True
+            )
+            
+            # Train tokenizer
+            self.tokenizer.train(files=files, trainer=trainer)
+            
+            # Save configuration along with tokenizer
+            config = {
+                'vocab_size': self.vocab_size,
+                'min_frequency': self.min_frequency,
+                'padding': self.padding_config,
+                'truncation': self.truncation_config,
+                'special_tokens': self.special_tokens,
+                'normalize': self.normalize
+            }
+            
+            # Save tokenizer and config
+            self.tokenizer.save(save_path)
+            with open(f"{save_path}.config", 'w') as f:
+                json.dump(config, f, indent=2)
+                
+        except Exception as e:
+            logging.error(f"Training failed: {e}")
+            raise
+
+    def encode(
+        self,
+        texts: Union[str, List[str]],
+        padding: bool = True,
+        truncation: bool = True,
+        max_length: Optional[int] = None,
+        return_tensors: bool = True
+    ) -> Dict[str, Union[List[int], Tensor]]:
+        """Enhanced encoding with configurable padding and truncation."""
+        if isinstance(texts, str):
+            texts = [texts]
+            
+        # Apply encoding with current configuration
+        encodings = self.tokenizer.encode_batch(texts)
+        
+        # Handle padding if requested
+        if padding:
+            max_len = max(len(enc.ids) for enc in encodings)
+            if max_length:
+                max_len = min(max_len, max_length)
+                
+            for enc in encodings:
+                padding_length = max_len - len(enc.ids)
+                if padding_length > 0:
+                    enc.ids.extend([self.padding_config['pad_token_id']] * padding_length)
+                    enc.attention_mask.extend([0] * padding_length)
+                    
+        # Handle truncation if requested
+        if truncation and max_length:
+            for enc in encodings:
+                if len(enc.ids) > max_length:
+                    enc.ids = enc.ids[:max_length]
+                    enc.attention_mask = enc.attention_mask[:max_length]
+                    
+        # Prepare output
+        output = {
+            'input_ids': [enc.ids for enc in encodings],
+            'attention_mask': [enc.attention_mask for enc in encodings]
+        }
+        
+        # Convert to tensors if requested
+        if return_tensors:
+            output = {k: torch.tensor(v) for k, v in output.items()}
+            
+        return output
 
 
 ###############################################################################
@@ -887,46 +914,40 @@ class DatasetProcessor:
             return []
 
     def _process_streaming_dataset(self, dataset: IterableDataset, output_dir: Path) -> List[str]:
-        """Process streaming dataset (like OpenWebText)."""
-        processed_files = []
-        batch_count = 0
-        
+        """Process streaming dataset with chunking."""
         try:
-            # Process in batches
-            batch = []
-            batch_size = self.batch_size
-            
-            for item in dataset:
-                text = item.get('text', '').strip()
-                if text:
-                    batch.append(text)
+            output_path = output_dir / "processed.txt"
+            with open(output_path, 'w', encoding='utf-8') as f:
+                batch = []
+                
+                pbar = tqdm(
+                    dataset, 
+                    desc="Processing streaming dataset",
+                    unit=" samples"
+                )
+                
+                for item in pbar:
+                    text = item.get('text', '').strip()
+                    if text:
+                        batch.append(text)
+                        if len(batch) >= self.batch_size:  # Use self.batch_size instead of chunk_size
+                            f.write('\n'.join(batch) + '\n')
+                            batch = []
+                            
+                            # Memory management
+                            if psutil.virtual_memory().percent > 85:
+                                gc.collect()
+                                
+                if batch:  # Write remaining items
+                    f.write('\n'.join(batch) + '\n')
                     
-                if len(batch) >= batch_size:
-                    output_path = output_dir / f"batch_{batch_count}.txt"
-                    with open(output_path, 'w', encoding='utf-8') as f:
-                        f.write('\n'.join(batch))
-                    processed_files.append(str(output_path))
-                    batch = []
-                    batch_count += 1
-                    
-                    # Limit the number of batches for OpenWebText
-                    if batch_count >= 100:  # Adjust this number as needed
-                        break
-            
-            # Process remaining items
-            if batch:
-                output_path = output_dir / f"batch_{batch_count}.txt"
-                with open(output_path, 'w', encoding='utf-8') as f:
-                    f.write('\n'.join(batch))
-                processed_files.append(str(output_path))
-            
-            return processed_files
+            return str(output_path)
             
         except Exception as e:
             logging.error(f"Error processing streaming dataset: {str(e)}")
-            return []
+            return None
 
-    def _process_regular_dataset(self, dataset, output_dir: Path) -> List[str]:
+    def _process_regular_dataset(self, dataset: DatasetDict, output_dir: Path) -> List[str]:
         """Process regular (non-streaming) dataset."""
         processed_files = []
         
@@ -1225,7 +1246,7 @@ class ChunkManager:
     def __init__(self, initial_workers: int = multiprocessing.cpu_count()):
         self.current_workers = initial_workers
         self.min_workers = 1
-        self.memory_monitor = MemoryMonitor()
+        self.memory_monitor = MemoryManager()
         
     def adjust_workers(self) -> int:
         """Dynamically adjust worker count based on system resources"""
@@ -1478,6 +1499,207 @@ class EnhancedLogger:
 ###############################################################################
 # Main Execution
 ###############################################################################
+def validate_dataset_config(config: Dict[str, Any]) -> bool:
+    """Validate dataset configuration."""
+    if not isinstance(config, dict) or 'datasets' not in config:
+        logging.error("Invalid configuration: missing 'datasets' key")
+        return False
+
+    for dataset in config['datasets']:
+        if not isinstance(dataset, dict):
+            logging.error(f"Invalid dataset configuration: {dataset}")
+            return False
+            
+        required_fields = {'name', 'type', 'config'}
+        missing = required_fields - set(dataset.keys())
+        if missing:
+            logging.error(f"Dataset missing required fields: {missing}")
+            return False
+            
+        if dataset['type'] not in {'huggingface', 'local'}:
+            logging.error(f"Unsupported dataset type: {dataset['type']}")
+            return False
+            
+        if dataset['type'] == 'local':
+            path = Path(dataset['config']['path'])
+            if not path.exists():
+                logging.error(f"Local dataset path does not exist: {path}")
+                return False
+
+    return True
+
+def process_local_dataset(input_path: Union[str, Path], output_path: Path, chunk_size: int) -> Optional[str]:
+    """Process local dataset files with chunking and progress bar."""
+    try:
+        input_path = Path(input_path)
+        if not input_path.exists():
+            logging.error(f"Input path does not exist: {input_path}")
+            return None
+
+        # Create output directory if it doesn't exist
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # If input_path is a directory, process all text files in it
+        if input_path.is_dir():
+            processed_files = []
+            text_files = list(input_path.glob('*.txt'))  # Add more extensions if needed
+            
+            # Process each file with progress bar
+            for file_path in tqdm(text_files, desc="Processing local files"):
+                try:
+                    # Simplified output path - just append _processed to the original name
+                    output_file = output_path.parent / f"local_processed_{file_path.name}"
+                    
+                    with open(file_path, 'r', encoding='utf-8') as infile, \
+                         open(output_file, 'w', encoding='utf-8') as outfile:
+                        while chunk := infile.read(chunk_size):
+                            outfile.write(chunk)
+                    processed_files.append(str(output_file))
+                except Exception as e:
+                    logging.warning(f"Error processing file {file_path}: {str(e)}")
+                    continue
+            
+            if processed_files:
+                return processed_files[0]  # Return at least one processed file
+            return None
+
+        # If input_path is a file
+        else:
+            with open(input_path, 'r', encoding='utf-8') as infile, \
+                 open(output_path, 'w', encoding='utf-8') as outfile:
+                while chunk := infile.read(chunk_size):
+                    outfile.write(chunk)
+            return str(output_path)
+
+    except Exception as e:
+        logging.error(f"Error processing local dataset {input_path}: {str(e)}")
+        return None
+
+def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = None, executor: Optional[Any] = None) -> Dict[str, Any]:
+    """Load datasets with enhanced validation."""
+    results = {
+        'datasets': {},
+        'stats': {'total_samples': 0, 'failed_loads': 0}
+    }
+    
+    for dataset in dataset_config['datasets']:
+        try:
+            if dataset['type'] == 'local':
+                results['datasets'][dataset['name']] = dataset['config']['path']
+            elif dataset['type'] == 'huggingface':
+                # Extract dataset specific parameters
+                dataset_name = dataset['config']['dataset_name']
+                config = dataset['config'].get('config')
+                
+                # Different loading logic based on dataset
+                if 'medical-question-answering-datasets' in dataset_name:
+                    dataset_obj = load_dataset(
+                        dataset_name,
+                        config,  # Pass config directly for medical dataset
+                        streaming=dataset['config'].get('streaming', False),
+                        split=dataset['config'].get('split', 'train'),
+                        cache_dir=cache_dir,
+                        trust_remote_code=True
+                    )
+                
+                else:
+                    # For other datasets like openwebtext
+                    dataset_obj = load_dataset(
+                        dataset_name,
+                        streaming=dataset['config'].get('streaming', False),
+                        split=dataset['config'].get('split', 'train'),
+                        cache_dir=cache_dir,
+                        trust_remote_code=True
+                    )
+                    
+                results['datasets'][dataset['name']] = dataset_obj
+                
+        except Exception as e:
+            logging.error(f"Failed to load dataset {dataset['name']}: {str(e)}")
+            results['stats']['failed_loads'] += 1
+            continue  # Continue to next dataset instead of stopping
+            
+    if not results['datasets']:
+        raise ValueError("No datasets were successfully loaded")
+            
+    return results
+
+def process_streaming_dataset(dataset: Any, output_path: Path, chunk_size: int, dataset_name: str) -> Optional[str]:
+    """Process streaming dataset with chunking."""
+    try:
+        # Ensure parent directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(output_path, 'w', encoding='utf-8') as f:
+            batch = []
+            
+            pbar = tqdm(
+                dataset, 
+                desc="Processing streaming dataset",
+                unit=" samples"
+            )
+            
+            for item in pbar:
+                text = item.get('text', '').strip()
+                if text:
+                    batch.append(text)
+                    if len(batch) >= chunk_size:
+                        f.write('\n'.join(batch) + '\n')
+                        batch = []
+                        
+                        # Memory management
+                        if psutil.virtual_memory().percent > 85:
+                            gc.collect()
+                            
+            if batch:  # Write remaining items
+                f.write('\n'.join(batch) + '\n')
+                
+        return str(output_path)
+        
+    except Exception as e:
+        logging.error(f"Error processing streaming dataset {dataset_name}: {str(e)}")
+        return None
+
+class WorkerManager:
+    """Manages worker pools with dynamic scaling"""
+    def __init__(self, initial_workers: int = None):
+        self.min_workers = 1
+        self.max_workers = multiprocessing.cpu_count()
+        self.current_workers = initial_workers or self.max_workers
+        self.memory_manager = MemoryManager()
+
+    def adjust_workers(self) -> int:
+        """Dynamically adjust worker count based on system resources"""
+        memory = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent(interval=1)
+        
+        # Reduce workers under high memory or CPU pressure
+        if memory.percent > 90 or cpu_percent > 90:
+            self.current_workers = self.min_workers
+        elif memory.percent > 80 or cpu_percent > 80:
+            self.current_workers = max(self.min_workers, self.current_workers // 2)
+        elif memory.percent < 60 and cpu_percent < 60:
+            self.current_workers = min(
+                self.current_workers * 2,
+                self.max_workers
+            )
+        
+        logging.info(f"Adjusted workers to {self.current_workers} "
+                    f"(Memory: {memory.percent}%, CPU: {cpu_percent}%)")
+        return self.current_workers
+
+    @contextmanager
+    def get_executor(self):
+        """Get appropriate executor based on current conditions"""
+        try:
+            if self.current_workers == 1:
+                yield None  # Signal to use synchronous processing
+            else:
+                with ProcessPoolExecutor(max_workers=self.current_workers) as executor:
+                    yield executor
+        finally:
+            self.adjust_workers()
+
 def main():
     """Enhanced main function with better configuration and error handling."""
     try:
@@ -1613,7 +1835,8 @@ def load_dataset_by_type(config: Dict[str, Any], cache_dir: Optional[str] = None
             return load_dataset(
                 'openwebtext',
                 streaming=True,  # Enable streaming
-                **config['download_config']
+                **config['download_config'],
+                trust_remote_code=True
             )
             
         elif dataset_type == 'huggingface':
