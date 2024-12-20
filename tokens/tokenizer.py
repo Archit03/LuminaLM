@@ -43,6 +43,10 @@ import chardet
 import numpy as np
 import itertools
 
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TF warnings
+os.environ['TOKENIZERS_PARALLELISM'] = 'true'  # Enable tokenizer parallelism
+
 ###############################################################################
 # Configuration
 ###############################################################################
@@ -1645,69 +1649,106 @@ def process_local_dataset(input_path: Union[str, Path], output_path: Path, chunk
         logging.error(f"Error processing local dataset {input_path}: {str(e)}")
         return None
 
-def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = None, executor: Optional[Any] = None) -> Dict[str, Any]:
-    """Load datasets with enhanced validation and streaming support."""
+def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = None) -> Dict[str, Any]:
+    """Load datasets with robust error handling and path validation."""
     results = {
         'datasets': {},
         'stats': {'total_samples': 0, 'failed_loads': 0}
     }
     
+    # Ensure cache directory exists and is writable
+    if cache_dir:
+        cache_dir = Path(cache_dir)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        if not os.access(cache_dir, os.W_OK):
+            logging.warning(f"Cache directory {cache_dir} is not writable, falling back to default")
+            cache_dir = None
+
     for dataset in dataset_config['datasets']:
         try:
             if dataset['type'] == 'local':
-                results['datasets'][dataset['name']] = dataset['config']['path']
+                path = Path(dataset['config']['path'])
+                if not path.exists():
+                    raise ValueError(f"Local dataset path does not exist: {path}")
+                
+                # Validate local files
+                files = list(path.glob(dataset['config'].get('pattern', '*.txt')))
+                if not files:
+                    raise ValueError(f"No matching files found in {path}")
+                
+                # Validate file encoding
+                for file in files[:5]:  # Check first 5 files
+                    try:
+                        with open(file, 'r', encoding='utf-8') as f:
+                            f.read(1024)  # Try reading first 1KB
+                    except UnicodeDecodeError:
+                        logging.warning(f"File {file} is not UTF-8 encoded, will be skipped")
+                
+                results['datasets'][dataset['name']] = str(path)
+                logging.info(f"Successfully loaded local dataset from {path} with {len(files)} files")
+                
             elif dataset['type'] == 'huggingface':
                 dataset_name = dataset['config']['dataset_name']
                 split = dataset['config'].get('split', 'train')
                 
-                if dataset_name == 'openwebtext':
-                    # Use streaming for OpenWebText to handle large dataset
-                    dataset_obj = load_dataset(
-                        dataset_name,
-                        split=split,
-                        streaming=True,
+                if dataset_name == "stas/openwebtext-10k":
+                    # Handle OpenWebText with specific configuration
+                    download_config = DownloadConfig(
                         cache_dir=cache_dir,
-                        download_config=DownloadConfig(
-                            cache_dir=cache_dir,
-                            force_download=False,
-                            resume_download=True
-                        )
+                        force_download=False,
+                        resume_download=True,
+                        max_retries=3
                     )
-                    # Convert streaming dataset to regular dataset with subset
-                    dataset_obj = list(itertools.islice(dataset_obj, 1000000))  # Adjust number as needed
                     
-                elif dataset_name == 'medical_qa_all':
-                    # Handle medical dataset with specific path pattern
-                    dataset_obj = load_dataset(
-                        "json",
-                        data_files=dataset['config'].get('data_files', '*.json'),
-                        split=split,
-                        cache_dir=cache_dir
-                    )
-                else:
-                    # Default loading configuration
                     dataset_obj = load_dataset(
                         dataset_name,
                         split=split,
                         cache_dir=cache_dir,
-                        download_config=DownloadConfig(
-                            cache_dir=cache_dir,
-                            force_download=False,
-                            resume_download=True
-                        )
+                        download_config=download_config,
                     )
+                    
+                elif dataset_name == "Malikeh1375/medical-question-answering-datasets":
+                    # Handle medical dataset
+                    dataset_obj = load_dataset(
+                        dataset_name,
+                        split=split,
+                        cache_dir=cache_dir,
+                    )
+                    
+                    # Validate and process medical dataset
+                    if 'question' in dataset_obj.features and 'answer' in dataset_obj.features:
+                        # Combine question and answer for training
+                        dataset_obj = dataset_obj.map(
+                            lambda x: {'text': f"Question: {x['question']}\nAnswer: {x['answer']}"},
+                            remove_columns=dataset_obj.column_names
+                        )
+                    
+                else:
+                    raise ValueError(f"Unsupported dataset: {dataset_name}")
+                
+                # Validate loaded dataset
+                if not dataset_obj or (hasattr(dataset_obj, '__len__') and len(dataset_obj) == 0):
+                    raise ValueError(f"Dataset {dataset_name} is empty")
                 
                 results['datasets'][dataset['name']] = dataset_obj
-                results['stats']['total_samples'] += len(dataset_obj) if not isinstance(dataset_obj, list) else len(dataset_obj)
+                results['stats']['total_samples'] += len(dataset_obj) if hasattr(dataset_obj, '__len__') else 0
+                logging.info(f"Successfully loaded {dataset_name} with {len(dataset_obj) if hasattr(dataset_obj, '__len__') else 'unknown'} samples")
                 
         except Exception as e:
-            logging.error(f"Failed to load dataset {dataset['name']}: {str(e)}")
+            logging.error(f"Failed to load dataset {dataset.get('name', 'unknown')}: {str(e)}")
             traceback.print_exc()
             results['stats']['failed_loads'] += 1
             continue
     
+    # Final validation
     if not results['datasets']:
         raise ValueError("No datasets were successfully loaded")
+    
+    # Log summary
+    logging.info(f"Successfully loaded {len(results['datasets'])} datasets")
+    logging.info(f"Total samples: {results['stats']['total_samples']}")
+    if results['stats']['failed_loads'] > 0:
+        logging.warning(f"Failed to load {results['stats']['failed_loads']} datasets")
     
     return results
 
