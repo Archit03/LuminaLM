@@ -42,7 +42,8 @@ from logging.handlers import RotatingFileHandler
 import chardet
 import numpy as np
 import itertools
-
+import warnings
+warnings.filterwarnings('ignore')
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TF warnings
 os.environ['TOKENIZERS_PARALLELISM'] = 'true'  # Enable tokenizer parallelism
@@ -1705,7 +1706,7 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
                                 "stas/openwebtext-10k",
                                 split="train",
                                 cache_dir=dataset_cache_dir,
-                                num_proc=4
+                                num_proc=16
                             )
                             pbar.update(1)
                         
@@ -1727,7 +1728,7 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
                                 "medalpaca/medical_qa_512",
                                 split="train",
                                 cache_dir=dataset_cache_dir,
-                                num_proc=4
+                                num_proc=16
                             )
                             pbar.update(1)
                             

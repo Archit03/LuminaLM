@@ -29,11 +29,7 @@ echo.
 
 :: Run the tokenizer with enhanced configuration
 echo Starting tokenizer training...
-%PYTHON_PATH% "%SCRIPT_PATH%" ^
-    --min_freq %MIN_FREQ% ^
-    --log "%LOG_FILE%" ^
-    --chunk_size %CHUNK_SIZE% ^
-    --workers %WORKERS%
+python tokenizer.py --vocab-size 60000 --min-frequency 2 --dataset-config dataset_config.yaml --cache-dir .cache
 
 if errorlevel 1 (
     echo Error: Tokenizer training failed. Check %LOG_FILE% for details.
