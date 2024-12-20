@@ -8,13 +8,13 @@ datasets:
 - name: openwebtext
   type: huggingface
   config:
-    dataset_name: "tiny_shakespeare"
+    dataset_name: "william_fedus/shakespeare"
     split: "train"
     cache_dir: ".cache/openwebtext"
 
 - name: medical_qa
   type: huggingface
   config:
-    dataset_name: "medalpaca/medical_qa_512"
+    dataset_name: "medical_dialog"
     split: "train"
     cache_dir: ".cache/medical"

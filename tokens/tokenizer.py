@@ -15,8 +15,7 @@ from tqdm import tqdm
 import torch
 from torch import Tensor
 from datasets import load_dataset, DatasetDict, IterableDataset, DownloadConfig
-from tokenizers import Tokenizer
-from tokenizers.models import BPE
+from tokenizers import Tokenizer, BPE
 from tokenizers.pre_tokenizers import ByteLevel, Whitespace
 from tokenizers.trainers import BpeTrainer
 import pandas as pd
@@ -2267,7 +2266,7 @@ class TokenizerTrainer:
     def add_files(self, path: Path):
         self.tokenizer.pre_tokenizer = Whitespace()
         self.tokenizer.train_from_files(
-            files=[str(path)],
+            files=[str(f) for f in Path(path).glob("*.txt")],
             trainer=self.trainer
         )
         return self.tokenizer
