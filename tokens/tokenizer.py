@@ -17,7 +17,7 @@ from torch import Tensor
 from datasets import load_dataset, DatasetDict, IterableDataset, DownloadConfig
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
-from tokenizers.pre_tokenizers import ByteLevel
+from tokenizers.pre_tokenizers import ByteLevel, Whitespace
 from tokenizers.trainers import BpeTrainer
 import pandas as pd
 from PIL import Image
@@ -2255,3 +2255,32 @@ class DatasetProcessor:
         except Exception as e:
             logging.error(f"Error processing streaming dataset: {str(e)}")
             return None
+
+class TokenizerTrainer:
+    def __init__(self, vocab_size: int = 32000, min_frequency: int = 2):
+        self.tokenizer = Tokenizer(BPE())
+        self.trainer = BpeTrainer(
+            vocab_size=vocab_size,
+            min_frequency=min_frequency,
+            special_tokens=["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"]
+        )
+        self.texts = []
+
+    def add_files(self, path: Path):
+        self.tokenizer.pre_tokenizer = Whitespace()
+        self.tokenizer.train_from_files(
+            files=[str(path)],
+            trainer=self.trainer
+        )
+        return self.tokenizer
+
+    def add_texts(self, texts: List[str]):
+        self.texts.extend(texts)
+
+    def train(self):
+        if self.texts:
+            self.tokenizer.train_from_iterator(
+                self.texts,
+                trainer=self.trainer
+            )
+        return self.tokenizer
