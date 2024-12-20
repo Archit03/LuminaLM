@@ -15,7 +15,8 @@ from tqdm import tqdm
 import torch
 from torch import Tensor
 from datasets import load_dataset, DatasetDict, IterableDataset, DownloadConfig
-from tokenizers import Tokenizer, BPE
+from tokenizers import Tokenizer
+from tokenizers.models import BPE
 from tokenizers.pre_tokenizers import ByteLevel, Whitespace
 from tokenizers.trainers import BpeTrainer
 import pandas as pd

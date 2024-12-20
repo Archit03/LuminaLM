@@ -9,3 +9,4 @@ api.env
 tokens/tokens/processed
 tokens/tokenizer.log
 tokens/tokens/
+tokens/tokenizer_training.log
