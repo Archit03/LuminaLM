@@ -1676,14 +1676,6 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
                 if not files:
                     raise ValueError(f"No matching files found in {path}")
                 
-                # Validate file encoding
-                for file in files[:5]:  # Check first 5 files
-                    try:
-                        with open(file, 'r', encoding='utf-8') as f:
-                            f.read(1024)  # Try reading first 1KB
-                    except UnicodeDecodeError:
-                        logging.warning(f"File {file} is not UTF-8 encoded, will be skipped")
-                
                 results['datasets'][dataset['name']] = str(path)
                 logging.info(f"Successfully loaded local dataset from {path} with {len(files)} files")
                 
@@ -1692,47 +1684,52 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
                 split = dataset['config'].get('split', 'train')
                 
                 if dataset_name == "stas/openwebtext-10k":
-                    # Handle OpenWebText with specific configuration
-                    download_config = DownloadConfig(
-                        cache_dir=cache_dir,
-                        force_download=False,
-                        resume_download=True,
-                        max_retries=3
-                    )
-                    
+                    # Handle OpenWebText without streaming
                     dataset_obj = load_dataset(
                         dataset_name,
                         split=split,
                         cache_dir=cache_dir,
-                        download_config=download_config,
+                        streaming=False  # Explicitly disable streaming
                     )
                     
                 elif dataset_name == "Malikeh1375/medical-question-answering-datasets":
-                    # Handle medical dataset
-                    dataset_obj = load_dataset(
-                        dataset_name,
-                        split=split,
-                        cache_dir=cache_dir,
-                    )
-                    
-                    # Validate and process medical dataset
-                    if 'question' in dataset_obj.features and 'answer' in dataset_obj.features:
-                        # Combine question and answer for training
-                        dataset_obj = dataset_obj.map(
-                            lambda x: {'text': f"Question: {x['question']}\nAnswer: {x['answer']}"},
-                            remove_columns=dataset_obj.column_names
+                    try:
+                        # First attempt with direct loading
+                        dataset_obj = load_dataset(
+                            dataset_name,
+                            split=split,
+                            cache_dir=cache_dir
                         )
+                    except Exception as e:
+                        logging.warning(f"Failed to load medical dataset directly: {str(e)}")
+                        # Fallback to loading as JSON
+                        dataset_obj = load_dataset(
+                            "json",
+                            data_files={
+                                "train": "medical_qa_data.json"  # Adjust path if needed
+                            },
+                            split=split,
+                            cache_dir=cache_dir
+                        )
+                    
+                    # Process medical dataset
+                    if dataset_obj is not None and len(dataset_obj) > 0:
+                        if 'question' in dataset_obj.features and 'answer' in dataset_obj.features:
+                            dataset_obj = dataset_obj.map(
+                                lambda x: {'text': f"Question: {x['question']}\nAnswer: {x['answer']}"},
+                                remove_columns=dataset_obj.column_names
+                            )
                     
                 else:
                     raise ValueError(f"Unsupported dataset: {dataset_name}")
                 
                 # Validate loaded dataset
-                if not dataset_obj or (hasattr(dataset_obj, '__len__') and len(dataset_obj) == 0):
+                if dataset_obj is not None and len(dataset_obj) > 0:
+                    results['datasets'][dataset['name']] = dataset_obj
+                    results['stats']['total_samples'] += len(dataset_obj)
+                    logging.info(f"Successfully loaded {dataset_name} with {len(dataset_obj)} samples")
+                else:
                     raise ValueError(f"Dataset {dataset_name} is empty")
-                
-                results['datasets'][dataset['name']] = dataset_obj
-                results['stats']['total_samples'] += len(dataset_obj) if hasattr(dataset_obj, '__len__') else 0
-                logging.info(f"Successfully loaded {dataset_name} with {len(dataset_obj) if hasattr(dataset_obj, '__len__') else 'unknown'} samples")
                 
         except Exception as e:
             logging.error(f"Failed to load dataset {dataset.get('name', 'unknown')}: {str(e)}")
