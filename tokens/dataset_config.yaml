@@ -10,7 +10,6 @@ datasets:
     dataset_name: "stas/openwebtext-10k"
     streaming: false
     split: "train"
-    trust_remote_code: true
     use_auth_token: true
     revision: "main"
 - name: medical_qa_all
@@ -20,4 +19,3 @@ datasets:
     config: "all-processed"  # Corrected key
     streaming: false
     split: "train"
-    trust_remote_code: true

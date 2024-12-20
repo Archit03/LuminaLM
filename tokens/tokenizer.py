@@ -1658,35 +1658,38 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
             elif dataset['type'] == 'huggingface':
                 # Extract dataset specific parameters
                 dataset_name = dataset['config']['dataset_name']
-                config = dataset['config'].get('config')
+                split = dataset['config'].get('split', 'train')
                 
                 # Different loading logic based on dataset
-                if 'medical-question-answering-datasets' in dataset_name:
+                if dataset_name == 'openwebtext':
                     dataset_obj = load_dataset(
                         dataset_name,
-                        config,  # Pass config directly for medical dataset
-                        streaming=dataset['config'].get('streaming', False),
-                        split=dataset['config'].get('split', 'train'),
+                        split=split,
                         cache_dir=cache_dir,
-                        trust_remote_code=True
+                        streaming=True  # Enable streaming for large datasets
                     )
-                
-                else:
-                    # For other datasets like openwebtext
+                elif 'medical' in dataset_name:
+                    # Handle medical datasets differently
                     dataset_obj = load_dataset(
                         dataset_name,
-                        streaming=dataset['config'].get('streaming', False),
-                        split=dataset['config'].get('split', 'train'),
-                        cache_dir=cache_dir,
-                        trust_remote_code=True
+                        split=split,
+                        cache_dir=cache_dir
+                    )
+                else:
+                    # Default loading configuration
+                    dataset_obj = load_dataset(
+                        dataset_name,
+                        split=split,
+                        cache_dir=cache_dir
                     )
                     
                 results['datasets'][dataset['name']] = dataset_obj
                 
         except Exception as e:
             logging.error(f"Failed to load dataset {dataset['name']}: {str(e)}")
+            traceback.print_exc()  # Print full traceback for debugging
             results['stats']['failed_loads'] += 1
-            continue  # Continue to next dataset instead of stopping
+            continue
             
     if not results['datasets']:
         raise ValueError("No datasets were successfully loaded")
