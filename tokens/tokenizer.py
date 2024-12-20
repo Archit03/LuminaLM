@@ -278,11 +278,11 @@ class TokenizationUtilities:
 ###############################################################################
 class MemoryManager:
     """Enhanced memory manager with alerts and dynamic thresholds"""
-    def __init__(self, alert_threshold: float = 0.8, critical_threshold: float = 0.9):
+    def __init__(self, alert_threshold: float = 0.95, critical_threshold: float = 0.98):
         self.alert_threshold = alert_threshold
         self.critical_threshold = critical_threshold
         self.last_alert_time = 0
-        self.alert_cooldown = 300  # 5 minutes between alerts
+        self.alert_cooldown = 300
         
     def check_memory(self) -> Tuple[bool, str]:
         """Check memory status with detailed reporting"""
@@ -297,18 +297,12 @@ class MemoryManager:
                 logging.critical(f"Critical memory usage: {memory.percent}%")
             return True, f"CRITICAL: {status_message}"
             
-        elif current_usage >= self.alert_threshold:
-            if time.time() - self.last_alert_time > self.alert_cooldown:
-                self.last_alert_time = time.time()
-                logging.warning(f"High memory usage: {memory.percent}%")
-            return True, f"WARNING: {status_message}"
-            
         return False, status_message
 
     def get_safe_chunk_size(self, item_size_bytes: int = 8192) -> int:
         """Calculate safe chunk size based on available memory"""
         available_memory = psutil.virtual_memory().available
-        target_memory = available_memory * 0.5  # Use 50% of available memory
+        target_memory = available_memory * 0.8
         return max(1000, int(target_memory / item_size_bytes))
 
     @contextmanager
@@ -832,6 +826,30 @@ class DatasetProcessor:
         self.output_dir = Path(config.local_data_path) / "processed"
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
+    def _calculate_optimal_batch_size(self) -> int:
+        """Calculate optimal batch size based on available system resources."""
+        available_memory = psutil.virtual_memory().available
+        # Estimate ~1KB per text item as a baseline
+        estimated_item_size = 1024  
+        
+        # Use 80% of available memory for batch processing (increased from 20%)
+        target_memory = available_memory * 0.8
+        optimal_size = int(target_memory / estimated_item_size)
+        
+        # Increased upper bound to allow larger batches
+        return max(1000, min(optimal_size, 100000))
+
+    def _calculate_optimal_workers(self) -> int:
+        """Calculate optimal number of workers based on system resources."""
+        cpu_count = multiprocessing.cpu_count()
+        memory_percent = psutil.virtual_memory().percent
+        
+        # Allow more workers when memory usage is lower
+        if memory_percent > 95:  # Only reduce at very high memory usage
+            return max(1, cpu_count // 2)
+        else:
+            return cpu_count  # Use all available CPUs
+
     def _process_local_dataset(self, config: Dict[str, Any]) -> List[str]:
         """Process local dataset from directory."""
         try:
@@ -1282,8 +1300,8 @@ class ChunkManager:
     
     def __init__(self, memory_manager: MemoryManager):
         self.memory_manager = memory_manager
-        self.min_chunk_size = 100
-        self.max_chunk_size = 10000
+        self.min_chunk_size = 1000  # Increased from 100
+        self.max_chunk_size = 100000  # Increased from 10000
 
     def chunk_iterator(
         self, 
@@ -1296,9 +1314,8 @@ class ChunkManager:
             
         iterator = iter(texts)
         while True:
-            # Check memory before processing next chunk
-            if self.memory_manager.should_pause()[0]:
-                logging.warning("High memory usage detected, reducing chunk size")
+            # Only reduce chunk size at very high memory usage
+            if psutil.virtual_memory().percent > 95:
                 chunk_size = max(self.min_chunk_size, chunk_size // 2)
                 gc.collect()
                 
@@ -1308,14 +1325,15 @@ class ChunkManager:
                 
             yield chunk
             
-            # Optionally increase chunk size if memory usage is low
-            if psutil.virtual_memory().percent < 60:
+            # Aggressively increase chunk size when memory is available
+            if psutil.virtual_memory().percent < 80:
                 chunk_size = min(self.max_chunk_size, chunk_size * 2)
 
     def get_chunk_size(self) -> int:
         """Calculate optimal chunk size based on available memory"""
         available_memory = psutil.virtual_memory().available
-        return max(1000, int(available_memory * 0.1 / 8192))  # 8KB per text estimate
+        # Use 80% of available memory (increased from previous value)
+        return max(self.min_chunk_size, int(available_memory * 0.8 / 8192))
 
 class AsyncFileProcessor:
     """Enhanced asynchronous file operations handler"""
