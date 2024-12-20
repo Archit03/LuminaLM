@@ -1835,8 +1835,7 @@ def load_dataset_by_type(config: Dict[str, Any], cache_dir: Optional[str] = None
             return load_dataset(
                 'openwebtext',
                 streaming=True,  # Enable streaming
-                **config['download_config'],
-                trust_remote_code=True
+                **config['download_config']
             )
             
         elif dataset_type == 'huggingface':
