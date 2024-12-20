@@ -311,6 +311,26 @@ class MemoryManager:
         target_memory = available_memory * 0.5  # Use 50% of available memory
         return max(1000, int(target_memory / item_size_bytes))
 
+    @contextmanager
+    def monitor_memory(self, operation_name: str):
+        """Context manager for monitoring memory during operations."""
+        start_memory = psutil.virtual_memory().percent
+        logging.info(f"Starting {operation_name} (Memory: {start_memory}%)")
+        
+        try:
+            yield
+        finally:
+            end_memory = psutil.virtual_memory().percent
+            delta = end_memory - start_memory
+            logging.info(
+                f"Completed {operation_name} "
+                f"(Memory: {end_memory}%, Delta: {delta:+.1f}%)"
+            )
+            
+            if end_memory > self.critical_threshold * 100:
+                logging.warning(f"Critical memory usage after {operation_name}: {end_memory}%")
+                gc.collect()
+
 
 ###############################################################################
 # Hybrid Tokenization Strategy
@@ -1063,6 +1083,23 @@ class GPUMemoryMonitor:
         
         return usage_ratio > self.threshold
 
+    def update_threshold(self, usage_ratio: float):
+        """Dynamically adjust memory threshold based on usage patterns."""
+        if usage_ratio > self.threshold:
+            # Decrease threshold if we're consistently hitting the limit
+            self.threshold = max(
+                self.min_threshold,
+                self.threshold * self.adjustment_factor
+            )
+            logging.info(f"Decreased GPU memory threshold to {self.threshold:.2f}")
+        elif usage_ratio < self.threshold * 0.7:  # Some headroom below threshold
+            # Gradually increase threshold if we have spare capacity
+            self.threshold = min(
+                0.8,  # Maximum threshold
+                self.threshold / self.adjustment_factor
+            )
+            logging.info(f"Increased GPU memory threshold to {self.threshold:.2f}")
+
 class MemoryMonitor:
     """Monitor system memory usage"""
     def __init__(self, threshold: float = 0.7):
@@ -1243,24 +1280,38 @@ class TokenizerPathManager:
 class ChunkManager:
     """Manages data chunking with dynamic worker adjustment"""
     
-    def __init__(self, initial_workers: int = multiprocessing.cpu_count()):
-        self.current_workers = initial_workers
-        self.min_workers = 1
-        self.memory_monitor = MemoryManager()
-        
-    def adjust_workers(self) -> int:
-        """Dynamically adjust worker count based on system resources"""
-        memory = psutil.virtual_memory()
-        
-        if memory.percent > 90:
-            self.current_workers = self.min_workers
-        elif memory.percent > 80:
-            self.current_workers = max(self.min_workers, self.current_workers // 2)
-        elif memory.percent < 60 and self.current_workers < multiprocessing.cpu_count():
-            self.current_workers = min(self.current_workers * 2, multiprocessing.cpu_count())
+    def __init__(self, memory_manager: MemoryManager):
+        self.memory_manager = memory_manager
+        self.min_chunk_size = 100
+        self.max_chunk_size = 10000
+
+    def chunk_iterator(
+        self, 
+        texts: List[str], 
+        chunk_size: Optional[int] = None
+    ) -> Generator[List[str], None, None]:
+        """Iterate over texts in memory-efficient chunks."""
+        if chunk_size is None:
+            chunk_size = self.get_chunk_size()
             
-        return self.current_workers
-        
+        iterator = iter(texts)
+        while True:
+            # Check memory before processing next chunk
+            if self.memory_manager.should_pause()[0]:
+                logging.warning("High memory usage detected, reducing chunk size")
+                chunk_size = max(self.min_chunk_size, chunk_size // 2)
+                gc.collect()
+                
+            chunk = list(islice(iterator, chunk_size))
+            if not chunk:
+                break
+                
+            yield chunk
+            
+            # Optionally increase chunk size if memory usage is low
+            if psutil.virtual_memory().percent < 60:
+                chunk_size = min(self.max_chunk_size, chunk_size * 2)
+
     def get_chunk_size(self) -> int:
         """Calculate optimal chunk size based on available memory"""
         available_memory = psutil.virtual_memory().available
@@ -1651,11 +1702,11 @@ def process_streaming_dataset(dataset: Any, output_path: Path, chunk_size: int, 
                         if psutil.virtual_memory().percent > 85:
                             gc.collect()
                             
-            if batch:  # Write remaining items
-                f.write('\n'.join(batch) + '\n')
-                
-        return str(output_path)
-        
+                if batch:  # Write remaining items
+                    f.write('\n'.join(batch) + '\n')
+                    
+            return str(output_path)
+            
     except Exception as e:
         logging.error(f"Error processing streaming dataset {dataset_name}: {str(e)}")
         return None
