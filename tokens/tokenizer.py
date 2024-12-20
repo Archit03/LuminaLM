@@ -1738,246 +1738,223 @@ def main():
         # Setup logging
         setup_logging(args.log)
         
-    except Exception as e:
-        logging.error(f"Error in main execution: {str(e)}")
-        raise
-
-def validate_dataset_config(config: Dict[str, Any]) -> bool:
-    """Validate dataset configuration."""
-    if not isinstance(config, dict):
-        logging.error(f"Invalid configuration type: {type(config)}")
-        return False
-
-    required_fields = {
-        'openwebtext': {'name', 'download_config'},
-        'huggingface': {'name', 'huggingface_id'},
-        'local': {'name', 'path', 'preprocessing'}
-    }
-    
-    try:
-        dataset_type = config.get('name')
-        if not dataset_type:
-            logging.error("Dataset configuration missing 'name' field")
-            return False
-            
-        required = required_fields.get(dataset_type, {'name', 'preprocessing'})
-        missing = [field for field in required if field not in config]
+        # Initialize managers
+        memory_manager = MemoryManager()
+        worker_manager = WorkerManager(initial_workers=args.workers)
+        gpu_monitor = GPUMemoryMonitor() if torch.cuda.is_available() else None
         
-        if missing:
-            logging.error(f"Dataset {dataset_type} missing required fields: {missing}")
-            return False
+        # Load and validate configuration
+        config_path = Path(args.config)
+        if not config_path.exists():
+            raise FileNotFoundError(f"Configuration file not found: {config_path}")
             
-        # Validate preprocessing configuration
-        if 'preprocessing' not in config:
-            logging.error(f"Dataset {dataset_type} missing preprocessing configuration")
-            return False
+        try:
+            with open(config_path) as f:
+                dataset_config = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML configuration: {str(e)}")
             
-        preproc = config['preprocessing']
-        if not isinstance(preproc, dict):
-            logging.error(f"Invalid preprocessing configuration type for {dataset_type}")
-            return False
+        if not validate_dataset_config(dataset_config):
+            raise ValueError("Invalid dataset configuration")
             
-        # Validate specific fields
-        if dataset_type == 'local':
-            path = Path(config['path'])
-            if not path.exists():
-                logging.error(f"Local dataset path does not exist: {path}")
-                return False
-                
-        return True
+        # Initialize tokenizer
+        tokenizer = MedicalTokenizer(
+            vocab_size=args.vocab_size,
+            min_frequency=args.min_freq
+        )
         
-    except Exception as e:
-        logging.error(f"Error validating dataset config: {str(e)}")
-        return False
-
-def load_datasets(dataset_configs: List[Dict[str, Any]], cache_dir: Optional[str] = None, **kwargs) -> Dict[str, Any]:
-    """Load datasets with enhanced validation."""
-    results = {
-        'datasets': {},
-        'stats': {'total_samples': 0, 'failed_loads': 0},
-        'metadata': {}
-    }
-    
-    # Validate configurations first
-    valid_configs = [
-        config for config in dataset_configs 
-        if validate_dataset_config(config)
-    ]
-    
-    if not valid_configs:
-        raise ValueError("No valid dataset configurations provided")
-    
-    # Continue with loading using valid configurations
-    with tqdm(total=len(valid_configs), desc="Loading datasets") as pbar:
-        for config in valid_configs:
-            try:
-                dataset_name = config['name']
-                dataset = load_dataset_by_type(config, cache_dir)
+        # Initialize logging directory
+        log_dir = Path("logs")
+        log_dir.mkdir(exist_ok=True)
+        
+        # Load datasets
+        dataset_results = load_datasets(dataset_config)
+        
+        # Process datasets and collect processed files
+        processed_files = []
+        for dataset_name, dataset in dataset_results['datasets'].items():
+            if isinstance(dataset, str):  # Local dataset path
+                processed_file = process_local_dataset(dataset, 
+                    Path(args.local_data_path) / f"{dataset_name}_processed.txt",
+                    args.chunk_size)
+            else:  # HuggingFace dataset
+                processed_file = process_streaming_dataset(dataset,
+                    Path(args.local_data_path) / f"{dataset_name}_processed.txt",
+                    args.chunk_size,
+                    dataset_name)
                 
-                if dataset is not None:
-                    results['datasets'][dataset_name] = dataset
-                    # Update statistics...
-                    
-            except Exception as e:
-                logging.error(f"Error loading dataset {config['name']}: {str(e)}")
-                results['stats']['failed_loads'] += 1
-            finally:
-                pbar.update(1)
-                
-    return results
+            if processed_file:
+                processed_files.append(processed_file)
 
-def load_dataset_by_type(config: Dict[str, Any], cache_dir: Optional[str] = None) -> Optional[Any]:
-    """Load dataset based on its type with streaming enabled for large datasets."""
-    dataset_type = config['name']
-    
-    try:
-        if dataset_type == 'openwebtext':
-            return load_dataset(
-                'openwebtext',
-                streaming=True,  # Enable streaming
-                **config['download_config']
-            )
-            
-        elif dataset_type == 'huggingface':
-            return load_dataset(
-                config['huggingface_id'],
-                config.get('subset'),
-                streaming=True,  # Enable streaming
-                cache_dir=cache_dir
-            )
-            
-        elif dataset_type == 'local':
-            return load_local_dataset(config)
-            
-        else:
-            logging.warning(f"Unsupported dataset type: {dataset_type}")
-            return None
-            
-    except Exception as e:
-        logging.error(f"Error loading {dataset_type} dataset: {str(e)}")
-        return None
+        if not processed_files:
+            raise ValueError("No files were successfully processed")
 
-def load_local_dataset(config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Load dataset from local directory."""
-    try:
-        data_path = Path(config['path'])
-        if not data_path.exists():
-            raise FileNotFoundError(f"Dataset path not found: {data_path}")
-            
-        dataset = {'text': []}
-        for file_path in data_path.rglob('*'):
-            if file_path.is_file() and file_path.suffix.lower() in {'.txt', '.json', '.csv'}:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    dataset['text'].extend(f.readlines())
-                    
-        return dataset
+        # Train tokenizer with processed files
+        logging.info("Starting tokenizer training...")
+        tokenizer.train(
+            processed_files,
+            save_path=str(Path(args.local_data_path) / "Medical_tokenizer.json")
+        )
+
+        logging.info("Tokenizer training completed successfully")
         
     except Exception as e:
-        logging.error(f"Error loading local dataset: {str(e)}")
-        return None
-
-def process_streaming_dataset(dataset, output_path: Path, chunk_size: int, dataset_name: str):
-    """Process a streaming dataset in chunks."""
-    try:
-        with open(output_path, 'w', encoding='utf-8') as f:
-            buffer = []
-            
-            # Handle both IterableDataset and dict types
-            if isinstance(dataset, dict):
-                items = dataset.get('text', [])
-            else:
-                items = dataset
-                
-            for item in items:
-                try:
-                    # Extract text from item depending on its type
-                    if isinstance(item, dict):
-                        text = item.get('text', '')
-                    elif isinstance(item, str):
-                        text = item
-                    else:
-                        continue
-                        
-                    if text and isinstance(text, str):
-                        buffer.append(text)
-                        
-                        if len(buffer) >= chunk_size:
-                            f.write('\n'.join(buffer) + '\n')
-                            f.flush()
-                            buffer = []
-                            
-                            # Memory management
-                            if psutil.virtual_memory().percent > 85:
-                                gc.collect()
-                                if torch.cuda.is_available():
-                                    torch.cuda.empty_cache()
-                                
-                except Exception as e:
-                    logging.warning(f"Error processing item in streaming dataset: {str(e)}")
-                    continue
-                    
-            # Write remaining buffer
-            if buffer:
-                f.write('\n'.join(buffer) + '\n')
-                
-        return str(output_path)
-        
-    except Exception as e:
-        logging.error(f"Error processing streaming dataset: {str(e)}")
-        if output_path.exists():
-            output_path.unlink()
-        return None
-
-def process_regular_dataset(dataset, output_path: Path, chunk_size: int, dataset_name: str):
-    """Process a regular (non-streaming) dataset."""
-    try:
-        with open(output_path, 'w', encoding='utf-8') as f:
-            buffer = []
-            
-            # Process items in chunks
-            for i in range(0, len(dataset), chunk_size):
-                chunk = dataset[i:i + chunk_size]
-                
-                for item in chunk:
-                    if isinstance(item, dict):
-                        text = item.get('text', '')
-                    else:
-                        text = str(item)
-                        
-                    if text and isinstance(text, str):
-                        buffer.append(text)
-                        
-                # Write buffer
-                if buffer:
-                    f.write('\n'.join(buffer) + '\n')
-                    f.flush()
-                    buffer = []
-                    
-                # Memory management
-                if psutil.virtual_memory().percent > 85:
-                    gc.collect()
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
-                    
-            return str(output_path)
-            
-    except Exception as e:
-        logging.error(f"Error processing regular dataset: {str(e)}")
-        if output_path.exists():
-            output_path.unlink()
-        return None
-
-def check_memory_usage():
-    """Check memory usage and force cleanup if needed."""
-    memory = psutil.virtual_memory()
-    if memory.percent > 90:
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        time.sleep(1)  # Give system time to free memory
-        return True
-    return False
+        logging.error(f"Critical error in main execution: {str(e)}")
+        logging.error(traceback.format_exc())
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
-    
+
+class RetryHandler:
+    """Handles retries for operations with exponential backoff"""
+    def __init__(self, max_retries: int = 3, base_delay: float = 1.0):
+        self.max_retries = max_retries
+        self.base_delay = base_delay
+
+    @contextmanager
+    def retry_context(self, operation_name: str):
+        """Context manager for retry logic"""
+        for attempt in range(self.max_retries):
+            try:
+                yield attempt
+                break  # Success, exit retry loop
+            except Exception as e:
+                delay = self.base_delay * (2 ** attempt)  # Exponential backoff
+                if attempt < self.max_retries - 1:
+                    logging.warning(
+                        f"{operation_name} failed (attempt {attempt + 1}/{self.max_retries}): "
+                        f"{str(e)}. Retrying in {delay:.1f}s..."
+                    )
+                    time.sleep(delay)
+                else:
+                    logging.error(
+                        f"{operation_name} failed after {self.max_retries} attempts: {str(e)}"
+                    )
+                    raise
+
+    async def async_retry(self, coroutine, operation_name: str):
+        """Async retry handler"""
+        for attempt in range(self.max_retries):
+            try:
+                return await coroutine
+            except Exception as e:
+                delay = self.base_delay * (2 ** attempt)
+                if attempt < self.max_retries - 1:
+                    logging.warning(
+                        f"{operation_name} failed (attempt {attempt + 1}/{self.max_retries}): "
+                        f"{str(e)}. Retrying in {delay:.1f}s..."
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    logging.error(
+                        f"{operation_name} failed after {self.max_retries} attempts: {str(e)}"
+                    )
+                    raise
+
+class DatasetLogger:
+    """Dedicated logger for dataset processing with detailed metrics and status tracking"""
+    def __init__(self, dataset_name: str, log_file: Path):
+        self.dataset_name = dataset_name
+        self.log_file = log_file
+        self.start_time = None
+        self.metrics = {
+            'processed_items': 0,
+            'failed_items': 0,
+            'total_tokens': 0,
+            'errors': [],
+            'warnings': [],
+            'memory_usage': []
+        }
+        
+        # Setup dataset-specific log file
+        self.dataset_log_file = log_file.parent / f"dataset_{dataset_name}.log"
+        self._setup_logger()
+
+    def _setup_logger(self):
+        """Setup dedicated logger for this dataset"""
+        self.logger = logging.getLogger(f"dataset.{self.dataset_name}")
+        self.logger.setLevel(logging.DEBUG)
+        
+        # File handler for dataset-specific logs
+        file_handler = RotatingFileHandler(
+            self.dataset_log_file,
+            maxBytes=10 * 1024 * 1024,  # 10MB
+            backupCount=3
+        )
+        formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)s - [%(name)s] %(message)s'
+        )
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
+
+    def start_processing(self):
+        """Mark the start of dataset processing"""
+        self.start_time = time.time()
+        self.logger.info(f"Started processing dataset: {self.dataset_name}")
+        self._log_system_state("Initial state")
+
+    def end_processing(self):
+        """Log final statistics and processing duration"""
+        duration = time.time() - self.start_time
+        self.logger.info(
+            f"Completed processing dataset: {self.dataset_name}\n"
+            f"Duration: {duration:.2f}s\n"
+            f"Processed items: {self.metrics['processed_items']}\n"
+            f"Failed items: {self.metrics['failed_items']}\n"
+            f"Total tokens: {self.metrics['total_tokens']}\n"
+            f"Average memory usage: {np.mean(self.metrics['memory_usage']):.1f}%"
+        )
+        self._log_system_state("Final state")
+
+    def log_progress(self, items_processed: int, tokens: int):
+        """Log processing progress with memory usage"""
+        self.metrics['processed_items'] += items_processed
+        self.metrics['total_tokens'] += tokens
+        
+        # Track memory usage
+        memory_percent = psutil.virtual_memory().percent
+        self.metrics['memory_usage'].append(memory_percent)
+        
+        self.logger.debug(
+            f"Progress update:\n"
+            f"Items processed: {items_processed}\n"
+            f"Total tokens: {tokens}\n"
+            f"Memory usage: {memory_percent}%"
+        )
+
+    def log_error(self, error: str, item_id: Optional[str] = None):
+        """Log processing errors with context"""
+        self.metrics['failed_items'] += 1
+        self.metrics['errors'].append((item_id, error))
+        self.logger.error(
+            f"Processing error:\n"
+            f"Item ID: {item_id}\n"
+            f"Error: {error}"
+        )
+
+    def log_warning(self, message: str, context: Optional[Dict] = None):
+        """Log warnings with optional context"""
+        self.metrics['warnings'].append((message, context))
+        self.logger.warning(
+            f"Warning: {message}\n"
+            f"Context: {context if context else 'None'}"
+        )
+
+    def _log_system_state(self, state_name: str):
+        """Log system resource state"""
+        memory = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent(interval=1)
+        
+        if torch.cuda.is_available():
+            gpu_memory = torch.cuda.memory_allocated() / torch.cuda.max_memory_allocated()
+            gpu_info = f"GPU Memory: {gpu_memory:.1%}"
+        else:
+            gpu_info = "GPU: Not available"
+            
+        self.logger.info(
+            f"System State - {state_name}:\n"
+            f"Memory Usage: {memory.percent}%\n"
+            f"CPU Usage: {cpu_percent}%\n"
+            f"{gpu_info}"
+        )
