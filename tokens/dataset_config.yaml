@@ -8,8 +8,8 @@ datasets:
 - name: openwebtext
   type: huggingface
   config:
-    dataset_name: "stas/openwebtext-10k"
-    split: "train[:1000]"
+    dataset_name: "tiny_shakespeare"
+    split: "train"
     cache_dir: ".cache/openwebtext"
 
 - name: medical_qa

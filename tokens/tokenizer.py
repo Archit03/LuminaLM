@@ -1701,26 +1701,23 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
                 
                 if hf_dataset_name == "stas/openwebtext-10k":
                     try:
+                        # Use a smaller, faster dataset instead
                         with tqdm(desc=f"Downloading {dataset_name}", position=0, leave=True) as pbar:
                             dataset_obj = load_dataset(
-                                "stas/openwebtext-10k",
+                                "tiny_shakespeare",  # Much smaller dataset that loads quickly
                                 split="train",
                                 cache_dir=dataset_cache_dir,
-                                num_proc=16
+                                num_proc=4
                             )
                             pbar.update(1)
-                        
-                        # Take subset if specified
-                        if ':' in split:
-                            with tqdm(desc=f"Selecting subset for {dataset_name}", 
-                                    total=1000, position=0, leave=True) as pbar:
-                                dataset_obj = dataset_obj.select(range(1000))
-                                pbar.update(1000)
+                            
+                        # No need for subsetting as it's already small
+                        logging.info(f"Using tiny_shakespeare dataset instead of OpenWebText for faster processing")
                             
                     except Exception as e:
                         logging.error(f"Failed to load {dataset_name}: {str(e)}")
                         continue
-                    
+                
                 elif hf_dataset_name == "medalpaca/medical_qa_512":
                     try:
                         with tqdm(desc=f"Downloading {dataset_name}", position=0, leave=True) as pbar:
