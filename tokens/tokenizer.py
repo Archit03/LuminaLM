@@ -14,7 +14,7 @@ from itertools import islice
 from tqdm import tqdm
 import torch
 from torch import Tensor
-from datasets import load_dataset, DatasetDict, IterableDataset
+from datasets import load_dataset, DatasetDict, IterableDataset, DownloadConfig
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.pre_tokenizers import ByteLevel
@@ -41,6 +41,7 @@ import aiofiles
 from logging.handlers import RotatingFileHandler
 import chardet
 import numpy as np
+import itertools
 
 ###############################################################################
 # Configuration
@@ -1028,7 +1029,7 @@ class DatasetProcessor:
                 if dataset_type == 'local':
                     processed_files = self._process_local_dataset(dataset_config)
                 elif dataset_type == 'huggingface':
-                    processed_files = self._process_huggingface_dataset(dataset_config)
+                    processed_file = self._process_huggingface_dataset(dataset_config)
                 else:
                     logging.warning(f"Unsupported dataset type: {dataset_type}")
                     continue
@@ -1645,7 +1646,7 @@ def process_local_dataset(input_path: Union[str, Path], output_path: Path, chunk
         return None
 
 def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = None, executor: Optional[Any] = None) -> Dict[str, Any]:
-    """Load datasets with enhanced validation."""
+    """Load datasets with enhanced validation and streaming support."""
     results = {
         'datasets': {},
         'stats': {'total_samples': 0, 'failed_loads': 0}
@@ -1656,22 +1657,30 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
             if dataset['type'] == 'local':
                 results['datasets'][dataset['name']] = dataset['config']['path']
             elif dataset['type'] == 'huggingface':
-                # Extract dataset specific parameters
                 dataset_name = dataset['config']['dataset_name']
                 split = dataset['config'].get('split', 'train')
                 
-                # Different loading logic based on dataset
                 if dataset_name == 'openwebtext':
+                    # Use streaming for OpenWebText to handle large dataset
                     dataset_obj = load_dataset(
                         dataset_name,
                         split=split,
+                        streaming=True,
                         cache_dir=cache_dir,
-                        streaming=True  # Enable streaming for large datasets
+                        download_config=DownloadConfig(
+                            cache_dir=cache_dir,
+                            force_download=False,
+                            resume_download=True
+                        )
                     )
-                elif 'medical' in dataset_name:
-                    # Handle medical datasets differently
+                    # Convert streaming dataset to regular dataset with subset
+                    dataset_obj = list(itertools.islice(dataset_obj, 1000000))  # Adjust number as needed
+                    
+                elif dataset_name == 'medical_qa_all':
+                    # Handle medical dataset with specific path pattern
                     dataset_obj = load_dataset(
-                        dataset_name,
+                        "json",
+                        data_files=dataset['config'].get('data_files', '*.json'),
                         split=split,
                         cache_dir=cache_dir
                     )
@@ -1680,20 +1689,26 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
                     dataset_obj = load_dataset(
                         dataset_name,
                         split=split,
-                        cache_dir=cache_dir
+                        cache_dir=cache_dir,
+                        download_config=DownloadConfig(
+                            cache_dir=cache_dir,
+                            force_download=False,
+                            resume_download=True
+                        )
                     )
-                    
+                
                 results['datasets'][dataset['name']] = dataset_obj
+                results['stats']['total_samples'] += len(dataset_obj) if not isinstance(dataset_obj, list) else len(dataset_obj)
                 
         except Exception as e:
             logging.error(f"Failed to load dataset {dataset['name']}: {str(e)}")
-            traceback.print_exc()  # Print full traceback for debugging
+            traceback.print_exc()
             results['stats']['failed_loads'] += 1
             continue
-            
+    
     if not results['datasets']:
         raise ValueError("No datasets were successfully loaded")
-            
+    
     return results
 
 def process_streaming_dataset(dataset: Any, output_path: Path, chunk_size: int, dataset_name: str) -> Optional[str]:
