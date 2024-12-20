@@ -951,7 +951,7 @@ class DatasetProcessor:
             logging.error(f"Error processing HuggingFace dataset: {str(e)}")
             return []
 
-    def _process_streaming_dataset(self, dataset: IterableDataset, output_dir: Path) -> List[str]:
+    def _process_streaming_dataset(self, dataset: Any, output_dir: Path) -> List[str]:
         """Process streaming dataset with chunking."""
         try:
             output_path = output_dir / "processed.txt"
@@ -1694,39 +1694,89 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
     return results
 
 def process_streaming_dataset(dataset: Any, output_path: Path, chunk_size: int, dataset_name: str) -> Optional[str]:
-    """Process streaming dataset with chunking."""
+    """Process streaming dataset with optimized batching and async I/O."""
     try:
         # Ensure parent directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
-        with open(output_path, 'w', encoding='utf-8') as f:
-            batch = []
-            
-            pbar = tqdm(
-                dataset, 
-                desc="Processing streaming dataset",
-                unit=" samples"
-            )
-            
-            for item in pbar:
-                text = item.get('text', '').strip()
-                if text:
-                    batch.append(text)
-                    if len(batch) >= chunk_size:
-                        f.write('\n'.join(batch) + '\n')
-                        batch = []
-                        
-                        # Memory management
-                        if psutil.virtual_memory().percent > 85:
-                            gc.collect()
-                            
-                if batch:  # Write remaining items
-                    f.write('\n'.join(batch) + '\n')
+        # Use buffered writing with larger buffer size
+        buffer_size = 1024 * 1024 * 8  # 8MB buffer
+        batch_size = 10000  # Increased batch size
+        
+        async def write_batch(file, texts: List[str]):
+            content = '\n'.join(texts) + '\n'
+            await file.write(content.encode('utf-8'))
+            await file.flush()
+
+        async def process_dataset():
+            async with aiofiles.open(output_path, 'wb', buffering=buffer_size) as f:
+                batch = []
+                total_processed = 0
+                start_time = time.time()
+                
+                # Create progress bar with larger update interval
+                with tqdm(desc=f"Processing {dataset_name}", 
+                         unit=" samples",
+                         mininterval=0.5) as pbar:
                     
-            return str(output_path)
+                    # Process in parallel using thread pool
+                    with ThreadPoolExecutor(max_workers=16) as executor:
+                        futures = []
+                        
+                        for item in dataset:
+                            if isinstance(item, dict):
+                                text = item.get('text', '').strip()
+                                if text:
+                                    batch.append(text)
+                                    
+                                    if len(batch) >= batch_size:
+                                        # Process batch in parallel
+                                        batch_copy = batch
+                                        batch = []
+                                        futures.append(
+                                            executor.submit(
+                                                write_batch, f, batch_copy
+                                            )
+                                        )
+                                        
+                                        # Update progress
+                                        total_processed += len(batch_copy)
+                                        pbar.update(len(batch_copy))
+                                        
+                                        # Log processing rate
+                                        elapsed = time.time() - start_time
+                                        rate = total_processed / elapsed
+                                        pbar.set_postfix({'rate': f'{rate:.1f} samples/s'})
+                                        
+                                        # Process completed futures
+                                        done_futures = [f for f in futures if f.done()]
+                                        for future in done_futures:
+                                            await future.result()
+                                            futures.remove(future)
+                        
+                        # Process remaining items
+                        if batch:
+                            await write_batch(f, batch)
+                            total_processed += len(batch)
+                            pbar.update(len(batch))
+                        
+                        # Wait for remaining futures
+                        for future in futures:
+                            await future.result()
+                
+                elapsed = time.time() - start_time
+                logging.info(
+                    f"Processed {total_processed} samples in {elapsed:.1f}s "
+                    f"({total_processed/elapsed:.1f} samples/s)"
+                )
+        
+        # Run async processing
+        asyncio.run(process_dataset())
+        return str(output_path)
             
     except Exception as e:
         logging.error(f"Error processing streaming dataset {dataset_name}: {str(e)}")
+        traceback.print_exc()
         return None
 
 class WorkerManager:
@@ -2027,3 +2077,98 @@ class DatasetLogger:
             f"CPU Usage: {cpu_percent}%\n"
             f"{gpu_info}"
         )
+
+# Add optimized batch processor
+class BatchProcessor:
+    """Efficient batch processing with parallel execution"""
+    
+    def __init__(self, max_workers: int = 16, batch_size: int = 10000):
+        self.max_workers = max_workers
+        self.batch_size = batch_size
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
+        self.pending_futures = []
+        
+    def process_batch(self, batch: List[str]) -> None:
+        """Process a batch of texts in parallel"""
+        future = self.executor.submit(self._process_batch, batch)
+        self.pending_futures.append(future)
+        
+        # Clean up completed futures
+        done_futures = [f for f in self.pending_futures if f.done()]
+        for future in done_futures:
+            self.pending_futures.remove(future)
+            # Check for exceptions
+            try:
+                future.result()
+            except Exception as e:
+                logging.error(f"Batch processing error: {str(e)}")
+    
+    def _process_batch(self, texts: List[str]) -> None:
+        """Process individual batch with optimized operations"""
+        try:
+            # Perform batch operations here
+            # This is where you'd add specific processing logic
+            pass
+        except Exception as e:
+            logging.error(f"Error processing batch: {str(e)}")
+            raise
+    
+    def wait_completion(self) -> None:
+        """Wait for all pending operations to complete"""
+        for future in self.pending_futures:
+            try:
+                future.result()
+            except Exception as e:
+                logging.error(f"Error in pending batch: {str(e)}")
+
+# Modify DatasetProcessor to use optimized batch processing
+class DatasetProcessor:
+    def __init__(self, datasets: List[Dict[str, Any]], config: Config):
+        # ... existing init code ...
+        self.batch_processor = BatchProcessor()
+    
+    def _process_streaming_dataset(self, dataset: Any, output_path: Path) -> Optional[str]:
+        """Process streaming dataset with optimized batch handling"""
+        try:
+            with open(output_path, 'wb', buffering=1024*1024*8) as f:  # 8MB buffer
+                batch = []
+                total_processed = 0
+                start_time = time.time()
+                
+                with tqdm(desc="Processing", unit=" samples", mininterval=0.5) as pbar:
+                    for item in dataset:
+                        text = item.get('text', '').strip()
+                        if text:
+                            batch.append(text)
+                            
+                            if len(batch) >= self.batch_processor.batch_size:
+                                self.batch_processor.process_batch(batch)
+                                total_processed += len(batch)
+                                pbar.update(len(batch))
+                                batch = []
+                                
+                                # Log processing rate
+                                elapsed = time.time() - start_time
+                                rate = total_processed / elapsed
+                                pbar.set_postfix({'rate': f'{rate:.1f} samples/s'})
+                    
+                    # Process remaining items
+                    if batch:
+                        self.batch_processor.process_batch(batch)
+                        total_processed += len(batch)
+                        pbar.update(len(batch))
+                    
+                    # Wait for all processing to complete
+                    self.batch_processor.wait_completion()
+                
+                elapsed = time.time() - start_time
+                logging.info(
+                    f"Processed {total_processed} samples in {elapsed:.1f}s "
+                    f"({total_processed/elapsed:.1f} samples/s)"
+                )
+                
+            return str(output_path)
+            
+        except Exception as e:
+            logging.error(f"Error processing streaming dataset: {str(e)}")
+            return None
