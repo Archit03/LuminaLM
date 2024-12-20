@@ -58,7 +58,7 @@ class Config:
         vocab_size: Optional[int] = None,
         min_frequency: int = 2,
         log_file: str = "tokenizer.log",
-        chunk_size: int = 1000,
+        chunk_size: int = 10000,
         max_workers: Optional[int] = None,
         memory_threshold: float = 0.8,
         cache_dir: str = ".cache",
