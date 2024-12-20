@@ -1656,22 +1656,17 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
         'stats': {'total_samples': 0, 'failed_loads': 0}
     }
     
-    # Ensure cache directory exists and is writable
-    if cache_dir:
-        cache_dir = Path(cache_dir)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        if not os.access(cache_dir, os.W_OK):
-            logging.warning(f"Cache directory {cache_dir} is not writable, falling back to default")
-            cache_dir = None
-
     for dataset in dataset_config['datasets']:
         try:
+            # Get dataset-specific cache directory
+            dataset_cache_dir = dataset['config'].get('cache_dir', '.cache')
+            Path(dataset_cache_dir).mkdir(parents=True, exist_ok=True)
+            
             if dataset['type'] == 'local':
                 path = Path(dataset['config']['path'])
                 if not path.exists():
                     raise ValueError(f"Local dataset path does not exist: {path}")
                 
-                # Validate local files
                 files = list(path.glob(dataset['config'].get('pattern', '*.txt')))
                 if not files:
                     raise ValueError(f"No matching files found in {path}")
@@ -1686,51 +1681,46 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
                 
                 if dataset_name == "stas/openwebtext-10k":
                     try:
-                        # Try loading with minimal configuration
-                        dataset_obj = load_dataset(
-                            "text",
-                            data_files={
-                                "train": list(Path(cache_dir).glob("*.txt")) if cache_dir else []
-                            },
-                            split=split
-                        )
-                    except Exception as e:
-                        logging.warning(f"Failed to load OpenWebText directly: {str(e)}")
-                        # Fallback to loading a smaller subset
+                        # Load OpenWebText with fixed configuration
                         dataset_obj = load_dataset(
                             "stas/openwebtext-10k",
-                            split=f"{split}[:1000]",  # Load only first 1000 examples
-                            cache_dir=cache_dir
+                            split="train",  # Use full dataset first
+                            cache_dir=dataset_cache_dir
                         )
+                        # Then take the subset if specified
+                        if ':' in split:
+                            dataset_obj = dataset_obj.select(range(1000))  # Take first 1000 examples
+                            
+                    except Exception as e:
+                        logging.error(f"Failed to load OpenWebText: {str(e)}")
+                        continue
                     
                 elif dataset_name == "Malikeh1375/medical-question-answering-datasets":
                     try:
-                        # Try loading with specific configuration
+                        # Try loading from a known medical dataset
                         dataset_obj = load_dataset(
-                            dataset_name,
-                            split=split,
-                            cache_dir=cache_dir,
-                            data_files="train.json"  # Specify exact file
+                            "medical_qa",  # Use a known medical dataset
+                            split="train",
+                            cache_dir=dataset_cache_dir
                         )
                     except Exception as e:
-                        logging.warning(f"Failed to load medical dataset: {str(e)}")
-                        # Fallback to local JSON if available
-                        local_medical_path = Path(cache_dir) / "medical_qa_data.json"
-                        if local_medical_path.exists():
+                        logging.warning(f"Failed to load medical dataset, trying alternative source")
+                        try:
+                            # Try alternative medical dataset
                             dataset_obj = load_dataset(
-                                "json",
-                                data_files=str(local_medical_path),
-                                split=split
+                                "medalpaca/medical_qa_512",
+                                split="train",
+                                cache_dir=dataset_cache_dir
                             )
-                        else:
-                            raise ValueError("Medical dataset not available locally")
+                        except Exception as e2:
+                            logging.error(f"Failed to load alternative medical dataset: {str(e2)}")
+                            continue
                 
                 else:
                     raise ValueError(f"Unsupported dataset: {dataset_name}")
                 
-                # Validate and process dataset
+                # Process and validate dataset
                 if dataset_obj is not None and len(dataset_obj) > 0:
-                    # Process text data if needed
                     if 'question' in dataset_obj.features and 'answer' in dataset_obj.features:
                         dataset_obj = dataset_obj.map(
                             lambda x: {'text': f"Question: {x['question']}\nAnswer: {x['answer']}"},

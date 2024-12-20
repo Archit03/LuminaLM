@@ -1,21 +1,20 @@
 datasets:
-- config:
-    path: "C:/Users/ASUS/Desktop/LuminaLM/Data"
-    pattern: '*.txt'
-  name: local
+- name: local
   type: local
+  config:
+    path: "C:/Users/ASUS/Desktop/LuminaLM/Data"
+    pattern: "*.txt"
+
 - name: openwebtext
   type: huggingface
   config:
     dataset_name: "stas/openwebtext-10k"
-    streaming: false
-    split: "train"
-    use_auth_token: true
-    revision: "main"
-- name: medical_qa_all
+    split: "train[:1000]"
+    cache_dir: ".cache/openwebtext"
+
+- name: medical_qa
   type: huggingface
   config:
-    dataset_name: "Malikeh1375/medical-question-answering-datasets"
-    config: "all-processed"  # Corrected key
-    streaming: false
+    dataset_name: "medalpaca/medical_qa_512"
     split: "train"
+    cache_dir: ".cache/medical"
