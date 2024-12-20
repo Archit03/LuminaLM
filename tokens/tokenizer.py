@@ -1700,19 +1700,12 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
                 
                 if hf_dataset_name == "stas/openwebtext-10k":
                     try:
-                        # Set timeout for dataset loading
-                        download_config = DownloadConfig(
-                            max_retries=3,
-                            num_proc=4,  # Use multiple processes for downloading
-                            timeout=100.0  # 100 seconds timeout
-                        )
-                        
                         with tqdm(desc=f"Downloading {dataset_name}", position=0, leave=True) as pbar:
                             dataset_obj = load_dataset(
                                 "stas/openwebtext-10k",
                                 split="train",
                                 cache_dir=dataset_cache_dir,
-                                download_config=download_config
+                                num_proc=4
                             )
                             pbar.update(1)
                         
@@ -1724,29 +1717,22 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
                                 pbar.update(1000)
                             
                     except Exception as e:
-                        logging.error(f"Failed to load {dataset_name} (timeout={download_config.timeout}s): {str(e)}")
+                        logging.error(f"Failed to load {dataset_name}: {str(e)}")
                         continue
                     
                 elif hf_dataset_name == "medalpaca/medical_qa_512":
                     try:
-                        # Set timeout for dataset loading
-                        download_config = DownloadConfig(
-                            max_retries=3,
-                            num_proc=4,  # Use multiple processes for downloading
-                            timeout=100.0  # 100 seconds timeout
-                        )
-                        
                         with tqdm(desc=f"Downloading {dataset_name}", position=0, leave=True) as pbar:
                             dataset_obj = load_dataset(
                                 "medalpaca/medical_qa_512",
                                 split="train",
                                 cache_dir=dataset_cache_dir,
-                                download_config=download_config
+                                num_proc=4
                             )
                             pbar.update(1)
                             
                     except Exception as e:
-                        logging.error(f"Failed to load {dataset_name} (timeout={download_config.timeout}s): {str(e)}")
+                        logging.error(f"Failed to load {dataset_name}: {str(e)}")
                         continue
                 
                 else:
@@ -1927,101 +1913,99 @@ def main():
         # Parse arguments
         parser = argparse.ArgumentParser(
             description='Medical text tokenizer',
-            conflict_handler='resolve'  # Handle argument conflicts
+            conflict_handler='resolve'
         )
         
         # Training arguments group
         training_args = parser.add_argument_group('Training Arguments')
-        training_args.add_argument('--local_data_path', type=str, 
-                          default=str(Path.cwd() / "tokens"),
-                          help="Path to store processed data and tokenizer")
-        training_args.add_argument('--vocab_size', type=int, 
-                          default=60000,
-                          help="Vocabulary size for the tokenizer")
-        training_args.add_argument('--min_freq', type=int, 
-                          default=2,
-                          help="Minimum frequency for BPE merges")
-        training_args.add_argument('--config', type=str, 
-                          default="dataset_config.yaml",
-                          help="Dataset configuration file path")
-        training_args.add_argument('--log', type=str, 
-                          default="tokenizer.log",
-                          help="Log file path")
-        training_args.add_argument('--chunk_size', type=int, 
-                          default=10000,
-                          help="Chunk size for processing")
-        training_args.add_argument('--workers', type=int, 
-                          default=8,
-                          help="Maximum number of workers for parallel processing")
-
+        training_args.add_argument(
+            '--vocab-size',
+            type=int,
+            default=32000,
+            help='Vocabulary size for tokenizer'
+        )
+        training_args.add_argument(
+            '--min-frequency',
+            type=int,
+            default=2,
+            help='Minimum frequency for a token to be included'
+        )
+        training_args.add_argument(
+            '--dataset-config',
+            type=str,
+            default='dataset_config.yaml',
+            help='Path to dataset configuration file'
+        )
+        training_args.add_argument(
+            '--cache-dir',
+            type=str,
+            default='.cache',
+            help='Cache directory for datasets'
+        )
+        
         args = parser.parse_args()
         
-        # Setup logging
-        setup_logging(args.log)
-        
-        # Initialize managers
-        memory_manager = MemoryManager()
-        worker_manager = WorkerManager(initial_workers=args.workers)
-        gpu_monitor = GPUMemoryMonitor() if torch.cuda.is_available() else None
-        
-        # Load and validate configuration
-        config_path = Path(args.config)
-        if not config_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
-            
-        try:
-            with open(config_path) as f:
-                dataset_config = yaml.safe_load(f)
-        except yaml.YAMLError as e:
-            raise ValueError(f"Invalid YAML configuration: {str(e)}")
+        # Load dataset configuration
+        with open(args.dataset_config, 'r') as f:
+            dataset_config = yaml.safe_load(f)
             
         if not validate_dataset_config(dataset_config):
             raise ValueError("Invalid dataset configuration")
             
-        # Initialize tokenizer
-        tokenizer = MedicalTokenizer(
+        # Check hardware and set device
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print("Checking hardware configuration...")
+        print(f"I'm using {device} to do my job\n")
+        
+        # Load datasets with progress tracking
+        print("Starting tokenizer training...")
+        datasets = load_datasets(dataset_config, args.cache_dir)
+        
+        # Initialize tokenizer trainer
+        trainer = TokenizerTrainer(
             vocab_size=args.vocab_size,
-            min_frequency=args.min_freq
+            min_frequency=args.min_frequency
         )
         
-        # Initialize logging directory
-        log_dir = Path("logs")
-        log_dir.mkdir(exist_ok=True)
-        
-        # Load datasets
-        dataset_results = load_datasets(dataset_config)
-        
-        # Process datasets and collect processed files
-        processed_files = []
-        for dataset_name, dataset in dataset_results['datasets'].items():
+        # Process datasets and train tokenizer
+        for dataset_name, dataset in datasets['datasets'].items():
             if isinstance(dataset, str):  # Local dataset path
-                processed_file = process_local_dataset(dataset, 
-                    Path(args.local_data_path) / f"{dataset_name}_processed.txt",
-                    args.chunk_size)
-            else:  # HuggingFace dataset
-                processed_file = process_streaming_dataset(dataset,
-                    Path(args.local_data_path) / f"{dataset_name}_processed.txt",
-                    args.chunk_size,
-                    dataset_name)
-                
-            if processed_file:
-                processed_files.append(processed_file)
-
-        if not processed_files:
-            raise ValueError("No files were successfully processed")
-
-        # Train tokenizer with processed files
-        logging.info("Starting tokenizer training...")
-        tokenizer.train(
-            processed_files,
-            save_path=str(Path(args.local_data_path) / "Medical_tokenizer.json")
-        )
+                trainer.add_files(Path(dataset))
+            else:  # Hugging Face dataset
+                trainer.add_texts(dataset['text'])
+        
+        # Train tokenizer with progress bar
+        tokenizer = trainer.train()
+        
+        # Save tokenizer
+        output_dir = Path('tokenizer')
+        output_dir.mkdir(exist_ok=True)
+        tokenizer.save_pretrained(output_dir)
+        
         logging.info("Tokenizer training completed successfully")
+        print("Tokenizer training completed successfully")
         
     except Exception as e:
-        logging.error(f"Critical error in main execution: {str(e)}")
-        logging.error(traceback.format_exc())
+        logging.error(f"Error during tokenizer training: {str(e)}")
+        traceback.print_exc()
         sys.exit(1)
+
+if __name__ == '__main__':
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler('tokenizer_training.log')
+        ]
+    )
+    
+    # Suppress warnings
+    warnings.filterwarnings('ignore')
+    
+    # Run main function
+    main()
 
 if __name__ == "__main__":
     main()
