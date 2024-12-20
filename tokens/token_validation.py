@@ -2,123 +2,125 @@ import logging
 import os
 import traceback
 from tokenizers import Tokenizer
-import tiktoken
 import torch
 import matplotlib.pyplot as plt
-from typing import List
-import time
+from typing import List, Dict
 
 # Logging setup
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s - %(levelname)s - %(message)s",
-                    handlers=[logging.FileHandler("token_validation/validation.log"),
+                    handlers=[logging.FileHandler("tokens/validation.log"),
                               logging.StreamHandler()])
 
-def plot_token_overlap(medtoken_tokens: List[List[int]], tiktoken_tokens: List[List[int]]):
-    """Plots the percentage of overlapping tokens between MedToken and Tiktoken."""
-    overlaps = []
-    for med_tokens, tik_tokens in zip(medtoken_tokens, tiktoken_tokens):
-        overlap = len(set(med_tokens) & set(tik_tokens)) / max(len(set(med_tokens)), 1) * 100
-        overlaps.append(overlap)
+def plot_sequence_lengths(original_lengths: List[int], truncated_lengths: List[int]):
+    """Plots original vs. truncated sequence lengths."""
     plt.figure(figsize=(10, 6))
-    plt.bar(range(len(overlaps)), overlaps, color="limegreen", alpha=0.8, label="Token Overlap (%)")
-    plt.xlabel("Sample Index")
-    plt.ylabel("Overlap Percentage")
-    plt.title("Token Overlap Between MedToken and Tiktoken")
-    plt.xticks(range(len(overlaps)))
-    plt.legend()
-    plt.grid(True)
-    os.makedirs("token_validation", exist_ok=True)
-    plt.savefig("token_validation/medtoken_vs_tiktoken_overlap.png")
-    plt.show()
-
-def plot_token_count_difference(medtoken_lengths: List[int], tiktoken_lengths: List[int]):
-    """Plots the absolute difference in token counts between MedToken and Tiktoken."""
-    differences = [abs(med_len - tik_len) for med_len, tik_len in zip(medtoken_lengths, tiktoken_lengths)]
-    plt.figure(figsize=(10, 6))
-    plt.bar(range(len(differences)), differences, color="goldenrod", alpha=0.8, label="Token Count Difference")
-    plt.xlabel("Sample Index")
-    plt.ylabel("Token Count Difference")
-    plt.title("Token Count Difference: MedToken vs. Tiktoken")
-    plt.xticks(range(len(differences)))
-    plt.legend()
-    plt.grid(True)
-    plt.savefig("token_validation/medtoken_vs_tiktoken_difference.png")
-    plt.show()
-
-def plot_tokenization_time(medtoken_time: float, tiktoken_time: float):
-    """Plots tokenization time comparison between MedToken and Tiktoken."""
-    plt.figure(figsize=(10, 6))
-    plt.bar(["MedToken", "Tiktoken"], [medtoken_time, tiktoken_time], color=["royalblue", "crimson"], alpha=0.8)
-    plt.ylabel("Time (seconds)")
-    plt.title("Tokenization Time Comparison: MedToken vs. Tiktoken")
-    for i, time_val in enumerate([medtoken_time, tiktoken_time]):
-        plt.text(i, time_val + 0.001, f"{time_val:.4f}s", ha="center", fontsize=12, fontweight="bold")
-    plt.grid(True, axis="y")
-    plt.savefig("token_validation/medtoken_vs_tiktoken_time.png")
-    plt.show()
-
-def plot_sequence_length_comparison(medtoken_lengths: List[int], tiktoken_lengths: List[int]):
-    """Plots sequence lengths for MedToken and Tiktoken for comparison."""
-    plt.figure(figsize=(10, 6))
-    plt.plot(medtoken_lengths, marker="o", label="MedToken Lengths", color="blue", alpha=0.8)
-    plt.plot(tiktoken_lengths, marker="x", label="Tiktoken Lengths", color="red", linestyle="--", alpha=0.8)
+    plt.plot(original_lengths, label="Original Lengths", marker="o")
+    plt.plot(truncated_lengths, label="Truncated Lengths", marker="x")
     plt.xlabel("Sample Index")
     plt.ylabel("Sequence Length")
-    plt.title("Sequence Length Comparison: MedToken vs. Tiktoken")
-    plt.xticks(range(len(medtoken_lengths)))
+    plt.title("Sequence Lengths Before and After Truncation")
     plt.legend()
     plt.grid(True)
-    plt.savefig("token_validation/medtoken_vs_tiktoken_lengths.png")
+    plt.savefig("tokens/sequence_lengths.png")
+    plt.show()
+
+def plot_attention_mask_coverage(attention_masks: torch.Tensor):
+    """Plots attention mask coverage (ratio of non-padded tokens to total tokens)."""
+    coverage = attention_masks.sum(dim=1).float() / attention_masks.size(1)
+    plt.figure(figsize=(10, 6))
+    plt.bar(range(len(coverage)), coverage, color="skyblue")
+    plt.xlabel("Sample Index")
+    plt.ylabel("Attention Mask Coverage")
+    plt.title("Attention Mask Coverage per Sample")
+    plt.grid(True)
+    plt.savefig("tokens/attention_mask_coverage.png")
+    plt.show()
+
+def plot_padding_efficiency(attention_masks: torch.Tensor, max_length: int):
+    """Plots padding efficiency (ratio of used tokens to max length)."""
+    efficiency = attention_masks.sum(dim=1).float() / max_length
+    plt.figure(figsize=(10, 6))
+    plt.bar(range(len(efficiency)), efficiency, color="lightcoral")
+    plt.xlabel("Sample Index")
+    plt.ylabel("Padding Efficiency")
+    plt.title("Padding Efficiency per Sample")
+    plt.grid(True)
+    plt.savefig("tokens/padding_efficiency.png")
     plt.show()
 
 def validate_tokenizer(tokenizer_path: str, sample_texts: List[str], max_length: int = None):
-    """Validates the MedToken tokenizer and compares it with OpenAI's Tiktoken."""
+    """Validates the tokenizer on a set of sample texts."""
     try:
         # Load the tokenizer
         if not os.path.exists(tokenizer_path):
             raise FileNotFoundError(f"Tokenizer file not found: {tokenizer_path}")
 
-        logging.info(f"Loading MedToken tokenizer from {tokenizer_path}")
-        medtoken_tokenizer = Tokenizer.from_file(tokenizer_path)
+        logging.info(f"Loading tokenizer from {tokenizer_path}")
+        tokenizer = Tokenizer.from_file(tokenizer_path)
 
-        # Load OpenAI's Tiktoken GPT-3.5 encoding
-        tiktoken_encoder = tiktoken.get_encoding("cl100k_base")
+        # Encode texts
+        logging.info("Encoding sample texts...")
+        encoded_batch = [
+            tokenizer.encode(text).ids for text in sample_texts
+        ]
 
-        # Encode texts with MedToken
-        logging.info("Encoding sample texts with MedToken...")
-        start_time = time.time()
-        medtoken_batch = [medtoken_tokenizer.encode(text).ids for text in sample_texts]
-        medtoken_time = time.time() - start_time
-        logging.info(f"MedToken time: {medtoken_time:.4f} seconds")
+        # Set max_length dynamically based on the longest sequence if not provided
+        if max_length is None:
+            max_length = max(len(seq) for seq in encoded_batch)
+            logging.info(f"Dynamic max_length set to: {max_length}")
 
-        # Encode texts with Tiktoken
-        logging.info("Encoding sample texts with OpenAI's Tiktoken...")
-        start_time = time.time()
-        tiktoken_batch = [tiktoken_encoder.encode(text) for text in sample_texts]
-        tiktoken_time = time.time() - start_time
-        logging.info(f"Tiktoken time: {tiktoken_time:.4f} seconds")
+        # Analyze sequence lengths
+        original_lengths = [len(ids) for ids in encoded_batch]
+        truncated_lengths = []
 
-        # Compare lengths
-        medtoken_lengths = [len(ids) for ids in medtoken_batch]
-        tiktoken_lengths = [len(ids) for ids in tiktoken_batch]
-        logging.info("Length Comparison:")
-        for i, (med_len, tik_len) in enumerate(zip(medtoken_lengths, tiktoken_lengths)):
-            logging.info(f"Text {i}: MedToken Length = {med_len}, Tiktoken Length = {tik_len}")
+        # Validate sequence lengths and log truncation details
+        for idx, ids in enumerate(encoded_batch):
+            if len(ids) > max_length:
+                logging.warning(f"Truncating sequence at index {idx} to max length {max_length}.")
+                truncated_tokens = ids[max_length:]
+                logging.info(f"Truncated tokens for Text {idx}: {truncated_tokens}")
+                encoded_batch[idx] = ids[:max_length]
+            truncated_lengths.append(len(encoded_batch[idx]))
 
-        # Plot comparison graphs
-        plot_token_overlap(medtoken_batch, tiktoken_batch)
-        plot_token_count_difference(medtoken_lengths, tiktoken_lengths)
-        plot_tokenization_time(medtoken_time, tiktoken_time)
-        plot_sequence_length_comparison(medtoken_lengths, tiktoken_lengths)
+        # Convert to tensors
+        input_ids = [torch.tensor(ids, dtype=torch.long) for ids in encoded_batch]
+        attention_masks = [
+            torch.tensor([1] * len(ids) + [0] * (max_length - len(ids)), dtype=torch.long)
+            if len(ids) < max_length else torch.tensor([1] * max_length, dtype=torch.long)
+            for ids in encoded_batch
+        ]
+
+        # Pad sequences
+        padded_input_ids = torch.nn.utils.rnn.pad_sequence(input_ids, batch_first=True, padding_value=0)
+        padded_attention_masks = torch.stack(attention_masks, dim=0)
+
+        # Log validation results
+        logging.info("Validation Results:")
+        logging.info(f"Padded Input IDs Shape: {padded_input_ids.shape}")
+        logging.info(f"Padded Attention Masks Shape: {padded_attention_masks.shape}")
+
+        # Example output
+        logging.info("Sample Encoded Outputs:")
+        for idx, input_ids in enumerate(padded_input_ids):
+            logging.info(f"Text {idx}: {sample_texts[idx]}")
+            logging.info(f"Input IDs: {input_ids.tolist()}")
+
+        # Plot sequence lengths
+        plot_sequence_lengths(original_lengths, truncated_lengths)
+
+        # Plot attention mask coverage
+        plot_attention_mask_coverage(padded_attention_masks)
+
+        # Plot padding efficiency
+        plot_padding_efficiency(padded_attention_masks, max_length)
 
     except Exception as e:
         logging.error(f"Error during validation: {e}")
         logging.error(traceback.format_exc())
 
-
 if __name__ == "__main__":
-    tokenizer_path = "tokens/Medical_tokenizer.json"
+    tokenizer_path = "tokens/tokenizer.json"
     sample_texts = [
         "Patient presents with severe chest pain.",
         "Medical history includes hypertension and diabetes.",
