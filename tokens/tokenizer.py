@@ -1656,8 +1656,15 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
         'stats': {'total_samples': 0, 'failed_loads': 0}
     }
     
-    for dataset in dataset_config['datasets']:
+    # Show total number of datasets to process
+    total_datasets = len(dataset_config['datasets'])
+    logging.info(f"Processing {total_datasets} datasets...")
+    
+    for dataset_idx, dataset in enumerate(dataset_config['datasets'], 1):
         try:
+            dataset_name = dataset.get('name', 'unknown')
+            logging.info(f"Processing dataset {dataset_idx}/{total_datasets}: {dataset_name}")
+            
             # Get dataset-specific cache directory
             dataset_cache_dir = dataset['config'].get('cache_dir', '.cache')
             Path(dataset_cache_dir).mkdir(parents=True, exist_ok=True)
@@ -1671,79 +1678,91 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
                 if not files:
                     raise ValueError(f"No matching files found in {path}")
                 
-                results['datasets'][dataset['name']] = str(path)
-                logging.info(f"Successfully loaded local dataset from {path} with {len(files)} files")
-                results['stats']['total_samples'] += len(files)
+                # Process local files with dataset name in progress bar
+                with tqdm(total=len(files), desc=f"Processing {dataset_name}", 
+                         unit="files", position=0, leave=True) as pbar:
+                    processed_files = []
+                    for file in files:
+                        try:
+                            with open(file, 'r', encoding='utf-8') as f:
+                                processed_files.append(file)
+                            pbar.update(1)
+                        except Exception as e:
+                            logging.warning(f"Error processing file {file}: {str(e)}")
+                    
+                results['datasets'][dataset_name] = str(path)
+                results['stats']['total_samples'] += len(processed_files)
+                logging.info(f"Successfully loaded {dataset_name} with {len(processed_files)} files")
                 
             elif dataset['type'] == 'huggingface':
-                dataset_name = dataset['config']['dataset_name']
+                hf_dataset_name = dataset['config']['dataset_name']
                 split = dataset['config'].get('split', 'train')
                 
-                if dataset_name == "stas/openwebtext-10k":
+                if hf_dataset_name == "stas/openwebtext-10k":
                     try:
-                        # Load OpenWebText with fixed configuration
-                        dataset_obj = load_dataset(
-                            "stas/openwebtext-10k",
-                            split="train",  # Use full dataset first
-                            cache_dir=dataset_cache_dir
-                        )
-                        # Then take the subset if specified
+                        with tqdm(desc=f"Loading {dataset_name}", position=0, leave=True) as pbar:
+                            dataset_obj = load_dataset(
+                                "stas/openwebtext-10k",
+                                split="train",
+                                cache_dir=dataset_cache_dir
+                            )
+                            pbar.update(1)
+                            
                         if ':' in split:
-                            dataset_obj = dataset_obj.select(range(1000))  # Take first 1000 examples
+                            with tqdm(desc=f"Processing {dataset_name}", position=0, leave=True) as pbar:
+                                dataset_obj = dataset_obj.select(range(1000))
+                                pbar.update(1)
                             
                     except Exception as e:
-                        logging.error(f"Failed to load OpenWebText: {str(e)}")
+                        logging.error(f"Failed to load {dataset_name}: {str(e)}")
                         continue
                     
-                elif dataset_name == "Malikeh1375/medical-question-answering-datasets":
+                elif hf_dataset_name == "medalpaca/medical_qa_512":
                     try:
-                        # Try loading from a known medical dataset
-                        dataset_obj = load_dataset(
-                            "medical_qa",  # Use a known medical dataset
-                            split="train",
-                            cache_dir=dataset_cache_dir
-                        )
-                    except Exception as e:
-                        logging.warning(f"Failed to load medical dataset, trying alternative source")
-                        try:
-                            # Try alternative medical dataset
+                        with tqdm(desc=f"Loading {dataset_name}", position=0, leave=True) as pbar:
                             dataset_obj = load_dataset(
                                 "medalpaca/medical_qa_512",
                                 split="train",
                                 cache_dir=dataset_cache_dir
                             )
-                        except Exception as e2:
-                            logging.error(f"Failed to load alternative medical dataset: {str(e2)}")
-                            continue
+                            pbar.update(1)
+                            
+                    except Exception as e:
+                        logging.error(f"Failed to load {dataset_name}: {str(e)}")
+                        continue
                 
                 else:
-                    raise ValueError(f"Unsupported dataset: {dataset_name}")
+                    raise ValueError(f"Unsupported dataset: {hf_dataset_name}")
                 
                 # Process and validate dataset
                 if dataset_obj is not None and len(dataset_obj) > 0:
                     if 'question' in dataset_obj.features and 'answer' in dataset_obj.features:
-                        dataset_obj = dataset_obj.map(
-                            lambda x: {'text': f"Question: {x['question']}\nAnswer: {x['answer']}"},
-                            remove_columns=dataset_obj.column_names
-                        )
+                        with tqdm(desc=f"Processing {dataset_name}", 
+                                total=len(dataset_obj), unit="examples",
+                                position=0, leave=True) as pbar:
+                            dataset_obj = dataset_obj.map(
+                                lambda x: {'text': f"Question: {x['question']}\nAnswer: {x['answer']}"},
+                                remove_columns=dataset_obj.column_names,
+                                desc=f"Processing {dataset_name}"
+                            )
+                            pbar.update(len(dataset_obj))
                     
-                    results['datasets'][dataset['name']] = dataset_obj
+                    results['datasets'][dataset_name] = dataset_obj
                     results['stats']['total_samples'] += len(dataset_obj)
                     logging.info(f"Successfully loaded {dataset_name} with {len(dataset_obj)} samples")
                 else:
                     raise ValueError(f"Dataset {dataset_name} is empty")
                 
         except Exception as e:
-            logging.error(f"Failed to load dataset {dataset.get('name', 'unknown')}: {str(e)}")
+            logging.error(f"Failed to load dataset {dataset_name}: {str(e)}")
             traceback.print_exc()
             results['stats']['failed_loads'] += 1
             continue
     
-    # Final validation
+    # Final validation and summary
     if not results['datasets']:
         raise ValueError("No datasets were successfully loaded")
     
-    # Log summary
     logging.info(f"Successfully loaded {len(results['datasets'])} datasets")
     logging.info(f"Total samples: {results['stats']['total_samples']}")
     if results['stats']['failed_loads'] > 0:
@@ -1971,8 +1990,7 @@ def main():
         tokenizer.train(
             processed_files,
             save_path=str(Path(args.local_data_path) / "Medical_tokenizer.json")
-        )  # Add closing parenthesis here
-
+        )
         logging.info("Tokenizer training completed successfully")
         
     except Exception as e:
@@ -2006,8 +2024,7 @@ class RetryHandler:
                     time.sleep(delay)
                 else:
                     logging.error(
-                        f"{operation_name} failed after {self.max_retries} attempts: {str(e)}"
-                    )
+                        f"{operation_name} failed after {self.max_retries} attempts: {str(e)}")
                     raise
 
     async def async_retry(self, coroutine, operation_name: str):
@@ -2025,8 +2042,7 @@ class RetryHandler:
                     await asyncio.sleep(delay)
                 else:
                     logging.error(
-                        f"{operation_name} failed after {self.max_retries} attempts: {str(e)}"
-                    )
+                        f"{operation_name} failed after {self.max_retries} attempts: {str(e)}")
                     raise
 
 class DatasetLogger:
