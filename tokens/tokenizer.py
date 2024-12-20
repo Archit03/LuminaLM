@@ -1678,53 +1678,65 @@ def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = Non
                 
                 results['datasets'][dataset['name']] = str(path)
                 logging.info(f"Successfully loaded local dataset from {path} with {len(files)} files")
+                results['stats']['total_samples'] += len(files)
                 
             elif dataset['type'] == 'huggingface':
                 dataset_name = dataset['config']['dataset_name']
                 split = dataset['config'].get('split', 'train')
                 
                 if dataset_name == "stas/openwebtext-10k":
-                    # Handle OpenWebText without streaming
-                    dataset_obj = load_dataset(
-                        dataset_name,
-                        split=split,
-                        cache_dir=cache_dir,
-                        streaming=False  # Explicitly disable streaming
-                    )
+                    try:
+                        # Try loading with minimal configuration
+                        dataset_obj = load_dataset(
+                            "text",
+                            data_files={
+                                "train": list(Path(cache_dir).glob("*.txt")) if cache_dir else []
+                            },
+                            split=split
+                        )
+                    except Exception as e:
+                        logging.warning(f"Failed to load OpenWebText directly: {str(e)}")
+                        # Fallback to loading a smaller subset
+                        dataset_obj = load_dataset(
+                            "stas/openwebtext-10k",
+                            split=f"{split}[:1000]",  # Load only first 1000 examples
+                            cache_dir=cache_dir
+                        )
                     
                 elif dataset_name == "Malikeh1375/medical-question-answering-datasets":
                     try:
-                        # First attempt with direct loading
+                        # Try loading with specific configuration
                         dataset_obj = load_dataset(
                             dataset_name,
                             split=split,
-                            cache_dir=cache_dir
+                            cache_dir=cache_dir,
+                            data_files="train.json"  # Specify exact file
                         )
                     except Exception as e:
-                        logging.warning(f"Failed to load medical dataset directly: {str(e)}")
-                        # Fallback to loading as JSON
-                        dataset_obj = load_dataset(
-                            "json",
-                            data_files={
-                                "train": "medical_qa_data.json"  # Adjust path if needed
-                            },
-                            split=split,
-                            cache_dir=cache_dir
-                        )
-                    
-                    # Process medical dataset
-                    if dataset_obj is not None and len(dataset_obj) > 0:
-                        if 'question' in dataset_obj.features and 'answer' in dataset_obj.features:
-                            dataset_obj = dataset_obj.map(
-                                lambda x: {'text': f"Question: {x['question']}\nAnswer: {x['answer']}"},
-                                remove_columns=dataset_obj.column_names
+                        logging.warning(f"Failed to load medical dataset: {str(e)}")
+                        # Fallback to local JSON if available
+                        local_medical_path = Path(cache_dir) / "medical_qa_data.json"
+                        if local_medical_path.exists():
+                            dataset_obj = load_dataset(
+                                "json",
+                                data_files=str(local_medical_path),
+                                split=split
                             )
-                    
+                        else:
+                            raise ValueError("Medical dataset not available locally")
+                
                 else:
                     raise ValueError(f"Unsupported dataset: {dataset_name}")
                 
-                # Validate loaded dataset
+                # Validate and process dataset
                 if dataset_obj is not None and len(dataset_obj) > 0:
+                    # Process text data if needed
+                    if 'question' in dataset_obj.features and 'answer' in dataset_obj.features:
+                        dataset_obj = dataset_obj.map(
+                            lambda x: {'text': f"Question: {x['question']}\nAnswer: {x['answer']}"},
+                            remove_columns=dataset_obj.column_names
+                        )
+                    
                     results['datasets'][dataset['name']] = dataset_obj
                     results['stats']['total_samples'] += len(dataset_obj)
                     logging.info(f"Successfully loaded {dataset_name} with {len(dataset_obj)} samples")
@@ -1969,7 +1981,7 @@ def main():
         tokenizer.train(
             processed_files,
             save_path=str(Path(args.local_data_path) / "Medical_tokenizer.json")
-        )
+        )  # Add closing parenthesis here
 
         logging.info("Tokenizer training completed successfully")
         
