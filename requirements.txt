@@ -2,7 +2,7 @@ torch>=2.0.0            # Updated to latest stable version for improved performa
 torchvision>=0.15.0     # Compatible with the latest PyTorch versions
 torchaudio>=0.10.0      # Ensure compatibility with torch >= 2.0.0
 tokenizers>=0.13.0      # Updated for compatibility with new features and bug fixes
-datasets>=2.6.0         # Latest stable version for enhanced dataset features
+datasets>=2.10.1        # Latest stable version for enhanced dataset features
 numpy>=1.23.0           # Improved performance and bug fixes
 scikit-learn>=1.1.0     # Latest stable version for ML utilities
 matplotlib>=3.6.0       # Newer features and fixes in visualization

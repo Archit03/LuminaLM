@@ -8,15 +8,16 @@ import multiprocessing
 import traceback
 import sys
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple, Union, Set, Generator, Callable
+from typing import List, Dict, Any, Optional, Tuple, Union, Set, Generator, Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from itertools import islice
 from tqdm import tqdm
 import torch
 from torch import Tensor
 from datasets import load_dataset, DatasetDict, IterableDataset, DownloadConfig
-from tokenizers import Tokenizer, BPE
-from tokenizers.pre_tokenizers import ByteLevel, Whitespace
+from tokenizers import Tokenizer
+from tokenizers.models import BPE
+from tokenizers.pre_tokenizers import ByteLevel
 from tokenizers.trainers import BpeTrainer
 import pandas as pd
 from PIL import Image
@@ -44,6 +45,7 @@ import itertools
 import warnings
 warnings.filterwarnings('ignore')
 import os
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TF warnings
 os.environ['TOKENIZERS_PARALLELISM'] = 'true'  # Enable tokenizer parallelism
 
@@ -349,7 +351,7 @@ class HybridTokenizationStrategy:
         texts: List[str],
         task_type: str = 'auto',
         max_length: Optional[int] = None,
-        **kwargs
+        **extra_args
     ) -> Dict[str, Tensor]:
         """
         Enhanced encode method with task-specific optimizations.
@@ -366,9 +368,9 @@ class HybridTokenizationStrategy:
         try:
             with self.memory_manager.monitor_memory(f"{task_type} encoding"):
                 if task_type == 'auto':
-                    return self.autoregressive_encode(texts, max_length, **kwargs)
+                    return self.autoregressive_encode(texts, max_length, **extra_args)
                 else:
-                    return self.bidirectional_encode(texts, max_length, **kwargs)
+                    return self.bidirectional_encode(texts, max_length, **extra_args)
         except Exception as e:
             logging.error(f"Encoding failed for task_type {task_type}: {str(e)}")
             raise
@@ -377,7 +379,7 @@ class HybridTokenizationStrategy:
         self,
         texts: List[str],
         max_length: Optional[int] = None,
-        **kwargs
+        **extra_args
     ) -> Dict[str, Tensor]:
         """
         Autoregressive encoding with memory-efficient batching.
@@ -420,7 +422,7 @@ class HybridTokenizationStrategy:
         self,
         texts: List[str],
         max_length: Optional[int] = None,
-        **kwargs
+        **extra_args
     ) -> Dict[str, Tensor]:
         """
         Bidirectional encoding with memory-efficient batching.
@@ -932,8 +934,8 @@ class DatasetProcessor:
             
             # Load dataset
             try:
-                if dataset_name == "openwebtext":
-                    # Handle streaming for OpenWebText
+                if dataset_name == "Trelis/tiny-shakespeare":
+                    # Handle streaming for tiny-shakespeare
                     dataset = load_dataset(
                         dataset_name,
                         streaming=True,
@@ -1002,7 +1004,6 @@ class DatasetProcessor:
             for i in range(0, len(dataset), self.batch_size):
                 batch = dataset[i:i + self.batch_size]
                 texts = [item[text_field] for item in batch if item[text_field]]
-                
                 if texts:
                     output_path = output_dir / f"batch_{i//self.batch_size}.txt"
                     with open(output_path, 'w', encoding='utf-8') as f:
@@ -1050,6 +1051,80 @@ class DatasetProcessor:
             
         except Exception as e:
             logging.error(f"Error in dataset processing: {str(e)}")
+            raise
+
+
+class TokenizerTrainer:
+    """Trainer class for tokenizer with enhanced features"""
+    
+    def __init__(self, vocab_size: int = 32000, min_frequency: int = 2):
+        self.vocab_size = vocab_size
+        self.min_frequency = min_frequency
+        self.tokenizer = Tokenizer(BPE())
+        self.trainer = BpeTrainer(
+            vocab_size=vocab_size,
+            min_frequency=min_frequency,
+            special_tokens=["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]", "[BOS]", "[EOS]"],
+            show_progress=True
+        )
+        self.texts = []
+        self.files = []
+
+    def add_files(self, path: Union[str, Path]) -> 'TokenizerTrainer':
+        """Add files for training"""
+        try:
+            if isinstance(path, str):
+                path = Path(path)
+                
+            if isinstance(path, Path):
+                if path.is_file():
+                    self.files.append(str(path))
+                elif path.is_dir():
+                    self.files.extend([str(f) for f in path.glob("*.txt")])
+            else:
+                logging.warning(f"Skipping invalid path: {path}")
+                
+        except Exception as e:
+            logging.error(f"Error adding file {path}: {str(e)}")
+            
+        return self
+
+    def add_texts(self, texts: Union[str, List[str], Iterator[str]]) -> 'TokenizerTrainer':
+        """Add texts for training"""
+        if isinstance(texts, str):
+            self.texts.append(texts)
+        elif isinstance(texts, (list, Iterator)):
+            for text in texts:
+                if isinstance(text, dict):
+                    # Handle dataset dictionary format
+                    text = text.get('text', '')
+                if text and isinstance(text, str):
+                    self.texts.append(text)
+        return self
+
+    def train(self) -> Tokenizer:
+        """Train the tokenizer"""
+        try:
+            # Set up pre-tokenizer
+            self.tokenizer.pre_tokenizer = ByteLevel(add_prefix_space=True)
+            
+            # Train from files if available
+            if self.files:
+                logging.info(f"Training tokenizer on {len(self.files)} files")
+                self.tokenizer.train(files=self.files, trainer=self.trainer)
+            
+            # Train from texts if available
+            if self.texts:
+                logging.info(f"Training tokenizer on {len(self.texts)} texts")
+                self.tokenizer.train_from_iterator(self.texts, trainer=self.trainer)
+            
+            if not self.files and not self.texts:
+                raise ValueError("No training data provided")
+            
+            return self.tokenizer
+            
+        except Exception as e:
+            logging.error(f"Tokenizer training failed: {str(e)}")
             raise
 
 class GPUMemoryMonitor:
@@ -1146,8 +1221,8 @@ class AsyncProcessPool:
         if self.pool:
             self.pool.shutdown(wait=True)
             
-    def submit(self, fn, *args, **kwargs):
-        return asyncio.wrap_future(self.pool.submit(fn, *args, **kwargs))
+    def submit(self, fn, *args, **extra_args):
+        return asyncio.wrap_future(self.pool.submit(fn, *args, **extra_args))
 
 class AsyncIterator:
     """Async iterator for concurrent task processing"""
@@ -1220,6 +1295,84 @@ class SynchronizedProgress:
                 pass
             # Log final progress
             logging.info(f"Progress: {self.current}/{self.total} ({self.current/self.total*100:.1f}%)")
+
+
+# Modify DatasetProcessor to use optimized batch processing
+class DatasetProcessor:
+    def __init__(self, datasets: List[Dict[str, Any]], config: Config):
+        # ... existing init code ...
+        self.batch_processor = BatchProcessor()
+    
+    def _process_streaming_dataset(self, dataset: Any, output_path: Path) -> Optional[str]:
+        """Process streaming dataset with optimized batch handling"""
+        try:
+            with open(output_path, 'wb', buffering=1024*1024*8) as f:  # 8MB buffer
+                batch = []
+                total_processed = 0
+                start_time = time.time()
+                
+                with tqdm(desc="Processing", unit=" samples", mininterval=0.5) as pbar:
+                    for item in dataset:
+                        text = item.get('text', '').strip()
+                        if text:
+                            batch.append(text)
+                            
+                            if len(batch) >= self.batch_processor.batch_size:
+                                self.batch_processor.process_batch(batch)
+                                total_processed += len(batch)
+                                pbar.update(len(batch))
+                                batch = []
+                                
+                                # Log processing rate
+                                elapsed = time.time() - start_time
+                                rate = total_processed / elapsed
+                                pbar.set_postfix({'rate': f'{rate:.1f} samples/s'})
+                    
+                    # Process remaining items
+                    if batch:
+                        self.batch_processor.process_batch(batch)
+                        total_processed += len(batch)
+                        pbar.update(len(batch))
+                    
+                    # Wait for all processing to complete
+                    self.batch_processor.wait_completion()
+                
+                elapsed = time.time() - start_time
+                logging.info(
+                    f"Processed {total_processed} samples in {elapsed:.1f}s "
+                    f"({total_processed/elapsed:.1f} samples/s)"
+                )
+                
+            return str(output_path)
+            
+        except Exception as e:
+            logging.error(f"Error processing streaming dataset: {str(e)}")
+            return None
+
+def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = None) -> Dict[str, Any]:
+    """Load all datasets from config."""
+    results = {'datasets': {}, 'stats': {'total_samples': 0, 'failed_loads': 0}}
+    
+    for dataset in dataset_config['datasets']:
+        dataset_name = dataset['name']
+        if dataset['type'] == 'huggingface':
+            dataset_data = load_dataset_from_config(dataset['config'])
+        else:  # local
+            dataset_data = load_local_dataset(dataset['config'])
+            
+        if dataset_data:
+            results['datasets'][dataset_name] = dataset_data
+            results['stats']['total_samples'] += len(dataset_data)
+        else:
+            results['stats']['failed_loads'] += 1
+            
+    return results
+
+# Place this at the top of your file, before any function definitions
+def load_dataset_config(config_path: str) -> Dict[str, Any]:
+    """Load dataset configuration from YAML."""
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
 
 class TokenizerPathManager:
     """Manages tokenizer save paths with backup and restore capabilities"""
@@ -1529,9 +1682,9 @@ class EnhancedLogger:
         self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
 
-    def set_context(self, **kwargs):
+    def set_context(self, **extra_args):
         """Set context for logging"""
-        self.context.update(kwargs)
+        self.context.update(extra_args)
 
     def clear_context(self):
         """Clear current context"""
@@ -1541,29 +1694,29 @@ class EnhancedLogger:
         """Format context for log message"""
         return ' '.join(f'{k}={v}' for k, v in self.context.items())
 
-    def info(self, message: str, **kwargs):
+    def info(self, message: str, **extra_args):
         """Log info message with context"""
         extra = {'context': self._format_context()}
-        extra.update(kwargs)
+        extra.update(extra_args)
         self.logger.info(message, extra=extra)
 
-    def error(self, message: str, exc_info: bool = True, **kwargs):
+    def error(self, message: str, exc_info: bool = True, **extra_args):
         """Log error message with context and optional stack trace"""
         extra = {'context': self._format_context()}
-        extra.update(kwargs)
+        extra.update(extra_args)
         self.logger.error(message, exc_info=exc_info, extra=extra)
 
-    def warning(self, message: str, **kwargs):
+    def warning(self, message: str, **extra_args):
         """Log warning message with context"""
         extra = {'context': self._format_context()}
-        extra.update(kwargs)
+        extra.update(extra_args)
         self.logger.warning(message, extra=extra)
 
     @contextmanager
-    def context_scope(self, **kwargs):
+    def context_scope(self, **extra_args):
         """Context manager for temporary context"""
         previous = self.context.copy()
-        self.set_context(**kwargs)
+        self.set_context(**extra_args)
         try:
             yield
         finally:
@@ -1602,187 +1755,161 @@ def validate_dataset_config(config: Dict[str, Any]) -> bool:
 
     return True
 
-def process_local_dataset(input_path: Union[str, Path], output_path: Path, chunk_size: int) -> Optional[str]:
-    """Process local dataset files with chunking and progress bar."""
+def process_local_file(file_path: Path) -> Optional[str]:
+    """Process a single local file."""
     try:
-        input_path = Path(input_path)
-        if not input_path.exists():
-            logging.error(f"Input path does not exist: {input_path}")
+        if file_path.suffix.lower() == '.csv':
+            import pandas as pd
+            df = pd.read_csv(file_path)
+            text_column = 'text'
+            if text_column in df.columns:
+                return '\n'.join(df[text_column].dropna().astype(str))
             return None
-
-        # Create output directory if it doesn't exist
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # If input_path is a directory, process all text files in it
-        if input_path.is_dir():
-            processed_files = []
-            text_files = list(input_path.glob('*.txt'))  # Add more extensions if needed
-            
-            # Process each file with progress bar
-            for file_path in tqdm(text_files, desc="Processing local files"):
-                try:
-                    # Simplified output path - just append _processed to the original name
-                    output_file = output_path.parent / f"local_processed_{file_path.name}"
-                    
-                    with open(file_path, 'r', encoding='utf-8') as infile, \
-                         open(output_file, 'w', encoding='utf-8') as outfile:
-                        while chunk := infile.read(chunk_size):
-                            outfile.write(chunk)
-                    processed_files.append(str(output_file))
-                except Exception as e:
-                    logging.warning(f"Error processing file {file_path}: {str(e)}")
-                    continue
-            
-            if processed_files:
-                return processed_files[0]  # Return at least one processed file
-            return None
-
-        # If input_path is a file
         else:
-            with open(input_path, 'r', encoding='utf-8') as infile, \
-                 open(output_path, 'w', encoding='utf-8') as outfile:
-                while chunk := infile.read(chunk_size):
-                    outfile.write(chunk)
-            return str(output_path)
-
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
     except Exception as e:
-        logging.error(f"Error processing local dataset {input_path}: {str(e)}")
+        logging.error(f"Error processing file {file_path}: {str(e)}")
         return None
 
-def load_datasets(dataset_config: Dict[str, Any], cache_dir: Optional[str] = None) -> Dict[str, Any]:
-    results = {'datasets': {}, 'stats': {'total_samples': 0, 'failed_loads': 0}}
+def load_local_dataset(config: dict) -> List[str]:
+    """Load local dataset with proper pattern handling."""
+    path = Path(config['path'])
+    patterns = config.get('patterns', ['*.txt'])
+    if isinstance(patterns, str):
+        patterns = [patterns]
     
-    for dataset in dataset_config['datasets']:
-        try:
-            dataset_name = dataset.get('name', 'unknown')
-            dataset_cache_dir = dataset['config'].get('cache_dir', '.cache')
-            Path(dataset_cache_dir).mkdir(parents=True, exist_ok=True)
-            
-            if dataset['type'] == 'local':
-                # Local dataset handling (unchanged)
-                path = Path(dataset['config']['path'])
-                if not path.exists():
-                    raise ValueError(f"Local dataset path does not exist: {path}")
-                
-                files = list(path.glob(dataset['config'].get('pattern', '*.txt')))
-                if not files:
-                    raise ValueError(f"No matching files found in {path}")
-                
-                with tqdm(total=len(files), desc=f"Processing {dataset_name}", unit="files") as pbar:
-                    processed_files = []
-                    for file in files:
-                        processed_files.append(file)
-                        pbar.update(1)
-                
-                results['datasets'][dataset_name] = str(path)
-                results['stats']['total_samples'] += len(processed_files)
-                logging.info(f"Successfully loaded {dataset_name} with {len(processed_files)} files")
-                
-            elif dataset['type'] == 'huggingface':
-                with tqdm(desc=f"Downloading {dataset_name}", position=0, leave=True) as pbar:
-                    dataset_obj = load_dataset(
-                        "tiny_shakespeare" if dataset_name == "openwebtext" else "medqa",
-                        split="train",
-                        cache_dir=dataset_cache_dir
-                    )
-                    pbar.update(1)
-                
-                results['datasets'][dataset_name] = dataset_obj
-                results['stats']['total_samples'] += len(dataset_obj)
-                logging.info(f"Successfully loaded {dataset_name} with {len(dataset_obj)} samples")
-                
-        except Exception as e:
-            logging.error(f"Failed to load dataset {dataset_name}: {str(e)}")
-            traceback.print_exc()
-            results['stats']['failed_loads'] += 1
-            continue
+    files = []
+    for pattern in patterns:
+        # Use glob instead of rglob for pattern matching
+        if '**' in pattern:
+            files.extend(path.glob(pattern))
+        else:
+            files.extend(path.glob(pattern))
     
-    return results
+    if not files:
+        logging.warning(f"No files found in {path} matching patterns: {patterns}")
+        return []
+    
+    processed_texts = []
+    with tqdm(total=len(files), desc="Processing local files") as pbar:
+        for file in files:
+            if text := process_local_file(file):
+                processed_texts.append(text)
+            pbar.update(1)
+    
+    return processed_texts
+
+def load_dataset_from_config(config: dict) -> Optional[Any]:
+    """Load a dataset based on configuration."""
+    try:
+        dataset_name = config.get('dataset_name')
+        config_name = config.get('config_name')  # Added this line
+        split = config.get('split', 'train')
+        cache_dir = config.get('cache_dir', '.cache')
+        
+        logging.info(f"Loading dataset: {dataset_name}" + 
+                    (f" with config: {config_name}" if config_name else ""))
+        
+        # Create cache directory if it doesn't exist
+        Path(cache_dir).mkdir(parents=True, exist_ok=True)
+        
+        with tqdm(total=1, desc=f"Loading {dataset_name}", unit="dataset") as pbar:
+            try:
+                # Create download config with retry settings
+                download_config = DownloadConfig(
+                    num_proc=4,
+                    max_retries=3
+                )
+                
+                # Load dataset with proper error handling
+                dataset = load_dataset(
+                    path=dataset_name,
+                    name=config_name,  # Added this line
+                    split=split,
+                    cache_dir=cache_dir,
+                    download_config=download_config
+                )
+                
+                pbar.update(1)
+                
+                # Convert to list with progress bar
+                texts = []
+                total = len(dataset) if hasattr(dataset, '__len__') else None
+                
+                with tqdm(total=total, desc=f"Processing {dataset_name}", unit=" samples") as process_bar:
+                    start_time = time.time()
+                    for item in dataset:
+                        if isinstance(item, dict):
+                            text = item.get('text', '')
+                        else:
+                            text = str(item)
+                        if text:
+                            texts.append({"text": text})
+                        process_bar.update(1)
+                        
+                        # Show processing rate using elapsed time from time.time()
+                        if process_bar.n % 100 == 0:
+                            elapsed = time.time() - start_time
+                            rate = process_bar.n / max(elapsed, 0.1)
+                            process_bar.set_postfix({'rate': f'{rate:.1f} samples/s'})
+                
+                return texts
+                
+            except Exception as e:
+                logging.error(f"Error loading dataset {dataset_name}: {str(e)}")
+                return None
+                
+    except Exception as e:
+        logging.error(f"Error in load_dataset_from_config: {str(e)}")
+        return None
 
 def process_streaming_dataset(dataset: Any, output_path: Path, chunk_size: int, dataset_name: str) -> Optional[str]:
-    """Process streaming dataset with optimized batching and async I/O."""
+    """Process streaming dataset with immediate processing."""
     try:
-        # Ensure parent directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Use buffered writing with larger buffer size
         buffer_size = 1024 * 1024 * 8  # 8MB buffer
-        batch_size = 10000  # Increased batch size
         
-        async def write_batch(file, texts: List[str]):
-            content = '\n'.join(texts) + '\n'
-            await file.write(content.encode('utf-8'))
-            await file.flush()
-
-        async def process_dataset():
-            async with aiofiles.open(output_path, 'wb', buffering=buffer_size) as f:
-                batch = []
-                total_processed = 0
-                start_time = time.time()
-                
-                # Create progress bar with larger update interval
-                with tqdm(desc=f"Processing {dataset_name}", 
-                         unit=" samples",
-                         mininterval=0.5) as pbar:
-                    
-                    # Process in parallel using thread pool
-                    with ThreadPoolExecutor(max_workers=16) as executor:
-                        futures = []
-                        
-                        for item in dataset:
-                            if isinstance(item, dict):
-                                text = item.get('text', '').strip()
-                                if text:
-                                    batch.append(text)
-                                    
-                                    if len(batch) >= batch_size:
-                                        # Process batch in parallel
-                                        batch_copy = batch
-                                        batch = []
-                                        futures.append(
-                                            executor.submit(
-                                                write_batch, f, batch_copy
-                                            )
-                                        )
-                                        
-                                        # Update progress
-                                        total_processed += len(batch_copy)
-                                        pbar.update(len(batch_copy))
-                                        
-                                        # Log processing rate
-                                        elapsed = time.time() - start_time
-                                        rate = total_processed / elapsed
-                                        pbar.set_postfix({'rate': f'{rate:.1f} samples/s'})
-                                        
-                                        # Process completed futures
-                                        done_futures = [f for f in futures if f.done()]
-                                        for future in done_futures:
-                                            await future.result()
-                                            futures.remove(future)
-                        
-                        # Process remaining items
-                        if batch:
-                            await write_batch(f, batch)
-                            total_processed += len(batch)
-                            pbar.update(len(batch))
-                        
-                        # Wait for remaining futures
-                        for future in futures:
-                            await future.result()
-                
-                elapsed = time.time() - start_time
-                logging.info(
-                    f"Processed {total_processed} samples in {elapsed:.1f}s "
-                    f"({total_processed/elapsed:.1f} samples/s)"
-                )
+        total = len(dataset) if hasattr(dataset, '__len__') else None
         
-        # Run async processing
-        asyncio.run(process_dataset())
+        with open(output_path, 'w', encoding='utf-8', buffering=buffer_size) as f:
+            with tqdm(total=total, desc=f"Processing {dataset_name}", unit=" samples") as pbar:
+                for item in dataset:
+                    if isinstance(item, dict):
+                        text = item.get('text', '')
+                    else:
+                        text = str(item)
+                        
+                    if text:
+                        f.write(text + '\n')
+                        pbar.update(1)
+                        
+                        # Update rate every 100 samples
+                        if pbar.n % 100 == 0:
+                            pbar.set_postfix({'rate': f'{pbar.n/pbar.elapsed:.1f} samples/s'})
+        
         return str(output_path)
             
     except Exception as e:
-        logging.error(f"Error processing streaming dataset {dataset_name}: {str(e)}")
-        traceback.print_exc()
+        logging.error(f"Error processing dataset {dataset_name}: {str(e)}")
+        return None
+
+def process_local_file(file_path: Path) -> Optional[str]:
+    """Process a single local file with proper error handling."""
+    try:
+        if file_path.suffix.lower() == '.csv':
+            df = pd.read_csv(file_path)
+            text_column = next((col for col in df.columns if col.lower() == 'text'), None)
+            if text_column:
+                return '\n'.join(df[text_column].dropna().astype(str))
+            return None
+            
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            return content if content.strip() else None
+            
+    except Exception as e:
+        logging.warning(f"Error processing {file_path}: {str(e)}")
         return None
 
 class WorkerManager:
@@ -1826,56 +1953,61 @@ class WorkerManager:
             self.adjust_workers()
 
 def main():
-    """Enhanced main function with better configuration and error handling."""
+    """Main function for tokenizer training"""
     try:
-        # Parse arguments
+        # Set up argument parser
         parser = argparse.ArgumentParser(
             description='Medical text tokenizer',
-            conflict_handler='resolve'
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter
         )
         
-        # Training arguments group
-        training_args = parser.add_argument_group('Training Arguments')
-        training_args.add_argument(
+        # Add arguments
+        parser.add_argument(
             '--vocab-size',
             type=int,
             default=32000,
-            help='Vocabulary size for tokenizer'
+            help='Vocabulary size for the tokenizer'
         )
-        training_args.add_argument(
+        parser.add_argument(
             '--min-frequency',
             type=int,
             default=2,
             help='Minimum frequency for a token to be included'
         )
-        training_args.add_argument(
+        parser.add_argument(
             '--dataset-config',
             type=str,
             default='dataset_config.yaml',
             help='Path to dataset configuration file'
         )
-        training_args.add_argument(
+        parser.add_argument(
             '--cache-dir',
             type=str,
             default='.cache',
-            help='Cache directory for datasets'
+            help='Directory for caching datasets'
         )
         
+        # Parse arguments
         args = parser.parse_args()
         
-        # Load dataset configuration
+        # Set up logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler('tokenizer.log'),
+                logging.StreamHandler(sys.stdout)
+            ]
+        )
+        
+        # Load and validate dataset configuration
         with open(args.dataset_config, 'r') as f:
             dataset_config = yaml.safe_load(f)
             
         if not validate_dataset_config(dataset_config):
             raise ValueError("Invalid dataset configuration")
             
-        # Check hardware and set device
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print("Checking hardware configuration...")
-        print(f"I'm using {device} to do my job\n")
-        
-        # Load datasets with progress tracking
+        # Start tokenizer training process
         print("Starting tokenizer training...")
         datasets = load_datasets(dataset_config, args.cache_dir)
         
@@ -1885,47 +2017,46 @@ def main():
             min_frequency=args.min_frequency
         )
         
-        # Process datasets and train tokenizer
+        # Process datasets
         for dataset_name, dataset in datasets['datasets'].items():
-            if isinstance(dataset, str):  # Local dataset path
-                trainer.add_files(Path(dataset))
-            else:  # Hugging Face dataset
-                trainer.add_texts(dataset['text'])
+            logging.info(f"Processing dataset: {dataset_name}")
+            
+            # Handle different dataset types
+            if dataset_name == 'local':
+                # For local datasets, process each text directly
+                for text in dataset:
+                    if isinstance(text, str) and text.strip():
+                        trainer.add_texts(text)
+            else:
+                # For HuggingFace datasets, extract text from items
+                if isinstance(dataset, list):
+                    for item in dataset:
+                        if isinstance(item, dict):
+                            text = item.get('text', '')
+                            if text and isinstance(text, str):
+                                trainer.add_texts(text)
+                        elif isinstance(item, str):
+                            trainer.add_texts(item)
         
-        # Train tokenizer with progress bar
+        # Train tokenizer
         tokenizer = trainer.train()
         
-        # Save tokenizer
+        # Save trained tokenizer
         output_dir = Path('tokenizer')
         output_dir.mkdir(exist_ok=True)
-        tokenizer.save_pretrained(output_dir)
+        output_path = output_dir / "tokenizer.json"
+        tokenizer.save(str(output_path))
         
-        logging.info("Tokenizer training completed successfully")
-        print("Tokenizer training completed successfully")
+        logging.info(f"Tokenizer saved to {output_path}")
+        print(f"Tokenizer training completed successfully. Saved to {output_path}")
         
     except Exception as e:
         logging.error(f"Error during tokenizer training: {str(e)}")
         traceback.print_exc()
+        print(f"Error: Tokenizer training failed. Check tokenizer.log for details.")
         sys.exit(1)
 
 if __name__ == '__main__':
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler('tokenizer_training.log')
-        ]
-    )
-    
-    # Suppress warnings
-    warnings.filterwarnings('ignore')
-    
-    # Run main function
-    main()
-
-if __name__ == "__main__":
     main()
 
 class RetryHandler:
@@ -2121,84 +2252,3 @@ class BatchProcessor:
                 future.result()
             except Exception as e:
                 logging.error(f"Error in pending batch: {str(e)}")
-
-# Modify DatasetProcessor to use optimized batch processing
-class DatasetProcessor:
-    def __init__(self, datasets: List[Dict[str, Any]], config: Config):
-        # ... existing init code ...
-        self.batch_processor = BatchProcessor()
-    
-    def _process_streaming_dataset(self, dataset: Any, output_path: Path) -> Optional[str]:
-        """Process streaming dataset with optimized batch handling"""
-        try:
-            with open(output_path, 'wb', buffering=1024*1024*8) as f:  # 8MB buffer
-                batch = []
-                total_processed = 0
-                start_time = time.time()
-                
-                with tqdm(desc="Processing", unit=" samples", mininterval=0.5) as pbar:
-                    for item in dataset:
-                        text = item.get('text', '').strip()
-                        if text:
-                            batch.append(text)
-                            
-                            if len(batch) >= self.batch_processor.batch_size:
-                                self.batch_processor.process_batch(batch)
-                                total_processed += len(batch)
-                                pbar.update(len(batch))
-                                batch = []
-                                
-                                # Log processing rate
-                                elapsed = time.time() - start_time
-                                rate = total_processed / elapsed
-                                pbar.set_postfix({'rate': f'{rate:.1f} samples/s'})
-                    
-                    # Process remaining items
-                    if batch:
-                        self.batch_processor.process_batch(batch)
-                        total_processed += len(batch)
-                        pbar.update(len(batch))
-                    
-                    # Wait for all processing to complete
-                    self.batch_processor.wait_completion()
-                
-                elapsed = time.time() - start_time
-                logging.info(
-                    f"Processed {total_processed} samples in {elapsed:.1f}s "
-                    f"({total_processed/elapsed:.1f} samples/s)"
-                )
-                
-            return str(output_path)
-            
-        except Exception as e:
-            logging.error(f"Error processing streaming dataset: {str(e)}")
-            return None
-
-class TokenizerTrainer:
-    def __init__(self, vocab_size: int = 32000, min_frequency: int = 2):
-        self.tokenizer = Tokenizer(BPE())
-        self.trainer = BpeTrainer(
-            vocab_size=vocab_size,
-            min_frequency=min_frequency,
-            special_tokens=["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"]
-        )
-        self.texts = []
-
-    def add_files(self, path: Path):
-        self.tokenizer.pre_tokenizer = Whitespace()
-        self.tokenizer.train_from_files(
-            files=[str(f) for f in Path(path).glob("*.txt")],
-            trainer=self.trainer
-        )
-        return self.tokenizer
-
-    def add_texts(self, texts: List[str]):
-        self.texts.extend(texts)
-
-    def train(self):
-        if self.texts:
-            self.tokenizer.train_from_iterator(
-                self.texts,
-                trainer=self.trainer
-            )
-        return self.tokenizer

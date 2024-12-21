@@ -3,18 +3,30 @@ datasets:
   type: local
   config:
     path: "C:/Users/ASUS/Desktop/LuminaLM/Data"
-    pattern: "*.txt"
+    patterns: 
+      - "*.txt"
+      - "*.csv"
+    csv_text_column: "text"
+
+- name: shakespeare
+  type: huggingface
+  config:
+    dataset_name: "Trelis/tiny-shakespeare"
+    split: "train"
+    cache_dir: "cache/shakespeare"
+
+- name: medical_textbook
+  type: huggingface
+  config:
+    dataset_name: "zxvix/MedicalTextbook"
+    config_name: "Anatomy_Gray"
+    split: "train"
+    cache_dir: "cache/medical"
 
 - name: openwebtext
   type: huggingface
   config:
-    dataset_name: "tiny_shakespeare"
+    dataset_name: "stas/openwebtext-10k"
     split: "train"
-    cache_dir: ".cache/openwebtext"
+    cache_dir: "cache/openwebtext"
 
-- name: medical_qa
-  type: huggingface
-  config:
-    dataset_name: "medqa"
-    split: "train"
-    cache_dir: ".cache/medical"
