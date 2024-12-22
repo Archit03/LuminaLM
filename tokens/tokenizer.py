@@ -1605,7 +1605,20 @@ class DatasetConfigManager:
             'pt': 'patient',
             'dx': 'diagnosis',
             'tx': 'treatment',
-            'hx': 'history'
+            'hx': 'history',
+            'ecg': 'electrocardiogram',
+            'eeg': 'electroencephalogram',
+            'ct': 'computed tomography',
+            'mri': 'magnetic resonance imaging',
+            'ultrasound': 'ultrasound imaging',
+            'xray': 'x-ray imaging',
+            'ecg': 'electrocardiogram',
+            'eeg': 'electroencephalogram',
+            'ct': 'computed tomography',
+            'mri': 'magnetic resonance imaging',
+            'ultrasound': 'ultrasound imaging',
+            'xray': 'x-ray imaging',
+            
         }
         
         for abbr, full in medical_abbreviations.items():

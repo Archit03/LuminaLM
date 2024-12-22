@@ -2,14 +2,15 @@ torch>=2.0.0            # Updated to latest stable version for improved performa
 torchvision>=0.15.0     # Compatible with the latest PyTorch versions
 torchaudio>=0.10.0      # Ensure compatibility with torch >= 2.0.0
 tokenizers>=0.13.0      # Updated for compatibility with new features and bug fixes
-datasets>=2.10.1        # Latest stable version for enhanced dataset features
+datasets==2.18.0        # Latest stable version for enhanced dataset features
 numpy>=1.23.0           # Improved performance and bug fixes
 scikit-learn>=1.1.0     # Latest stable version for ML utilities
 matplotlib>=3.6.0       # Newer features and fixes in visualization
 tqdm>=4.64.0            # Newer progress bar features and fixes
 pyyaml>=6.0             # Updated for YAML parsing and security fixes
 pinecone-client>=2.2.2  # Latest stable Pinecone client for embedding storage
-fsspec>=2024.10.0       # Latest version for file system handling
+fsspec==2024.10.0       # Fixed version to align with gcsfs dependency
+gcsfs==2024.10.0        # Explicitly specify gcsfs to match the fsspec version
 spacy>=3.5.0            # Updated NLP library with enhanced features
 Unidecode>=1.3.6        # For robust Unicode to ASCII conversions
 python-dotenv>=1.0.0    # Manage environment variables easily
