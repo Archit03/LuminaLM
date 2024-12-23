@@ -30,3 +30,10 @@ datasets:
     split: "train"
     cache_dir: "cache/openwebtext"
 
+- name: medical_prescriptions
+  type: huggingface
+  config:
+    dataset_name: "Technoculture/medical-prescriptions"
+    split: "train"
+    cache_dir: "cache/medical_prescriptions"
+

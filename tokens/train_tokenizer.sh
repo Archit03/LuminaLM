@@ -26,7 +26,7 @@ fi
 
 # Check CUDA availability and echo status
 echo "Checking hardware configuration..."
-$PYTHON_PATH -c "import torch; print('I\\'m using ' + ('CUDA' if torch.cuda.is_available() else 'CPU') + ' to do my job')"
+$PYTHON_PATH -c "import torch; print('I\\'m using ' + ('CUDA' if torch.cuda.is_available() else 'CPU') + ' to do my job.')"
 echo
 
 # Run the tokenizer with enhanced configuration

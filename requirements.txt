@@ -9,8 +9,8 @@ matplotlib>=3.6.0       # Newer features and fixes in visualization
 tqdm>=4.64.0            # Newer progress bar features and fixes
 pyyaml>=6.0             # Updated for YAML parsing and security fixes
 pinecone-client>=2.2.2  # Latest stable Pinecone client for embedding storage
-fsspec==2024.10.0       # Fixed version to align with gcsfs dependency
-gcsfs==2024.10.0        # Explicitly specify gcsfs to match the fsspec version
+fsspec<=2024.2.0        # Downgrade to align with datasets requirements
+gcsfs==2024.2.0         # Align with the compatible fsspec version
 spacy>=3.5.0            # Updated NLP library with enhanced features
 Unidecode>=1.3.6        # For robust Unicode to ASCII conversions
 python-dotenv>=1.0.0    # Manage environment variables easily
@@ -22,3 +22,4 @@ tensorboard
 aiofiles
 chardet
 pynvml
+pytorch-lightning
